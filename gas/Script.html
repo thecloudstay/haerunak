@@ -36,12 +36,49 @@ function dist(a, b, c, d){
 /* ══════════════ 지도 ══════════════ */
 var map = L.map('map', {
   center: [36.35, 127.3], zoom: 7, zoomControl: false,
-  attributionControl: true, minZoom: 6, maxZoom: 18
+  attributionControl: true, minZoom: 6, maxZoom: 19
 });
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '지도 &copy; OpenStreetMap · CARTO | 물때 바다타임 · 기상 Open-Meteo',
-  subdomains: 'abcd', maxZoom: 19
-}).addTo(map);
+/* ── 베이스맵 3종: 지도 / 위성 / 밝게 ── */
+var BASES = {
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {attribution:'지도 &copy; OpenStreetMap · CARTO | 물때 바다타임 · 기상 Open-Meteo', subdomains:'abcd', maxZoom:19, className:'basetiles'}),
+  sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {attribution:'위성 Esri · Maxar | 물때 바다타임 · 기상 Open-Meteo', maxZoom:19, className:'basetiles'}),
+  lite: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    {attribution:'지도 &copy; OpenStreetMap · CARTO | 물때 바다타임 · 기상 Open-Meteo', subdomains:'abcd', maxZoom:19, className:'basetiles'})
+};
+var SATLBL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  {maxZoom:19, opacity:.92, className:'basetiles'});
+var curBase = 'dark';
+BASES.dark.addTo(map);
+function setBase_(k){
+  if (!BASES[k] || k === curBase) return;
+  if (map.hasLayer(BASES[curBase])) map.removeLayer(BASES[curBase]);
+  if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
+  BASES[k].addTo(map);
+  if (k === 'sat') SATLBL.addTo(map);
+  curBase = k;
+  document.body.className = document.body.className.replace(/\s*map-sat\b/,'') + (k === 'sat' ? ' map-sat' : '');
+  var bs = document.querySelectorAll('.basebtn');
+  for (var i=0;i<bs.length;i++) bs[i].className = 'basebtn' + (bs[i].getAttribute('data-b') === k ? ' on' : '');
+  try { localStorage.setItem('hrn_base', k); } catch(e){}
+}
+var baseCtl = L.control({position:'bottomleft'});
+baseCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw');
+  d.innerHTML = '<button class="basebtn on" data-b="dark" type="button">지도</button>'
+              + '<button class="basebtn" data-b="sat" type="button">위성</button>'
+              + '<button class="basebtn" data-b="lite" type="button">밝게</button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(e){
+    var t = e.target;
+    while (t && t !== d && !(t.className && String(t.className).indexOf('basebtn') >= 0)) t = t.parentNode;
+    if (t && t !== d) setBase_(t.getAttribute('data-b'));
+  });
+  return d;
+};
+baseCtl.addTo(map);
+try { var sv = localStorage.getItem('hrn_base'); if (sv && sv !== 'dark') setBase_(sv); } catch(e){}
 
 function pinIcon(r, isTop, small){
   return L.divIcon({
