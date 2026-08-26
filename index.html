@@ -1217,6 +1217,30 @@ body.map-sat .leaflet-container{background:#0b1a22}
 }
 .skytag.warn{background:rgba(251,191,36,.14);color:#fcd34d;border-color:rgba(251,191,36,.32)}
 .skytag.danger{background:rgba(248,113,113,.16);color:#fca5a5;border-color:rgba(248,113,113,.38)}
+/* 섬 들어가는 길 */
+.fplan{
+  margin-top:9px;padding:11px 13px;border-radius:13px;font-size:12.5px;line-height:1.6;
+  background:rgba(46,230,168,.09);border:1px solid rgba(46,230,168,.22);color:#c9ecdd;
+}
+.fplan b{display:inline-block;margin-right:6px;color:#7fe8c4;font-weight:800}
+.fplan.warn{background:rgba(251,191,36,.09);border-color:rgba(251,191,36,.26);color:#e8ddc0}
+.fplan.warn b{color:#fcd34d}
+.frisk{
+  margin-top:7px;padding:9px 12px;border-radius:11px;font-size:12px;font-weight:700;
+  background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fcd34d;
+}
+.frisk.r3{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.36);color:#fca5a5}
+.flinks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.flink{
+  display:inline-block;padding:8px 12px;border-radius:11px;text-decoration:none;
+  font-size:11.5px;font-weight:700;color:#cfe3ef;
+  background:rgba(255,255,255,.055);border:1px solid var(--line);transition:.18s var(--sp);
+}
+.flink:active{transform:scale(.95)}
+.flink.hot{background:rgba(53,208,255,.13);border-color:rgba(53,208,255,.3);color:#8fdcff}
+.flink.tel{background:rgba(46,230,168,.12);border-color:rgba(46,230,168,.28);color:#7fe8c4}
+.ftips{margin:10px 0 0;padding-left:17px;color:var(--mut);font-size:11.5px;line-height:1.75}
+.ftips li{margin-bottom:2px}
 </style><style>
 .spot{padding:12px;border-radius:var(--r2);background:rgba(255,255,255,.045);
   border:1px solid var(--line);margin-bottom:8px}
@@ -2673,6 +2697,70 @@ function rainBite_(rainH, cloudPct){
   return Math.max(-1, Math.min(1, b));
 }
 
+/* ══════════ 14. 섬 들어가는 길 ══════════ */
+/**
+ * 해루질의 핵심 시간은 간조 전후다. 그런데 섬은 배가 끊긴다.
+ * 이 둘이 어긋나는지를 미리 알려주는 것이 이 함수의 목적이다.
+ *
+ * 연안여객선 운항대는 항로마다 다르므로 보수적인 공통값만 쓴다.
+ * 실제 시간표는 예약처에서 확인하라고 안내한다 — 추정한 시각을 단정해서 보여주면
+ * 그 시각에 맞춰 나갔다가 배를 놓친다.
+ *
+ * @param lowT  간조 시각 (시, 소수)
+ * @param wave  파고(m)
+ * @param wind  풍속(m/s)
+ * @param carOk 차량 선적 가능 여부
+ * @return {mode, word, risk, riskWord, needStay}
+ */
+var FERRY_FIRST = 7.5;      // 첫 배 통상 하한
+var FERRY_LAST  = 17.5;     // 막배 통상 상한 (겨울은 더 이르다)
+
+function ferryPlan_(lowT, wave, wind, carOk){
+  var r = { mode:'', word:'', risk:0, riskWord:'', needStay:false };
+
+  /* 1) 물때와 배 시간이 맞는가 */
+  if (lowT === null || lowT === undefined){
+    r.mode = 'unknown';
+    r.word = '간조 시각을 먼저 확인하세요.';
+  } else {
+    var lt   = ((lowT % 24) + 24) % 24;
+    var from = lt - 1.5, to = lt + 1.5;          // 작업 창
+    var inOk  = from >= FERRY_FIRST + 1.0;        // 들어가서 자리 잡을 여유
+    var outOk = to   <= FERRY_LAST  - 1.0;        // 나올 배를 탈 여유
+    if (inOk && outOk){
+      r.mode = 'day';
+      r.word = '당일치기가 됩니다. 간조 ' + fmtH_(lt) + ' 전후로 작업하고 오후 배로 나오면 됩니다.';
+    } else if (lt >= 19 || lt <= 5){
+      r.mode = 'stay';
+      r.needStay = true;
+      r.word = '간조가 ' + fmtH_(lt) + '입니다. 해루질엔 좋은 시각이지만 그 시간엔 배가 없습니다 — 1박을 잡거나 다른 날을 고르세요.';
+    } else {
+      r.mode = 'tight';
+      r.needStay = true;
+      r.word = '간조 ' + fmtH_(lt) + '이라 당일 배로는 빠듯합니다. 첫 배·막배 시각을 확인하고 안 되면 1박 하세요.';
+    }
+  }
+
+  /* 2) 뜰 수 있는 날인가 — 결항은 파고가 좌우한다 */
+  if (wave !== null && wave !== undefined){
+    if (wave >= 2.5)      { r.risk = 3; r.riskWord = '결항 가능성이 큽니다'; }
+    else if (wave >= 1.5) { r.risk = 2; r.riskWord = '결항될 수 있습니다'; }
+    else if (wave >= 1.0) { r.risk = 1; r.riskWord = '운항 여부를 꼭 확인하세요'; }
+  }
+  if (wind !== null && wind !== undefined && wind >= 14 && r.risk < 3){
+    r.risk = 3; r.riskWord = '강풍 — 결항 가능성이 큽니다';
+  }
+
+  /* 3) 나가는 배가 끊기면 갇힌다 */
+  if (r.risk >= 2 && !r.needStay){
+    r.word += ' 들어갔다가 못 나올 수 있으니 돌아오는 배편까지 확인하세요.';
+  }
+  if (carOk === 0 || carOk === false){
+    r.word += ' 차는 두고 들어가야 합니다.';
+  }
+  return r;
+}
+
 
 /* ══ Ban.gs ══ */
 /**
@@ -2904,6 +2992,32 @@ function banMetaNow_(){ return effBans_().meta; }
 function spotsExtra_(id){
   var j = remoteJson_('spots-extra');
   return (j && (j[String(id)] || j[id])) || [];
+}
+
+/** 섬 들어가는 길 — data/ferry.json {book,status,tel,portInfo,tips}
+ *  예약처가 바뀌거나 전화번호가 생기면 이 파일만 고치면 된다. */
+var FERRY_FALLBACK = {
+  book: [{ n:'가보고 싶은 섬 (해양수산부 공식)', u:'https://island.haewoon.co.kr/', note:'연안여객선 통합 예약·예매' },
+         { n:'한국해운조합 여객선예매',        u:'https://island.theksa.co.kr/',  note:'회원 9매·비회원 3매까지' }],
+  status:[{ n:'실시간 운항현황', u:'https://www.komsa.or.kr/prog/dailyCurState/kor/sub03_0201/list.do', note:'해양교통안전공단 — 지금 뜨는지' },
+          { n:'내일의 운항 예보', u:'https://www.komsa.or.kr/prog/tmmrwSailing/kor/sub03_0207/list.do', note:'전날 미리 확인' }],
+  tel:  [{ n:'여객선 예매 고객센터', v:'1599-5985', note:'한국해운조합 · 옹진 항로는 2번' }],
+  portInfo: {},
+  tips: ['연안여객선은 신분증이 있어야 탑니다. 안 가져가면 못 탑니다.',
+         '출항 30분 전까지는 매표소에 도착하세요.',
+         '결항은 당일 아침에 결정되는 일이 많습니다. 출발 전 한 번 더 확인하세요.',
+         '차를 싣는 배는 예약이 빨리 찹니다. 성수기·주말은 미리 잡으세요.']
+};
+function ferryInfo_(){
+  var j = remoteJson_('ferry');
+  if (!j) return FERRY_FALLBACK;
+  return {
+    book:     j.book     || FERRY_FALLBACK.book,
+    status:   j.status   || FERRY_FALLBACK.status,
+    tel:      j.tel      || FERRY_FALLBACK.tel,
+    portInfo: j.portInfo || {},
+    tips:     j.tips     || FERRY_FALLBACK.tips
+  };
 }
 
 
@@ -3451,6 +3565,7 @@ function analyze_(p, ds, tide, wxRec, want){
       range: Math.round(range*100)/100, src: tide.src,
       sunrise: sun.rise, sunset: sun.set, dawn: tw.rise, dusk: tw.set,
       events: ev, floor: FLOOR_KO[p.f] || '',
+      ferry: p.isl ? ferryPlan_(lowT, hWx.wave, hWx.wind, p.fr ? p.fr[2] : 1) : null,
       vis: Math.round(vis.vis*100)/100, visWord: vis.word, ssc: Math.round(vis.ssc),
       flatWidth: Math.round(width),
       curPeak: Math.round(flow.peak*100)/100,
@@ -4080,6 +4195,7 @@ function doGet(e){
     species: { haeru: allSpecies_('haeru'), fish: allSpecies_('fish') },
     ban: (typeof banMetaNow_==='function' ? banMetaNow_() : BAN_META),
     nonpro: NONPRO,
+    ferry: (typeof ferryInfo_==='function' ? ferryInfo_() : null),
     ref: ref
   });
   return t.evaluate()
@@ -4443,7 +4559,7 @@ function updateNote(real){
   n.style.borderColor = real ? 'rgba(46,230,168,.3)' : 'rgba(251,191,36,.32)';
   n.style.color = real ? '#7fe8c4' : '#fcd34d';
 }
-window.BOOT = {today:todayStr_(),count:POINTS.length,indexCount:allIndex_().length,species:{haeru:allSpecies_('haeru'),fish:allSpecies_('fish')},ban:BAN_META,nonpro:NONPRO};
+window.BOOT = {today:todayStr_(),count:POINTS.length,indexCount:allIndex_().length,species:{haeru:allSpecies_('haeru'),fish:allSpecies_('fish')},ban:BAN_META,nonpro:NONPRO,ferry:(typeof ferryInfo_==='function'?ferryInfo_():null)};
 </script>
 <script>
 (function(){
@@ -4927,19 +5043,61 @@ function renderDetail(d){
   cs.appendChild(el('div','gauge-l', meta.luxWord + ' · 달 남중 ' + (solT.transit != null ? hmH(solT.transit) : '-') + ' 전후가 활성기입니다'));
   b.appendChild(cs);
 
-  /* 배편 */
+  /* 배편 — 물때와 배 시간이 맞는지가 핵심이다 */
   if (d.point.isl){
     var fs3 = el('div','sec');
     fs3.appendChild(el('div','sec-t','들어가는 길'));
-    var fr = d.point.fr;
+    var fr = d.point.fr, fp = meta.ferry || {};
     var fbox = el('div','ferry');
-    fbox.innerHTML = '<div class="ferry-i">⛴</div><div class="ferry-t">'
-      + (fr ? '<b>' + fr[0] + '</b>에서 배로 <b>약 ' + fr[1] + '분</b>'
-              + (fr[2] ? ' · 차량 선적 가능' : ' · 차는 두고 가야 합니다')
-              + '<br>물때보다 배 시간이 먼저입니다. 출항 여부는 당일 기상에 달렸습니다.'
-            : '섬입니다. 배편과 출항 여부를 먼저 확인하세요.')
-      + '</div>';
+    var head = fr
+      ? '<b>' + fr[0] + '</b>에서 배로 <b>약 ' + fr[1] + '분</b>'
+        + (fr[2] ? ' · 차량 선적 가능' : ' · 차는 두고 가야 합니다')
+      : '섬입니다. 배편과 출항 여부를 먼저 확인하세요.';
+    fbox.innerHTML = '<div class="ferry-i">⛴</div><div class="ferry-t">' + head + '</div>';
     fs3.appendChild(fbox);
+
+    // 물때 대 배 시간
+    if (fp.word){
+      var pl = el('div','fplan' + (fp.mode === 'day' ? ' ok' : ' warn'));
+      pl.innerHTML = '<b>' + (fp.mode === 'day' ? '당일치기'
+                            : fp.mode === 'stay' ? '1박 필요'
+                            : fp.mode === 'tight' ? '빠듯함' : '확인 필요') + '</b> ' + fp.word;
+      fs3.appendChild(pl);
+    }
+    // 결항 위험
+    if (fp.riskWord){
+      var rk = el('div','frisk r' + fp.risk, '⚠ ' + fp.riskWord);
+      fs3.appendChild(rk);
+    }
+
+    // 예약처·운항정보 — 실제로 눌러서 확인할 수 있게
+    var FI = (window.BOOT && BOOT.ferry) || {};
+    var links = el('div','flinks');
+    (FI.status || []).forEach(function(x){
+      var a = el('a','flink hot', x.n); a.href = x.u; a.target = '_blank'; a.rel = 'noopener';
+      a.title = x.note || ''; links.appendChild(a);
+    });
+    (FI.book || []).forEach(function(x){
+      var a = el('a','flink', x.n); a.href = x.u; a.target = '_blank'; a.rel = 'noopener';
+      a.title = x.note || ''; links.appendChild(a);
+    });
+    var pinfo = (FI.portInfo || {})[fr ? fr[0] : ''];
+    if (pinfo){
+      var a2 = el('a','flink', fr[0] + ' 안내'); a2.href = pinfo; a2.target='_blank'; a2.rel='noopener';
+      links.appendChild(a2);
+    }
+    (FI.tel || []).forEach(function(t){
+      var a3 = el('a','flink tel', '☎ ' + t.n + ' ' + t.v);
+      a3.href = 'tel:' + String(t.v).replace(/[^0-9]/g,'');
+      a3.title = t.note || ''; links.appendChild(a3);
+    });
+    if (links.childNodes.length) fs3.appendChild(links);
+
+    if ((FI.tips || []).length){
+      var tl = el('ul','ftips');
+      FI.tips.forEach(function(t){ tl.appendChild(el('li','', t)); });
+      fs3.appendChild(tl);
+    }
     b.appendChild(fs3);
   }
 
