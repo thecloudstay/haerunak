@@ -1241,6 +1241,38 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .flink.tel{background:rgba(46,230,168,.12);border-color:rgba(46,230,168,.28);color:#7fe8c4}
 .ftips{margin:10px 0 0;padding-left:17px;color:var(--mut);font-size:11.5px;line-height:1.75}
 .ftips li{margin-bottom:2px}
+/* 준비물 구매 링크 */
+.chip.buy{
+  text-decoration:none;background:rgba(46,230,168,.13);
+  border-color:rgba(46,230,168,.3);color:#7fe8c4;
+}
+.chip.buy em{font-style:normal;opacity:.7;font-size:10px;margin-left:3px}
+.chip.gear.off{opacity:.62}
+.shop-disc{margin-top:10px;font-size:10.5px;color:var(--mut2);line-height:1.6}
+
+/* 잡는 법 영상 */
+.vids{display:flex;flex-direction:column;gap:8px}
+.vid{
+  display:flex;gap:11px;align-items:center;text-decoration:none;
+  padding:9px;border-radius:14px;background:rgba(255,255,255,.045);
+  border:1px solid var(--line);transition:.18s var(--sp);
+}
+.vid:active{transform:scale(.985)}
+.vid.paid{background:rgba(251,191,36,.09);border-color:rgba(251,191,36,.26)}
+.vid-th{
+  width:74px;height:44px;border-radius:9px;object-fit:cover;flex:0 0 auto;
+  background:rgba(255,255,255,.06);
+}
+.vid-th.ph{display:grid;place-items:center;color:var(--mut2);font-size:15px}
+.vid-b{min-width:0;display:flex;flex-direction:column;gap:2px}
+.vid-b b{font-size:12.5px;font-weight:700;color:var(--txt)}
+.vid-b span{font-size:11px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vid-ch{color:var(--mut2)!important}
+.vid-ad{
+  font-style:normal;font-size:9.5px;font-weight:800;color:#fcd34d;
+  align-self:flex-start;margin-top:2px;
+}
+.vid.srch .vid-b b{color:var(--mut);font-weight:600}
 </style><style>
 .spot{padding:12px;border-radius:var(--r2);background:rgba(255,255,255,.045);
   border:1px solid var(--line);margin-bottom:8px}
@@ -4054,6 +4086,57 @@ function apiRefLookup(code){
            amount: d.amount || 0, rate: Math.round(rate * 100), first: d.first || '', last: d.last || '' };
 }
 
+/* ══════════ 준비물 제휴 링크 ══════════
+ * 도구 이름을 상품군으로 정규화한 뒤 data/gear.json 의 shop 에서 링크를 찾는다.
+ * 링크가 없으면 null 을 돌려주고 화면은 글자만 보여준다 — 빈 링크를 누르게 두지 않는다. */
+function shopFor_(names){
+  var j = remoteJson_('gear') || {};
+  var shop = j.shop || {};
+  var out = [], seen = {};
+  (names || []).forEach(function(n){
+    var k = (typeof gearKey_ === 'function') ? gearKey_(n) : n;
+    if (!k || seen[k]) return;
+    seen[k] = 1;
+    var s = shop[k];
+    out.push({ n: k, u: (s && s.u) ? s.u : '', why: (s && s.why) ? s.why : '' });
+  });
+  return out;
+}
+
+/** 제휴 링크가 하나라도 걸려 있으면 고지 문구를 돌려준다.
+ *  대가를 받는 사실을 알리는 것은 공정거래위원회 추천·보증 심사지침상 의무다. */
+function shopDisclosure_(items){
+  var has = (items || []).some(function(x){ return x && x.u; });
+  if (!has) return '';
+  var j = remoteJson_('gear') || {};
+  return j.disclosure || '이 링크로 구매하시면 해루낚이 수수료를 받습니다. 가격은 같습니다.';
+}
+
+/* ══════════ 대상물별 '잡는 법' 영상 ══════════
+ * 유튜버에게 노출 자리를 주는 것이 곧 대가다. 현금 없이 제휴가 성립한다.
+ * 등록된 영상이 없으면 유튜브 검색 링크를 만든다 — 이건 언제나 유효하다. */
+function videosFor_(names, mode){
+  var j = remoteJson_('videos') || {};
+  var all = j.items || [];
+  var out = [];
+  (names || []).slice(0, 4).forEach(function(n){
+    var hit = all.filter(function(v){ return v && v.target === n; });
+    // 대가를 받은 노출을 위로 올린다
+    hit.sort(function(a, b){ return (b.paid ? 1 : 0) - (a.paid ? 1 : 0); });
+    if (hit.length){
+      var v = hit[0];
+      out.push({ target:n, id:v.id || '', ch:v.ch || '', t:v.t || '', paid:!!v.paid,
+                 u: v.id ? ('https://www.youtube.com/watch?v=' + v.id) : (v.u || ''),
+                 thumb: v.id ? ('https://img.youtube.com/vi/' + v.id + '/mqdefault.jpg') : '' });
+    } else {
+      var q = n + ' ' + (mode === 'fish' ? '낚시' : '잡는법');
+      out.push({ target:n, id:'', ch:'', t:'', paid:false, search:true,
+                 u: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q), thumb:'' });
+    }
+  });
+  return out;
+}
+
 
 /* ══ Rig.gs ══ */
 /**
@@ -4168,6 +4251,39 @@ function rigsFor_(targets, mode){
 
 /** 해루질 공통 안전 장비 — 어떤 대상이든 항상 붙는다 */
 var SAFE_KIT = ['구명조끼(자동팽창형 권장)', '휴대폰 방수팩', '호루라기', '보조 랜턴(주 랜턴 방전 대비)', '물때표 캡처', '동행 1인 이상'];
+
+/* ══════════ 도구 이름 → 상품군 정규화 ══════════
+ * '장갑'·'두꺼운 장갑'·'목장갑'은 결국 같은 물건을 산다.
+ * 상품군으로 묶어야 제휴 링크 하나가 여러 대상물을 덮는다. */
+var GEAR_NORM = {
+  '망':'채집망', '망태기':'채집망', '채집망':'채집망',
+  '장갑':'작업 장갑', '두꺼운 장갑':'작업 장갑', '목장갑':'작업 장갑', '네오프렌 장갑':'네오프렌 장갑',
+  '장화':'갯벌 장화', '긴 장화':'갯벌 장화',
+  '랜턴':'방수 랜턴', '보조 랜턴':'방수 랜턴', '헤드랜턴':'헤드랜턴',
+  '뜰채':'뜰채', '긴 뜰채':'뜰채', '소형 통발형 뜰채':'뜰채',
+  '갈퀴':'갯벌 갈퀴', '갈퀴(그레)':'갯벌 갈퀴',
+  '호미':'갯벌 호미',
+  '집게':'집게',
+  '통':'채집통',
+  '맛소금':'맛소금', '소금':'맛소금',
+  '조새(굴칼)':'조새',
+  '칼':'작업칼', '일자 드라이버나 칼':'작업칼',
+  '구명조끼(자동팽창형 권장)':'구명조끼',
+  '휴대폰 방수팩':'방수팩',
+  '호루라기':'호루라기'
+};
+
+/** 도구 이름을 상품군으로 바꾼다. 매칭 없으면 원래 이름 그대로. */
+function gearKey_(name){
+  if (!name) return '';
+  var n = String(name).trim();
+  if (GEAR_NORM[n]) return GEAR_NORM[n];
+  // 부분 일치 — '두꺼운 방수 장갑' 같은 변형도 잡는다
+  for (var k in GEAR_NORM){
+    if (n.indexOf(k) >= 0) return GEAR_NORM[k];
+  }
+  return n;
+}
 
 
 /* ══ Code.gs ══ */
@@ -4316,6 +4432,22 @@ function apiPoint(id, ds, want, days){
     rigs: (typeof rigsFor_ === 'function')
       ? { haeru: rigsFor_(an.haeru.targets, 'haeru'), fish: rigsFor_(an.fish.targets, 'fish'),
           safe: SAFE_KIT }
+      : null,
+    // 준비물에 걸린 제휴 링크 — 도구 이름을 상품군으로 묶어 한 번에 내려준다
+    shop: (function(){
+      if (typeof shopFor_ !== 'function' || typeof rigsFor_ !== 'function') return null;
+      var names = [];
+      ['haeru','fish'].forEach(function(m){
+        (rigsFor_(m === 'haeru' ? an.haeru.targets : an.fish.targets, m) || [])
+          .forEach(function(r){ (r.t || []).forEach(function(t){ names.push(t); }); });
+      });
+      SAFE_KIT.forEach(function(t){ names.push(t); });
+      var items = shopFor_(names);
+      return { items: items, disclosure: shopDisclosure_(items) };
+    })(),
+    videos: (typeof videosFor_ === 'function')
+      ? { haeru: videosFor_((an.haeru.targets||[]).map(function(x){return x.n;}), 'haeru'),
+          fish:  videosFor_((an.fish.targets ||[]).map(function(x){return x.n;}), 'fish') }
       : null,
     week: apiWeek_(p, ds, want, Math.min(15, Math.max(7, Number(days) || 7)))
   };
@@ -4904,6 +5036,7 @@ function closeDetail(){
 $('detailScrim').onclick = closeDetail;
 
 function renderDetail(d){
+  window.__detail = d;            // shopChip 이 제휴 링크를 찾을 때 쓴다
   if (!d || d.error){ $('detailBody').innerHTML = '<p style="padding:30px 0;text-align:center;color:#8ba6b8">'+((d&&d.error)||'오류')+'</p>'; return; }
   var m = S.mode === 'fish' ? d.fish : d.haeru;
   var o = S.mode === 'fish' ? d.haeru : d.fish;
@@ -5187,7 +5320,7 @@ function renderDetail(d){
     (rlist || []).forEach(function(r){
       var card = el('div','rig');
       card.innerHTML = '<div class="rig-h"><b>' + r.n + '</b></div>'
-        + ((r.t && r.t.length) ? '<div class="rig-t">' + r.t.map(function(x){ return '<span class="chip">' + x + '</span>'; }).join('') + '</div>' : '')
+        + ((r.t && r.t.length) ? '<div class="rig-t">' + r.t.map(shopChip).join('') + '</div>' : '')
         + (r.b ? '<p class="rig-b">🪱 ' + r.b + '</p>' : '')
         + (r.tip ? '<p class="rig-tip">' + r.tip + '</p>' : '')
         + (r.warn ? '<p class="spot-w">⚠ ' + r.warn + '</p>' : '');
@@ -5198,10 +5331,36 @@ function renderDetail(d){
     if (S.mode === 'haeru' && d.rigs.safe){
       var sf = el('div','rig safe');
       sf.innerHTML = '<div class="rig-h"><b>🦺 안전 장비 — 대상과 무관하게 항상</b></div>'
-        + '<div class="rig-t">' + d.rigs.safe.map(function(x){ return '<span class="chip">' + x + '</span>'; }).join('') + '</div>';
+        + '<div class="rig-t">' + d.rigs.safe.map(shopChip).join('') + '</div>';
       rs2.appendChild(sf);
     }
+    if (d.shop && d.shop.disclosure)
+      rs2.appendChild(el('div','shop-disc', d.shop.disclosure));
     b.appendChild(rs2);
+  }
+
+  /* 잡는 법 영상 — 유튜버 노출 자리 */
+  var vlist = d.videos ? (S.mode === 'fish' ? d.videos.fish : d.videos.haeru) : null;
+  if (vlist && vlist.length){
+    var vs = el('div','sec');
+    vs.appendChild(el('div','sec-t','잡는 법 영상'));
+    var vw = el('div','vids');
+    vlist.forEach(function(v){
+      var a = el('a','vid' + (v.paid ? ' paid' : '') + (v.search ? ' srch' : ''));
+      a.href = v.u; a.target = '_blank'; a.rel = 'noopener' + (v.paid ? ' sponsored nofollow' : '');
+      var thumb = v.thumb
+        ? '<img class="vid-th" src="' + v.thumb + '" alt="" loading="lazy">'
+        : '<div class="vid-th ph">▶</div>';
+      a.innerHTML = thumb
+        + '<div class="vid-b"><b>' + v.target + (v.search ? ' 잡는 법 찾아보기' : '') + '</b>'
+        + (v.t ? '<span>' + v.t + '</span>' : '')
+        + (v.ch ? '<span class="vid-ch">' + v.ch + '</span>' : '')
+        + (v.paid ? '<em class="vid-ad">광고</em>' : '') + '</div>';
+      a.addEventListener('click', function(){ refEvent('video'); });
+      vw.appendChild(a);
+    });
+    vs.appendChild(vw);
+    b.appendChild(vs);
   }
 
   /* 오늘 조건에 맞는 준비물 (제휴 링크) */
@@ -5210,8 +5369,13 @@ function renderDetail(d){
     gs.appendChild(el('div','sec-t','조건 맞춤 장비 <span style="font-weight:600;color:var(--mut2)">(제휴 링크)</span>'));
     var gw = el('div','chips');
     d.gear.forEach(function(g){
-      var c = el('a','chip gear', g.n + (g.why ? ' · ' + g.why : ''));
-      c.href = g.url || '#'; c.target = '_blank'; c.rel = 'noopener sponsored';
+      var label = g.n + (g.why ? ' · ' + g.why : '');
+      if (!g.url){                       // 링크가 없으면 앵커로 만들지 않는다
+        gw.appendChild(el('span','chip gear off', label));
+        return;
+      }
+      var c = el('a','chip gear', label);
+      c.href = g.url; c.target = '_blank'; c.rel = 'noopener sponsored nofollow';
       c.addEventListener('click', function(){ bizClick(g.id, 'gear'); });
       gw.appendChild(c);
     });
@@ -5814,6 +5978,25 @@ function refCode(){
   } catch(e){}
   return null;
 }
+
+/* 준비물 칩 — 제휴 링크가 걸린 도구만 누를 수 있게 만든다 */
+function shopChip(name){
+  var esc = function(v){ return String(v).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var d = window.__detail;
+  var hit = null;
+  if (d && d.shop && d.shop.items){
+    for (var i = 0; i < d.shop.items.length; i++){
+      var it = d.shop.items[i];
+      if (!it.u) continue;
+      if (name === it.n || String(name).indexOf(it.n) >= 0 || String(it.n).indexOf(name) >= 0){ hit = it; break; }
+    }
+  }
+  if (!hit) return '<span class="chip">' + esc(name) + '</span>';
+  return '<a class="chip buy" href="' + esc(hit.u) + '" target="_blank" rel="noopener sponsored nofollow">'
+       + esc(name) + ' <em>사기</em></a>';
+}
+
 function refEvent(ev){
   var c = refCode();
   if (c && window.google && google.script) try { google.script.run.apiRefEvent(c, ev); } catch(e){}
