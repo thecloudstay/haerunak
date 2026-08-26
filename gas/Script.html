@@ -1,0 +1,1260 @@
+<script>
+(function(){
+'use strict';
+
+/* ══════════════ 상태 ══════════════ */
+var S = {
+  ds: BOOT.today, mode: 'haeru', rows: [], sort: 'score', filter: 'all', want: null,
+  fmode: 'haeru', sel: null, me: null, markers: {}, loading: false, cur: null
+};
+var $ = function(id){ return document.getElementById(id); };
+var el = function(t, c, h){ var e = document.createElement(t); if(c) e.className = c; if(h!=null) e.innerHTML = h; return e; };
+var WD = ['일','월','화','수','목','금','토'];
+var MODE_NAME = { haeru:'해루질', fish:'낚시' };
+
+function toast(msg, ms){
+  var t = $('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.hidden = true; }, ms||2400);
+}
+function hm(min){
+  if (min === null || min === undefined) return '--:--';
+  var m = ((min % 1440) + 1440) % 1440;
+  return ('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2);
+}
+function hmH(h){ return hm(Math.round(h*60)); }
+function dstr(d){
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+function parseDs(ds){ var a = ds.split('-'); return new Date(+a[0], +a[1]-1, +a[2]); }
+function dist(a, b, c, d){
+  var R = 6371, r = Math.PI/180;
+  var x = (c-a)*r, y = (d-b)*r;
+  var h = Math.sin(x/2)*Math.sin(x/2) + Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+
+/* ══════════════ 지도 ══════════════ */
+var map = L.map('map', {
+  center: [36.35, 127.3], zoom: 7, zoomControl: false,
+  attributionControl: true, minZoom: 6, maxZoom: 18
+});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '지도 &copy; OpenStreetMap · CARTO | 물때 바다타임 · 기상 Open-Meteo',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+function pinIcon(r, isTop, small){
+  return L.divIcon({
+    className: '',
+    html: '<div class="pin pin-'+r.grade+(small?' sm':'')+(isTop?' pin-top':'')+'" style="position:relative">'+r.score+'</div>',
+    iconSize: small ? [26,26] : [38,38],
+    iconAnchor: small ? [13,13] : [19,19]
+  });
+}
+function drawPins(){
+  Object.keys(S.markers).forEach(function(k){ map.removeLayer(S.markers[k]); });
+  S.markers = {};
+  var z = map.getZoom();
+  var placed = [];                       // 큰 핀이 이미 차지한 화면 좌표
+  var MIN = z >= 11 ? 0 : (z >= 9 ? 30 : 38);
+  S.rows.forEach(function(r, idx){
+    var pt = map.latLngToLayerPoint([r.la, r.lo]);
+    var small = false;
+    for (var k=0;k<placed.length;k++){
+      var dx = placed[k].x - pt.x, dy = placed[k].y - pt.y;
+      if (dx*dx + dy*dy < MIN*MIN){ small = true; break; }
+    }
+    if (!small) placed.push(pt);
+    var m = L.marker([r.la, r.lo], { icon: pinIcon(r, idx === 0, small), zIndexOffset: 1000 - idx });
+    m.on('click', function(){ openDetail(r.i); });
+    m.addTo(map);
+    S.markers[r.i] = m;
+  });
+}
+map.on('zoomend', function(){ if (S.rows.length) drawPins(); });
+
+/* ══════════════ 데이터 ══════════════ */
+function load(){
+  if (S.loading) return;
+  S.loading = true;
+  $('btnReload').classList.add('spin');
+  renderSkeleton();
+  google.script.run
+    .withSuccessHandler(function(res){
+      S.loading = false;
+      $('btnReload').classList.remove('spin');
+      $('boot').classList.add('hide');
+      if (!res || !res.rows){ toast('데이터를 불러오지 못했습니다'); return; }
+      if (res.empty || !res.rows.length){
+        S.rows = []; render();
+        toast(res.msg || '조건에 맞는 자리가 없습니다', 3200);
+        return;
+      }
+      S.rows = res.rows;
+      S.shown = res.shown; S.total = res.total;
+      S.gen = res.generated;
+      render();
+    })
+    .withFailureHandler(function(e){
+      S.loading = false;
+      $('btnReload').classList.remove('spin');
+      $('boot').classList.add('hide');
+      toast('오류: ' + (e && e.message ? e.message : '불러오기 실패'));
+    })
+    .apiBoard(S.ds, S.mode, {
+      want: S.want,
+      isl: S.filter === 'isl' || S.filter === 'car' ? true : (S.filter === 'land' ? false : null),
+      car: S.filter === 'car'
+    });
+}
+
+/* ══════════════ 렌더 ══════════════ */
+function sorted(){
+  var a = S.rows.slice();
+  if (S.sort === 'near' && S.me){
+    a.forEach(function(r){ r._d = dist(S.me[0], S.me[1], r.la, r.lo); });
+    a.sort(function(x,y){ return x._d - y._d; });
+  } else if (S.sort === 'time'){
+    a.sort(function(x,y){
+      var xa = x.win ? x.win[0] : 99999, ya = y.win ? y.win[0] : 99999;
+      return xa - ya;
+    });
+  } else {
+    a.sort(function(x,y){ return y.raw - x.raw; });
+  }
+  var f = favs();
+  if (f.length){
+    a.sort(function(x,y){ return (f.indexOf(y.i) >= 0 ? 1 : 0) - (f.indexOf(x.i) >= 0 ? 1 : 0); });
+  }
+  return a;
+}
+
+function syncPick(){
+  var open = $('sheet').classList.contains('open');
+  $('pick').classList.toggle('fade', open);
+  if (!pickClosed()) $('pickRestore').hidden = true;
+  else $('pickRestore').style.opacity = open ? '0' : '1';
+}
+function render(){
+  drawPins();
+  renderPick();
+  renderList();
+  $('tagline').textContent = MODE_NAME[S.mode] + ' · ' + S.rows.length + '곳'
+    + (S.total && S.rows.length < S.total ? ' / ' + S.total : '') + ' 분석';
+  $('wantbar').hidden = !S.want;
+  $('pick').classList.toggle('hasWant', !!S.want);
+  if (S.want) $('wantbarT').textContent = S.want + ' 기준으로 순위를 냈습니다';
+  syncPick();
+  $('sheetFoot').innerHTML = (S.gen || '') + ' 기준 · 물때 바다타임 · 기상 Open-Meteo · 점수는 참고용이며 안전 판단은 직접 하세요'
+    + '<br>제휴·광고 문의 <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc);text-decoration:none">thecloudstay@gmail.com</a>'
+    + ' · <a href="#" id="redeemLink" style="color:var(--mut);text-decoration:underline">' + (isPremium() ? '프리미엄 이용 중' : '이용권 등록') + '</a>'
+    + ' · <a href="#" id="partnerLink" style="color:var(--mut);text-decoration:underline">파트너 모집</a>';
+  var rl = document.getElementById('redeemLink');
+  if (rl) rl.onclick = function(e){ e.preventDefault(); if (!isPremium()) openRedeem(); };
+  var pl = document.getElementById('partnerLink');
+  if (pl) pl.onclick = function(e){ e.preventDefault(); openPartner(); };
+}
+
+function renderPick(){
+  var top = S.rows.slice().sort(function(a,b){ return b.raw - a.raw; })[0];
+  if (!top){ $('pick').hidden = true; $('pickRestore').hidden = true; return; }
+  S.cur = top;
+  if (pickClosed()){ $('pick').hidden = true; $('pickRestore').hidden = false; $('pickRestore').classList.toggle('hasWant', !!S.want); }
+  else { $('pick').hidden = false; $('pickRestore').hidden = true; }
+  $('pickScore').textContent = top.score;
+  $('pickRing').style.setProperty('--v', top.score);
+  $('pickRing').style.background = 'conic-gradient(var(--'+top.grade+') calc('+top.score+'*1%),rgba(255,255,255,.08) 0)';
+  $('pickName').textContent = top.n;
+  $('pickVerdict').textContent = top.verdict;
+  var c = $('pickChips'); c.innerHTML = '';
+  c.appendChild(el('span','chip', top.r));
+  c.appendChild(el('span','chip hot', top.mul + ' · 조차 ' + top.range + 'm'));
+  if (top.win) c.appendChild(el('span','chip hot', hm(top.win[0]) + '~' + hm(top.win[1])));
+  if (S.mode === 'haeru' && top.vis != null)
+    c.appendChild(el('span','chip', '시야 ' + (top.vis >= 1 ? top.vis.toFixed(1) + 'm' : Math.round(top.vis*100) + 'cm')));
+  if (S.mode === 'fish' && top.cur != null)
+    c.appendChild(el('span','chip', '조류 ' + top.cur.toFixed(1) + '노트'));
+  if (top.isl && top.fr) c.appendChild(el('span','chip', '배 ' + top.fr[0] + ' ' + top.fr[1] + '분'));
+  (top.targets||[]).slice(0,3).forEach(function(t){ c.appendChild(el('span','chip', t)); });
+  (top.banned||[]).slice(0,1).forEach(function(t){ c.appendChild(el('span','chip warn', t + ' 금어기')); });
+  if (top.warn && top.warn.length) c.appendChild(el('span','chip warn', top.warn[0]));
+  $('pickCta').onclick = function(){ openDetail(top.i); };
+  var bd = $('pick').querySelector('.pick-badge');
+  bd.dataset.n = top.n; bd.dataset.s = top.score;
+  if (!S._moved){ S._moved = true; map.setView([top.la - 0.55, top.lo], 8, { animate:true }); }
+}
+
+function renderSkeleton(){
+  var l = $('list'); l.innerHTML = '';
+  for (var k=0;k<6;k++) l.appendChild(el('div','sk'));
+}
+
+function renderList(){
+  var l = $('list'); l.innerHTML = '';
+  var arr = sorted();
+  $('sheetTitle').textContent = MODE_NAME[S.mode] + ' ' +
+    (S.sort==='near' ? '가까운 순' : S.sort==='time' ? '시간 빠른 순' : '추천 순위');
+  arr.forEach(function(r, i){
+    var row = el('div','row' + (S.sel===r.i?' on':''));
+    row.appendChild(el('div','row-rank', String(i+1)));
+
+    var body = el('div','row-body');
+    var top = el('div','row-top');
+    if (favs().indexOf(r.i) >= 0) top.appendChild(el('span','row-fav','★'));
+    top.appendChild(el('span','row-name', r.n));
+    if (r.isl) top.appendChild(el('span','row-isl', r.fr ? '배 '+r.fr[1]+'분' : '섬'));
+    top.appendChild(el('span','row-reg', r.r + (r._d!=null ? ' · '+Math.round(r._d)+'km' : '')));
+    body.appendChild(top);
+    body.appendChild(el('div','row-verdict', r.verdict));
+
+    var ch = el('div','row-chips');
+    if (r.win) ch.appendChild(el('span','chip hot', hm(r.win[0])+'~'+hm(r.win[1])));
+    ch.appendChild(el('span','chip', r.mul));
+    if (S.mode === 'haeru' && r.vis != null)
+      ch.appendChild(el('span','chip', '시야 ' + (r.vis >= 1 ? r.vis.toFixed(1)+'m' : Math.round(r.vis*100)+'cm')));
+    (r.targets||[]).slice(0,2).forEach(function(t){ ch.appendChild(el('span','chip', t)); });
+    (r.banned||[]).slice(0,1).forEach(function(t){ ch.appendChild(el('span','chip warn', t+' 금어기')); });
+    if (r.warn && r.warn.length) ch.appendChild(el('span','chip warn', r.warn[0].length>14 ? r.warn[0].slice(0,13)+'…' : r.warn[0]));
+    body.appendChild(ch);
+    row.appendChild(body);
+
+    row.appendChild(el('div','grade g-'+r.grade, r.grade + '<small>'+r.score+'</small>'));
+    row.onclick = function(){ openDetail(r.i); };
+    l.appendChild(row);
+  });
+  if (!arr.length) l.appendChild(el('div','row-verdict',
+    (S.want ? S.want + '을(를) 노릴 자리가 조건에 없습니다. 필터를 넓혀보세요.' : '조건에 맞는 자리가 없습니다.')));
+}
+
+/* ══════════════ 상세 ══════════════ */
+function openDetail(id){
+  refEvent('open');
+  S.sel = id;
+  var d = $('detail'); d.hidden = false;
+  $('detailBody').innerHTML = '<div class="sk" style="height:120px"></div><div class="sk" style="height:180px"></div><div class="sk" style="height:120px"></div>';
+  google.script.run
+    .withSuccessHandler(renderDetail)
+    .withFailureHandler(function(){ $('detailBody').innerHTML = '<p class="row-verdict" style="padding:30px 0;text-align:center">정보를 불러오지 못했습니다.</p>'; })
+    .apiPoint(id, S.ds, S.want, isPremium() ? 15 : 7);
+  var m = S.markers[id];
+  if (m){ map.panTo([m.getLatLng().lat - 0.35, m.getLatLng().lng], { animate:true }); }
+}
+function closeDetail(){
+  var p = $('detailPanel');
+  p.style.transition = 'transform .3s var(--sp)';
+  p.style.transform = 'translateY(100%)';
+  setTimeout(function(){ $('detail').hidden = true; p.style.transform = ''; p.style.transition = ''; }, 280);
+}
+$('detailScrim').onclick = closeDetail;
+
+function renderDetail(d){
+  if (!d || d.error){ $('detailBody').innerHTML = '<p style="padding:30px 0;text-align:center;color:#8ba6b8">'+((d&&d.error)||'오류')+'</p>'; return; }
+  var m = S.mode === 'fish' ? d.fish : d.haeru;
+  var o = S.mode === 'fish' ? d.haeru : d.fish;
+  var meta = d.meta, w = meta.wx || {};
+  var b = $('detailBody'); b.innerHTML = '';
+
+  /* 헤더 */
+  var head = el('div','dt-head');
+  var ring = el('div','ring', '<span>'+m.score+'</span>');
+  ring.style.background = 'conic-gradient(var(--'+m.grade+') calc('+m.score+'*1%),rgba(255,255,255,.08) 0)';
+  head.appendChild(ring);
+  head.appendChild(el('div','', '<h2>'+d.point.n+'</h2><p>'+d.point.r+' · '+d.point.floor+' · '+(d.point.tag||'')+'</p>'));
+  var fav = el('button','fav-btn' + (favs().indexOf(d.point.i) >= 0 ? ' on' : ''), '★');
+  fav.onclick = function(){
+    var on = toggleFav(d.point.i);
+    fav.classList.toggle('on', on);
+    toast(on ? '즐겨찾기에 담았습니다 — 목록 맨 위에 고정됩니다' : '즐겨찾기 해제');
+    renderList();
+  };
+  head.appendChild(fav);
+  b.appendChild(head);
+
+  /* 결론 */
+  b.appendChild(el('div','dt-verdict' + (m.score < 46 ? ' bad' : ''), m.verdict));
+
+  /* 세부 포인트 (국민포인트) */
+  {
+    var sp0 = el('div','sec');
+    sp0.appendChild(el('div','sec-t','어디로 들어가나 — 세부 포인트'));
+    (d.spots || []).forEach(function(x, i){
+      var card = el('div','spot' + (i === 0 ? ' best' : ''));
+      card.innerHTML = '<div class="spot-h">' + (i === 0 ? '<span class="spot-star">★ 추천 진입</span>' : '') + '<b>' + x.n + '</b></div>'
+        + '<div class="spot-t">' + (x.t||[]).map(function(y){ return '<span class="chip">' + y + '</span>'; }).join('') + '</div>'
+        + '<p class="spot-d">' + x.d + '</p>'
+        + (x.w ? '<p class="spot-w">⚠ ' + x.w + '</p>' : '');
+      sp0.appendChild(card);
+    });
+    if (!(d.spots || []).length)
+      sp0.appendChild(el('div','gauge-l','아직 등록된 세부 포인트가 없습니다. 아시는 자리가 있으면 제보해 주세요 — 검토 후 모두에게 공개됩니다.'));
+    else
+      sp0.appendChild(el('div','gauge-l','어장 경계·규제는 수시로 바뀝니다. 현장 팻말과 지역 고시가 항상 우선입니다.'));
+    var sgBtn = el('button','act','이 자리 세부 포인트 제보하기');
+    sgBtn.style.marginTop = '8px';
+    sgBtn.onclick = function(){ openSuggestForm(sp0, d); };
+    sp0.appendChild(sgBtn);
+    b.appendChild(sp0);
+  }
+
+  /* 조석 그래프 */
+  var s1 = el('div','sec');
+  s1.appendChild(el('div','sec-t', S.ds.slice(5).replace('-','월 ')+'일 물때 · '+meta.mul+' · 조차 '+meta.range+'m'
+    + ' <span style="font-weight:600;color:var(--mut2)">('+(meta.src==='badatime'?'바다타임':meta.src==='khoa'?'해양조사원':'자체 추정')+')</span>'));
+  var tb = el('div','tidebox');
+  tb.appendChild(tideSVG(meta, m.window));
+  var lg = el('div','tide-legend');
+  lg.innerHTML = '<span>00시</span><span>06시</span><span>12시</span><span>18시</span><span>24시</span>';
+  tb.appendChild(lg);
+  s1.appendChild(tb);
+  b.appendChild(s1);
+
+  /* 만조·간조 목록 */
+  var s2 = el('div','sec');
+  s2.appendChild(el('div','sec-t','만조 · 간조'));
+  var g = el('div','grid');
+  (meta.events||[]).slice(0,6).forEach(function(e){
+    g.appendChild(el('div','cell', '<b style="color:'+(e.k==='H'?'#35d0ff':'#2ee6a8')+'">'+hmH(e.t)+'</b><span>'+(e.k==='H'?'만조':'간조')+' '+e.lv+'cm</span>'));
+  });
+  s2.appendChild(g);
+  b.appendChild(s2);
+
+  /* 어종 지정 결과 */
+  if (d.want && d.want.has){
+    var wb = el('div','sec');
+    wb.appendChild(el('div','sec-t', S.want + ' 기준'));
+    wb.appendChild(el('div','dt-verdict' + (d.want.ban && d.want.ban.banned ? ' bad' : ''),
+      d.want.reason + (d.want.thermal != null ? ' · 수온 적합도 ' + d.want.thermal + '%' : '')));
+    b.appendChild(wb);
+  }
+
+  /* 금어기 경고 */
+  var bt = (m.bannedTargets || []);
+  if (bt.length){
+    var bw = el('div','sec');
+    bw.appendChild(el('div','sec-t','지금 잡으면 안 되는 것'));
+    bt.forEach(function(t){
+      var bn = t.ban || {};
+      var box = el('div','banbox');
+      box.innerHTML = '<h4>⛔ ' + t.n + ' 금어기</h4><p>'
+        + (bn.from ? bn.from + ' ~ ' + bn.to + ' (' + bn.scope + ') 포획·채취가 금지됩니다.' : '포획이 제한됩니다.')
+        + (bn.size ? ' 기간이 아니어도 ' + bn.size + (bn.unit ? bn.unit : '') + ' 미만은 잡을 수 없습니다.' : '')
+        + (bn.note ? ' ' + bn.note : '') + '</p>';
+      bw.appendChild(box);
+    });
+    var mt = meta.banMeta || {};
+    bw.appendChild(el('div','banbox', '<p class="src">근거: ' + (mt.basis||'') + ' (' + (mt.asOf||'') + ' 기준)<br>'
+      + (mt.warn||'') + '</p>'));
+    b.appendChild(bw);
+  }
+
+  /* 수중 시야 */
+  if (S.mode === 'haeru'){
+    var vs = el('div','sec');
+    vs.appendChild(el('div','sec-t','수중 시야 추정'));
+    var vv = meta.vis, vpct = Math.max(4, Math.min(100, Math.round(Math.log(1+vv)/Math.log(1+8)*100)));
+    var vcol = vv >= 2.5 ? '#2ee6a8' : vv >= 1.2 ? '#a3e635' : vv >= 0.5 ? '#fbbf24' : '#f87171';
+    var g = el('div','gauge');
+    g.innerHTML = '<div class="gauge-v" style="color:'+vcol+'">' + (vv >= 1 ? vv.toFixed(1)+'m' : Math.round(vv*100)+'cm') + '</div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i style="width:'+vpct+'%;background:'+vcol+'"></i></div>'
+      + '<div class="gauge-l">' + meta.visWord + ' · 부유물 ' + meta.ssc + 'mg/L 추정<br>'
+      + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
+    vs.appendChild(g);
+    b.appendChild(vs);
+
+    var fs2 = el('div','sec');
+    fs2.appendChild(el('div','sec-t','드러나는 갯벌'));
+    var fw = meta.flatWidth;
+    var fg = el('div','gauge');
+    fg.innerHTML = '<div class="gauge-v" style="color:#35d0ff">' + (fw >= 1000 ? (fw/1000).toFixed(1)+'km' : Math.round(fw/10)*10+'m') + '</div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i style="width:'+Math.min(100,Math.round(fw/2500*100))+'%;background:#35d0ff"></i></div>'
+      + '<div class="gauge-l">' + d.point.floor + ' 경사로 계산한 물가에서의 거리<br>돌아올 시간을 여기에 맞춰 잡으세요</div></div>';
+    fs2.appendChild(fg);
+    b.appendChild(fs2);
+  }
+
+  /* 조류와 솔루나 */
+  var cs = el('div','sec');
+  cs.appendChild(el('div','sec-t','조류와 달 활동'));
+  var cg = el('div','grid');
+  var solT = meta.solunar || {};
+  [[meta.curPeak != null ? meta.curPeak.toFixed(1)+'노트' : '-', '최대 조류'],
+   [(solT.strength||0)+'%', '솔루나 강도'],
+   [meta.moonLux != null ? meta.moonLux.toFixed(2)+'lx' : '-', '달빛 조도'],
+   [solT.moonrise != null ? hmH(solT.moonrise) : '-', '월출'],
+   [solT.moonset != null ? hmH(solT.moonset) : '-', '월몰'],
+   [meta.press != null ? (meta.press > 0 ? '+' : '') + meta.press.toFixed(1) : '-', '기압 추세']
+  ].forEach(function(c){ cg.appendChild(el('div','cell','<b>'+c[0]+'</b><span>'+c[1]+'</span>')); });
+  cs.appendChild(cg);
+  cs.appendChild(el('div','gauge-l', meta.luxWord + ' · 달 남중 ' + (solT.transit != null ? hmH(solT.transit) : '-') + ' 전후가 활성기입니다'));
+  b.appendChild(cs);
+
+  /* 배편 */
+  if (d.point.isl){
+    var fs3 = el('div','sec');
+    fs3.appendChild(el('div','sec-t','들어가는 길'));
+    var fr = d.point.fr;
+    var fbox = el('div','ferry');
+    fbox.innerHTML = '<div class="ferry-i">⛴</div><div class="ferry-t">'
+      + (fr ? '<b>' + fr[0] + '</b>에서 배로 <b>약 ' + fr[1] + '분</b>'
+              + (fr[2] ? ' · 차량 선적 가능' : ' · 차는 두고 가야 합니다')
+              + '<br>물때보다 배 시간이 먼저입니다. 출항 여부는 당일 기상에 달렸습니다.'
+            : '섬입니다. 배편과 출항 여부를 먼저 확인하세요.')
+      + '</div>';
+    fs3.appendChild(fbox);
+    b.appendChild(fs3);
+  }
+
+  /* 바다·하늘 */
+  var s3 = el('div','sec');
+  s3.appendChild(el('div','sec-t','바다와 하늘'));
+  var g2 = el('div','grid');
+  var cells = [
+    [w.wave!=null ? w.wave.toFixed(1)+'m' : '-', '파고'],
+    [w.wind!=null ? Math.round(w.wind)+'m/s' : '-', (w.wdir||'')+'풍' + (w.onshore ? ' · '+w.onshore : '')],
+    [w.sst !=null ? w.sst.toFixed(1)+'°' : '-', '수온'],
+    [w.temp!=null ? Math.round(w.temp)+'°' : '-', '기온'],
+    [hmH(meta.sunrise)+'/'+hmH(meta.sunset), '일출·일몰'],
+    [meta.moonBright+'%', '달 밝기']
+  ];
+  cells.forEach(function(c){ g2.appendChild(el('div','cell','<b>'+c[0]+'</b><span>'+c[1]+'</span>')); });
+  s3.appendChild(g2);
+  b.appendChild(s3);
+
+  /* 점수 분해 */
+  var s4 = el('div','sec');
+  s4.appendChild(el('div','sec-t','점수를 이렇게 냈습니다'));
+  var bars = el('div','bars');
+  var MAXP = S.mode === 'fish'
+    ? { 피딩:28, 조류:18, 해상:20, 수온:16, 기압:8, 물색:10 }
+    : { 노출:28, 시야:22, 타이밍:20, 안전:18, 활성:12 };
+  Object.keys(m.parts).forEach(function(k){
+    var v = m.parts[k], mx = MAXP[k] || 25;
+    var r = el('div','bar-row');
+    r.appendChild(el('div','bar-lb', k));
+    var tr = el('div','bar-tr'); var fl = el('div','bar-fl'); tr.appendChild(fl); r.appendChild(tr);
+    r.appendChild(el('div','bar-vl', v + '/' + mx));
+    bars.appendChild(r);
+    setTimeout(function(){ fl.style.width = Math.round(v/mx*100) + '%'; }, 60);
+  });
+  s4.appendChild(bars);
+  b.appendChild(s4);
+
+  /* 근거 · 주의 */
+  if ((m.why||[]).length || (m.warn||[]).length){
+    var s5 = el('div','sec');
+    s5.appendChild(el('div','sec-t','근거와 주의'));
+    var ln = el('div','lines');
+    (m.why||[]).forEach(function(t){ ln.appendChild(el('div','line','<i>✓</i><span>'+t+'</span>')); });
+    (m.warn||[]).forEach(function(t){ ln.appendChild(el('div','line w','<i>⚠</i><span>'+t+'</span>')); });
+    s5.appendChild(ln);
+    b.appendChild(s5);
+  }
+
+  /* 광고 슬롯 — 지역·시즌 타겟, 금어기 필터 통과분만. 프리미엄은 숨김 */
+  if (d.ad && !isPremium()){
+    var adBox = el('a','adcard');
+    adBox.href = d.ad.url || '#'; adBox.target = '_blank'; adBox.rel = 'noopener sponsored';
+    adBox.innerHTML = '<span class="adtag">제휴</span><b>' + d.ad.t + '</b>' + (d.ad.d ? '<span>' + d.ad.d + '</span>' : '');
+    adBox.addEventListener('click', function(){ bizClick(d.ad.id, 'ad'); });
+    b.appendChild(adBox);
+  }
+
+  /* 대상 */
+  var s6 = el('div','sec');
+  s6.appendChild(el('div','sec-t', S.mode==='fish' ? '이 시기 노릴 어종' : '이 시기 채집물'));
+  var ch = el('div','chips');
+  (m.targets||[]).forEach(function(t){
+    var lab = t.n + (t.v>=3 ? ' 제철' : '');
+    if (t.ban && t.ban.size) lab += ' · ' + t.ban.size + (t.ban.unit||'') + '↑';
+    ch.appendChild(el('span','chip'+(t.v>=3?' hot':''), lab));
+  });
+  s6.appendChild(ch);
+  b.appendChild(s6);
+
+  /* 준비물과 채비 — 오늘 대상 기준 */
+  if (d.rigs){
+    var rlist = S.mode === 'fish' ? d.rigs.fish : d.rigs.haeru;
+    var rs2 = el('div','sec');
+    rs2.appendChild(el('div','sec-t', S.mode === 'fish' ? '채비와 미끼 — 오늘 대상 기준' : '준비물 — 오늘 대상 기준'));
+    (rlist || []).forEach(function(r){
+      var card = el('div','rig');
+      card.innerHTML = '<div class="rig-h"><b>' + r.n + '</b></div>'
+        + ((r.t && r.t.length) ? '<div class="rig-t">' + r.t.map(function(x){ return '<span class="chip">' + x + '</span>'; }).join('') + '</div>' : '')
+        + (r.b ? '<p class="rig-b">🪱 ' + r.b + '</p>' : '')
+        + (r.tip ? '<p class="rig-tip">' + r.tip + '</p>' : '')
+        + (r.warn ? '<p class="spot-w">⚠ ' + r.warn + '</p>' : '');
+      rs2.appendChild(card);
+    });
+    if (!(rlist || []).length)
+      rs2.appendChild(el('div','gauge-l','오늘 대상에 등록된 채비 정보가 없습니다.'));
+    if (S.mode === 'haeru' && d.rigs.safe){
+      var sf = el('div','rig safe');
+      sf.innerHTML = '<div class="rig-h"><b>🦺 안전 장비 — 대상과 무관하게 항상</b></div>'
+        + '<div class="rig-t">' + d.rigs.safe.map(function(x){ return '<span class="chip">' + x + '</span>'; }).join('') + '</div>';
+      rs2.appendChild(sf);
+    }
+    b.appendChild(rs2);
+  }
+
+  /* 오늘 조건에 맞는 준비물 (제휴 링크) */
+  if (d.gear && d.gear.length){
+    var gs = el('div','sec');
+    gs.appendChild(el('div','sec-t','조건 맞춤 장비 <span style="font-weight:600;color:var(--mut2)">(제휴 링크)</span>'));
+    var gw = el('div','chips');
+    d.gear.forEach(function(g){
+      var c = el('a','chip gear', g.n + (g.why ? ' · ' + g.why : ''));
+      c.href = g.url || '#'; c.target = '_blank'; c.rel = 'noopener sponsored';
+      c.addEventListener('click', function(){ bizClick(g.id, 'gear'); });
+      gw.appendChild(c);
+    });
+    gs.appendChild(gw);
+    b.appendChild(gs);
+  }
+
+  /* 이 근처 제휴처 */
+  if (d.partners && d.partners.length){
+    var ps = el('div','sec');
+    ps.appendChild(el('div','sec-t','이 근처 <span style="font-weight:600;color:var(--mut2)">(제휴)</span>'));
+    var TY = { shop:'🎣 낚시점', stay:'🏠 숙박', food:'🍜 식당', boat:'⛴ 낚싯배' };
+    d.partners.forEach(function(x){
+      var card = el('div','pcard');
+      card.innerHTML = '<div class="pcard-h"><em>' + (TY[x.ty] || '🏷') + '</em><b>' + x.n + '</b>'
+        + (x.tag ? '<span class="pcard-tag">' + x.tag + '</span>' : '') + '</div>'
+        + (x.d ? '<p>' + x.d + '</p>' : '');
+      var acts = el('div','pcard-a');
+      if (x.tel){
+        var tb = el('a','act','전화');
+        tb.href = 'tel:' + x.tel;
+        tb.addEventListener('click', function(){ bizClick(x.id, 'partner'); });
+        acts.appendChild(tb);
+      }
+      if (x.url){
+        var ub = el('a','act','자세히');
+        ub.href = x.url; ub.target = '_blank'; ub.rel = 'noopener';
+        ub.addEventListener('click', function(){ bizClick(x.id, 'partner'); });
+        acts.appendChild(ub);
+      }
+      if (x.ty === 'boat'){
+        var bb = el('button','act primary','예약 문의');
+        bb.onclick = function(){ openBookForm(ps, d, x); };
+        acts.appendChild(bb);
+      }
+      card.appendChild(acts);
+      ps.appendChild(card);
+    });
+    ps.appendChild(el('div','gauge-l','제휴처 등록·광고 문의 thecloudstay@gmail.com'));
+    b.appendChild(ps);
+  }
+
+  /* 반대 모드 */
+  var s7 = el('div','sec');
+  s7.appendChild(el('div','sec-t', S.mode==='fish' ? '같은 날 해루질은' : '같은 날 낚시는'));
+  s7.appendChild(el('div','dt-verdict'+(o.score<46?' bad':''), o.verdict));
+  b.appendChild(s7);
+
+  /* 실제 조황 */
+  var cs2 = el('div','sec');
+  cs2.appendChild(el('div','sec-t','실제 조황 기록'));
+  var cbody = el('div','catchbody');
+  cbody.innerHTML = '<div class="gauge-l" style="padding:4px 2px">불러오는 중…</div>';
+  cs2.appendChild(cbody);
+  b.appendChild(cs2);
+  google.script.run.withSuccessHandler(function(cd){
+    renderCatch(cbody, cd || {n:0,recent:[]}, d);
+  }).withFailureHandler(function(){ cbody.innerHTML = ''; renderCatch(cbody, {n:0,recent:[]}, d); })
+    .apiCatchPoint(d.point.i, S.mode);
+
+  /* 7일 전망 */
+  if (d.week && d.week.length){
+    var s8 = el('div','sec');
+    s8.appendChild(el('div','sec-t','앞으로 7일'));
+    var wk = el('div','week');
+    d.week.forEach(function(x){
+      var v = S.mode==='fish' ? x.f : x.h;
+      var win = S.mode==='fish' ? x.fw : x.hw;
+      var dt = parseDs(x.ds);
+      var c = v>=88?'#2ee6a8':v>=76?'#a3e635':v>=62?'#fbbf24':v>=46?'#fb923c':'#f87171';
+      var card = el('div','wd'+(x.ds===S.ds?' today':''),
+        '<em>'+(dt.getMonth()+1)+'/'+dt.getDate()+' '+WD[dt.getDay()]+'</em>'+
+        '<b style="color:'+c+'">'+v+'</b>'+
+        '<div class="wv"><i style="width:'+v+'%;background:'+c+'"></i></div>'+
+        '<small>'+x.mul+'</small>'+
+        (S.mode==='haeru'&&x.vis!=null?'<small class="vis">'+(x.vis>=1?x.vis.toFixed(1)+'m':Math.round(x.vis*100)+'cm')+'</small>':'')+
+        '<small style="color:var(--mut2)">'+(win?hm(win[0]):'-')+'</small>');
+      card.onclick = function(){ S.ds = x.ds; renderDates(); closeDetail(); load(); };
+      wk.appendChild(card);
+    });
+    s8.appendChild(wk);
+    b.appendChild(s8);
+  }
+
+  /* 비어업인 수칙 */
+  if (S.mode === 'haeru' && BOOT.nonpro && BOOT.nonpro.length){
+    var rs = el('div','sec');
+    rs.appendChild(el('div','sec-t','해루질 전에 확인할 것'));
+    var rb = el('div','rulebox');
+    BOOT.nonpro.forEach(function(x){
+      rb.appendChild(el('div','r','<b>'+x.t+'</b><span>'+x.d+'</span>'));
+    });
+    rs.appendChild(rb);
+    b.appendChild(rs);
+  }
+
+  /* 액션 */
+  var act = el('div','dt-actions');
+  var nav = el('a','act primary','길찾기');
+  nav.href = 'https://map.kakao.com/link/to/' + encodeURIComponent(d.point.n) + ',' + d.point.la + ',' + d.point.lo;
+  nav.target = '_blank'; nav.rel = 'noopener';
+  nav.addEventListener('click', function(){ refEvent('nav'); });
+  act.appendChild(nav);
+  var bt = el('a','act','원본 물때');
+  bt.href = 'https://m.badatime.com/' + d.point.i + '.html';
+  bt.target = '_blank'; bt.rel = 'noopener';
+  act.appendChild(bt);
+  var cl = el('button','act','닫기'); cl.onclick = closeDetail;
+  act.appendChild(cl);
+  b.appendChild(act);
+
+  b.scrollTop = 0;
+}
+
+/* 낚싯배 예약 문의 양식 */
+function openBookForm(box, d, partner){
+  var old = box.querySelector('.catch-form');
+  if (old){ old.remove(); return; }
+  var f = el('div','catch-form');
+  f.innerHTML =
+    '<div class="gauge-l" style="padding:0 2px 4px"><b style="color:var(--txt)">' + partner.n + '</b> 예약 문의 — 출조일 ' + S.ds + '</div>'
+    + '<div class="cf-row"><span>인원</span><input id="bkPax" maxlength="4" inputmode="numeric" placeholder="2"></div>'
+    + '<div class="cf-row"><span>연락처</span><input id="bkTel" maxlength="16" inputmode="tel" placeholder="010-0000-0000"></div>'
+    + '<div class="cf-row"><span>요청</span><input id="bkMemo" maxlength="80" placeholder="대상어·시간대 등 (선택)"></div>'
+    + '<button class="act primary" id="bkSave">문의 보내기</button>'
+    + '<div class="gauge-l">확인 후 업체 또는 해루낚에서 연락드립니다. 기상으로 출항이 취소될 수 있습니다.</div>';
+  box.appendChild(f);
+  f.querySelector('#bkSave').onclick = function(){
+    var tel = f.querySelector('#bkTel').value.trim();
+    if (!tel){ toast('연락처를 적어주세요'); return; }
+    f.querySelector('#bkSave').textContent = '보내는 중…';
+    google.script.run.withSuccessHandler(function(r){
+      toast(r && r.ok ? '문의가 접수됐습니다. 곧 연락드리겠습니다' : (r && r.msg) || '전송 실패');
+      f.remove();
+    }).withFailureHandler(function(){ toast('보내지 못했습니다. ' + (partner.tel ? '전화(' + partner.tel + ')로 문의해주세요' : '')); f.querySelector('#bkSave').textContent = '문의 보내기'; })
+      .apiBookRequest({ ds: S.ds, point: d.point.n, partner: partner.n, pid: partner.id,
+        pax: f.querySelector('#bkPax').value, tel: tel,
+        memo: f.querySelector('#bkMemo').value, ref: refCode() || '', uid: myUid() });
+  };
+}
+
+/* 이용권 등록 — prompt() 는 구글 iframe·일부 브라우저에서 차단되므로 자체 창을 쓴다 */
+function openRedeem(){
+  var old = document.getElementById('redeemBox');
+  if (old){ old.remove(); return; }
+  var wrap = el('div','detail');
+  wrap.id = 'redeemBox';
+  wrap.innerHTML = '<div class="detail-scrim"></div>'
+    + '<div class="detail-panel glass" style="max-height:none;padding-bottom:calc(20px + var(--safeB))">'
+    + '<div class="handle"><i></i></div>'
+    + '<div style="padding:4px 18px 8px">'
+    + '<h3 style="font-size:17px;font-weight:800;margin-bottom:6px">이용권 등록</h3>'
+    + '<p class="gauge-l" style="margin-bottom:12px">프리미엄: 15일 전망 · 광고 없음 · 1년</p>'
+    + '<div class="cf-row"><span>코드</span><input id="rdCode" maxlength="24" autocapitalize="characters" placeholder="HRN-XXXX"></div>'
+    + '<div class="dt-actions"><button class="act primary" id="rdGo">등록</button><button class="act" id="rdX">닫기</button></div>'
+    + '</div></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('.detail-scrim').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#rdX').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#rdGo').onclick = function(){
+    var code = wrap.querySelector('#rdCode').value.trim();
+    if (!code){ toast('코드를 입력하세요'); return; }
+    wrap.querySelector('#rdGo').textContent = '확인 중…';
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.ok){
+        try { localStorage.setItem('hrn_premium', JSON.stringify({ until: r.until })); } catch(e){}
+        toast('프리미엄이 켜졌습니다. 감사합니다!');
+        wrap.remove(); load();
+      } else { toast((r && r.msg) || '코드 확인 실패'); wrap.querySelector('#rdGo').textContent = '등록'; }
+    }).withFailureHandler(function(){ toast('확인하지 못했습니다'); wrap.querySelector('#rdGo').textContent = '등록'; })
+      .apiRedeem(code, myUid());
+  };
+}
+
+/* 파트너(유튜버) 안내 + 성과 조회 */
+function openPartner(){
+  var old = document.getElementById('ptBox');
+  if (old){ old.remove(); return; }
+  var wrap = el('div','detail');
+  wrap.id = 'ptBox';
+  wrap.innerHTML = '<div class="detail-scrim"></div>'
+    + '<div class="detail-panel glass" style="max-height:88vh">'
+    + '<div class="handle"><i></i></div>'
+    + '<div style="padding:4px 18px calc(20px + var(--safeB));overflow-y:auto">'
+    + '<h3 style="font-size:18px;font-weight:800;margin-bottom:6px">파트너 모집 — 유튜버·커뮤니티</h3>'
+    + '<p class="gauge-l" style="margin-bottom:12px">영상·게시글에 본인 링크를 붙이면, 그 링크로 들어온 사용자가 만드는 수익을 나눕니다.</p>'
+    + '<div class="rig"><div class="rig-h"><b>이렇게 됩니다</b></div>'
+    + '<p class="rig-tip">1. 채널 코드를 받습니다 (예: haeru_tv)<br>'
+    + '2. 고정댓글에 <b style="color:var(--acc)">앱주소?ref=코드</b> 를 답니다<br>'
+    + '3. 30일 안에 그 사용자가 만든 수익이 코드에 귀속됩니다<br>'
+    + '4. 매월 1일 자동 정산 — 집계표를 그대로 공유합니다</p></div>'
+    + '<div class="rig"><div class="rig-h"><b>분배율</b></div>'
+    + '<p class="rig-tip">기본 <b>30%</b> · 월 유입 100명 이상 <b>35%</b> · 1,000명 이상 <b>40%</b> · 예약 수수료는 20%</p></div>'
+    + '<div class="rig"><div class="rig-h"><b>내 코드 성과 조회</b></div>'
+    + '<div class="cf-row" style="margin-top:8px"><span>코드</span><input id="ptCode" maxlength="24" placeholder="haeru_tv"></div>'
+    + '<button class="act primary" id="ptGo" style="margin-top:8px;width:100%">조회</button>'
+    + '<div id="ptOut" class="gauge-l" style="margin-top:8px"></div></div>'
+    + '<div class="gauge-l" style="margin-top:10px">제휴 신청: <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc)">thecloudstay@gmail.com</a> 으로 채널 링크를 보내주세요. 하루 안에 코드를 드립니다.</div>'
+    + '<button class="act" id="ptX" style="width:100%;margin-top:12px">닫기</button>'
+    + '</div></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('.detail-scrim').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#ptX').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#ptGo').onclick = function(){
+    var code = wrap.querySelector('#ptCode').value.trim();
+    if (!code){ toast('코드를 입력하세요'); return; }
+    var out = wrap.querySelector('#ptOut');
+    out.textContent = '조회 중…';
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.ok)
+        out.innerHTML = '<b style="color:var(--acc)">' + r.code + '</b> — 유입 ' + r.visit
+          + ' · 상세열람 ' + r.open + ' · 길찾기 ' + r.nav
+          + (r.amount ? ' · 귀속 매출 ' + r.amount + '원' : '')
+          + '<br>현재 분배율 <b>' + r.rate + '%</b> · 첫 유입 ' + r.first + ' · 최근 ' + r.last;
+      else out.textContent = (r && r.msg) || '집계가 없습니다';
+    }).withFailureHandler(function(){ out.textContent = '정적판에서는 조회가 되지 않습니다. 앱스 스크립트판 주소에서 확인하세요'; })
+      .apiRefLookup(code);
+  };
+}
+
+/* 세부 포인트 제보 양식 */
+function openSuggestForm(box, d){
+  var old = box.querySelector('.catch-form');
+  if (old){ old.remove(); return; }
+  var f = el('div','catch-form');
+  f.innerHTML =
+    '<div class="cf-row"><span>포인트명</span><input id="sgN" maxlength="30" placeholder="예: 해수욕장 좌측 갯바위"></div>'
+    + '<div class="cf-row"><span>설명</span><input id="sgD" maxlength="100" placeholder="무엇이 잡히고 어떻게 들어가는지"></div>'
+    + '<div class="cf-row"><span>주의</span><input id="sgW" maxlength="80" placeholder="고립·어촌계 등 (선택)"></div>'
+    + '<div class="cf-row"><span>닉네임</span><input id="sgNick" maxlength="12" value="' + lsGet('hrn_nick') + '"></div>'
+    + '<button class="act primary" id="sgSave">제보 보내기</button>'
+    + '<div class="gauge-l">검토 후 반영됩니다. 잘못된 제보(사유지·금지구역)는 제외됩니다.</div>';
+  box.appendChild(f);
+  f.querySelector('#sgSave').onclick = function(){
+    var name = f.querySelector('#sgN').value.trim();
+    if (!name){ toast('포인트 이름을 적어주세요'); return; }
+    var nick = f.querySelector('#sgNick').value.trim();
+    try { localStorage.setItem('hrn_nick', nick); } catch(e){}
+    f.querySelector('#sgSave').textContent = '보내는 중…';
+    google.script.run.withSuccessHandler(function(r){
+      toast(r && r.ok ? (r.local ? '이 기기에 저장했습니다. 공동 반영은 앱스 스크립트판에서 됩니다' : '제보 감사합니다! 검토 후 모두에게 공개됩니다') : '전송 실패');
+      f.remove();
+    }).withFailureHandler(function(){ toast('보내지 못했습니다'); f.querySelector('#sgSave').textContent = '제보 보내기'; })
+      .apiSpotSuggest({ i: d.point.i, n: d.point.n, spot: name,
+        desc: f.querySelector('#sgD').value, warn: f.querySelector('#sgW').value,
+        nick: nick, uid: myUid() });
+  };
+}
+
+/* 조황 기록 렌더 */
+function renderCatch(box, cd, d){
+  box.innerHTML = '';
+  if (cd.n > 0){
+    var head = el('div','gauge');
+    var col = cd.rate >= 62 ? '#2ee6a8' : cd.rate >= 40 ? '#fbbf24' : '#f87171';
+    head.innerHTML = '<div class="gauge-v" style="color:'+col+'">'+cd.rate+'%</div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i style="width:'+cd.rate+'%;background:'+col+'"></i></div>'
+      + '<div class="gauge-l">기록 '+cd.n+'건의 성공률'
+      + (cd.byMul && cd.byMul.length ? ' · 잘 나온 물때: ' + cd.byMul.slice(0,3).map(function(m){ return m.mul+'('+m.rate+'%)'; }).join(' ') : '')
+      + '</div></div>';
+    box.appendChild(head);
+    (cd.recent||[]).slice(0,4).forEach(function(r){
+      var ic = r.rs==='상'?'🟢':r.rs==='중'?'🟡':r.rs==='하'?'🟠':'⚫';
+      box.appendChild(el('div','catch-row', ic+' <b>'+r.ds+'</b> '+(r.mul||'')+' · '+(r.tg||'')+' '
+        + (r.memo ? '— '+r.memo : '') + ' <em>'+r.nick+'</em>'));
+    });
+  } else {
+    box.appendChild(el('div','gauge-l','아직 기록이 없습니다. 첫 기록을 남기면 이 자리 점수가 실측으로 보정되기 시작합니다.'));
+  }
+  var btn = el('button','act primary catch-open','다녀온 기록 남기기');
+  btn.onclick = function(){ openCatchForm(box, d); };
+  box.appendChild(btn);
+}
+function openCatchForm(box, d){
+  var old = box.querySelector('.catch-form');
+  if (old){ old.remove(); return; }
+  var m = S.mode === 'fish' ? d.fish : d.haeru;
+  var f = el('div','catch-form');
+  f.innerHTML =
+    '<div class="cf-row"><span>조과</span><div class="cf-seg" id="cfRes">'
+    + ['상','중','하','꽝'].map(function(x,i){ return '<button data-v="'+x+'"'+(i===1?' class="on"':'')+'>'+x+'</button>'; }).join('') + '</div></div>'
+    + '<div class="cf-row"><span>잡은 것</span><input id="cfTg" maxlength="40" value="' + (m.targets||[]).slice(0,2).map(function(t){return t.n;}).join(', ') + '"></div>'
+    + '<div class="cf-row"><span>한 줄</span><input id="cfMemo" maxlength="60" placeholder="물색 좋았음, 씨알 굵음 등"></div>'
+    + '<div class="cf-row"><span>닉네임</span><input id="cfNick" maxlength="12" value="' + lsGet('hrn_nick') + '" placeholder="익명"></div>'
+    + '<button class="act primary" id="cfSave">저장</button>';
+  box.appendChild(f);
+  f.querySelector('#cfRes').addEventListener('click', function(e){
+    var b2 = e.target.closest('button'); if (!b2) return;
+    f.querySelectorAll('#cfRes button').forEach(function(x){ x.classList.remove('on'); });
+    b2.classList.add('on');
+  });
+  f.querySelector('#cfSave').onclick = function(){
+    var nick = f.querySelector('#cfNick').value.trim();
+    try { localStorage.setItem('hrn_nick', nick); } catch(e){}
+    var entry = {
+      ds: S.ds, i: d.point.i, n: d.point.n, mode: S.mode,
+      targets: f.querySelector('#cfTg').value, result: (f.querySelector('#cfRes .on')||{}).dataset ? f.querySelector('#cfRes .on').dataset.v : '중',
+      memo: f.querySelector('#cfMemo').value, nick: nick,
+      mul: d.meta.mul, score: m.score, uid: myUid()
+    };
+    f.querySelector('#cfSave').textContent = '저장 중…';
+    google.script.run.withSuccessHandler(function(r){
+      toast(r && r.ok ? '기록됐습니다. 이 자리 점수에 반영됩니다' : (r && r.msg) || '저장 실패');
+      google.script.run.withSuccessHandler(function(cd){ renderCatch(box, cd, d); }).apiCatchPoint(d.point.i, S.mode);
+    }).withFailureHandler(function(){ toast('저장하지 못했습니다'); f.querySelector('#cfSave').textContent = '저장'; })
+      .apiCatchSave(entry);
+  };
+}
+
+/* 조석 곡선 SVG */
+function tideSVG(meta, win){
+  var W = 320, H = 108, PT = 10, PB = 20;
+  var ev = (meta.events||[]).slice().sort(function(a,b){ return a.t-b.t; });
+  var ns = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  if (!ev.length) return svg;
+
+  // 앞뒤로 가상 극점을 붙여 0~24시를 모두 덮는다
+  var pts = ev.slice();
+  var P = 6.2103;
+  while (pts[0].t > 0)      pts.unshift({ k: pts[0].k==='H'?'L':'H', t: pts[0].t - P, lv: oppLv(pts, pts[0]) });
+  while (pts[pts.length-1].t < 24){
+    var last = pts[pts.length-1];
+    pts.push({ k: last.k==='H'?'L':'H', t: last.t + P, lv: oppLv(pts, last) });
+  }
+  function oppLv(list, ref){
+    for (var k=0;k<list.length;k++){ if (list[k].k !== ref.k) return list[k].lv; }
+    return ref.lv;
+  }
+  var lvs = pts.map(function(p){ return p.lv; });
+  var mn = Math.min.apply(null,lvs), mx = Math.max.apply(null,lvs);
+  if (mx - mn < 10) mx = mn + 10;
+  var X = function(t){ return t/24*W; };
+  var Y = function(l){ return PT + (1 - (l-mn)/(mx-mn)) * (H-PT-PB); };
+
+  function level(t){
+    for (var k=0;k<pts.length-1;k++){
+      if (t >= pts[k].t && t <= pts[k+1].t){
+        var a = pts[k], b2 = pts[k+1];
+        var f = (t - a.t)/(b2.t - a.t);
+        return (a.lv + b2.lv)/2 + (a.lv - b2.lv)/2 * Math.cos(Math.PI*f);
+      }
+    }
+    return pts[pts.length-1].lv;
+  }
+  var dpath = '', apath = '';
+  for (var t=0; t<=24; t+=0.25){
+    var x = X(t).toFixed(1), y = Y(level(t)).toFixed(1);
+    dpath += (t===0 ? 'M' : 'L') + x + ' ' + y;
+  }
+  apath = dpath + 'L'+W+' '+(H-PB)+'L0 '+(H-PB)+'Z';
+
+  // 그라데이션
+  var defs = document.createElementNS(ns,'defs');
+  defs.innerHTML = '<linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0%" stop-color="#35d0ff" stop-opacity=".38"/>'+
+    '<stop offset="100%" stop-color="#35d0ff" stop-opacity="0"/></linearGradient>';
+  svg.appendChild(defs);
+
+  // 야간 음영
+  function shade(a, b2){
+    if (b2 <= a) return;
+    var r = document.createElementNS(ns,'rect');
+    r.setAttribute('x', X(a)); r.setAttribute('y', 0);
+    r.setAttribute('width', X(b2)-X(a)); r.setAttribute('height', H-PB);
+    r.setAttribute('fill','rgba(2,10,18,.45)');
+    svg.appendChild(r);
+  }
+  if (meta.sunrise != null) shade(0, meta.sunrise);
+  if (meta.sunset != null)  shade(meta.sunset, 24);
+
+  // 추천 시간창
+  function drawWin(a2, b3){
+    if (b3 > a2){
+      var hi = document.createElementNS(ns,'rect');
+      hi.setAttribute('x', X(a2)); hi.setAttribute('y', 0);
+      hi.setAttribute('width', X(b3)-X(a2)); hi.setAttribute('height', H-PB);
+      hi.setAttribute('fill','rgba(46,230,168,.16)');
+      hi.setAttribute('stroke','rgba(46,230,168,.5)'); hi.setAttribute('stroke-width','1');
+      svg.appendChild(hi);
+      var lb = document.createElementNS(ns,'text');
+      lb.setAttribute('x', (X(a2)+X(b3))/2); lb.setAttribute('y', H-PB-5);
+      lb.setAttribute('text-anchor','middle'); lb.setAttribute('font-size','9');
+      lb.setAttribute('fill','#2ee6a8'); lb.setAttribute('font-weight','800');
+      lb.textContent = '추천';
+      svg.appendChild(lb);
+    }
+  }
+  if (win){
+    var wa = win[0], wb = win[1];
+    drawWin(Math.max(0, wa), Math.min(24, wb));
+    if (wb > 24) drawWin(0, wb - 24);        // 자정을 넘긴 부분
+    if (wa < 0)  drawWin(24 + wa, 24);
+  }
+
+  var area = document.createElementNS(ns,'path');
+  area.setAttribute('d', apath); area.setAttribute('fill','url(#tg)');
+  svg.appendChild(area);
+  var line = document.createElementNS(ns,'path');
+  line.setAttribute('d', dpath); line.setAttribute('fill','none');
+  line.setAttribute('stroke','#35d0ff'); line.setAttribute('stroke-width','2'); line.setAttribute('stroke-linecap','round');
+  svg.appendChild(line);
+
+  // 극점 표시
+  ev.forEach(function(e){
+    var c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx', X(e.t)); c.setAttribute('cy', Y(e.lv)); c.setAttribute('r', 3.2);
+    c.setAttribute('fill', e.k==='H' ? '#35d0ff' : '#2ee6a8');
+    svg.appendChild(c);
+    var tx = document.createElementNS(ns,'text');
+    tx.setAttribute('x', Math.min(W-16, Math.max(16, X(e.t))));
+    tx.setAttribute('y', Y(e.lv) + (e.k==='H' ? -8 : 14));
+    tx.setAttribute('text-anchor','middle'); tx.setAttribute('font-size','9');
+    tx.setAttribute('fill', e.k==='H' ? '#8fd8f5' : '#8fe6c8'); tx.setAttribute('font-weight','700');
+    tx.textContent = hmH(e.t);
+    svg.appendChild(tx);
+  });
+
+  // 현재 시각
+  if (S.ds === BOOT.today){
+    var now = new Date(); var nt = now.getHours() + now.getMinutes()/60;
+    var nl = document.createElementNS(ns,'line');
+    nl.setAttribute('x1', X(nt)); nl.setAttribute('x2', X(nt));
+    nl.setAttribute('y1', 0); nl.setAttribute('y2', H-PB);
+    nl.setAttribute('stroke','#fff'); nl.setAttribute('stroke-width','1');
+    nl.setAttribute('stroke-dasharray','3 3'); nl.setAttribute('opacity','.55');
+    svg.appendChild(nl);
+  }
+  // 기준선
+  var base = document.createElementNS(ns,'line');
+  base.setAttribute('x1',0); base.setAttribute('x2',W);
+  base.setAttribute('y1',H-PB); base.setAttribute('y2',H-PB);
+  base.setAttribute('stroke','rgba(255,255,255,.12)'); base.setAttribute('stroke-width','1');
+  svg.appendChild(base);
+  return svg;
+}
+
+/* ══════════════ 날짜 ══════════════ */
+function renderDates(){
+  var n = $('datestrip'); n.innerHTML = '';
+  var base = parseDs(BOOT.today);   // 서버 기준 오늘
+  for (var k=-1; k<=8; k++){
+    var d = new Date(base.getTime() + k*86400000);
+    var ds = dstr(d);
+    var lbl = k===0 ? '오늘' : k===1 ? '내일' : k===-1 ? '어제' : (d.getMonth()+1)+'/'+d.getDate();
+    var c = el('button','dchip'+(ds===S.ds?' on':''),
+      '<b>'+lbl+'</b><span>'+WD[d.getDay()]+'</span>');
+    (function(x){ c.onclick = function(){ if (S.ds===x) return; S.ds = x; renderDates(); load(); }; })(ds);
+    n.appendChild(c);
+  }
+  var on = n.querySelector('.dchip.on');
+  if (on) on.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+}
+
+/* ══════════════ 모드 토글 ══════════════ */
+function movePill(){
+  var seg = $('seg'), act = seg.querySelector('.seg-btn.active'), pill = seg.querySelector('.seg-pill');
+  pill.style.width = act.offsetWidth + 'px';
+  pill.style.transform = 'translateX(' + (act.offsetLeft - 4) + 'px)';
+}
+$('seg').addEventListener('click', function(e){
+  var b = e.target.closest('.seg-btn');
+  if (!b || b.classList.contains('active')) return;
+  $('seg').querySelectorAll('.seg-btn').forEach(function(x){ x.classList.remove('active'); });
+  b.classList.add('active'); movePill();
+  S.mode = b.dataset.mode;
+  load();
+});
+
+/* ══════════════ 정렬 ══════════════ */
+$('sorts').addEventListener('click', function(e){
+  var b = e.target.closest('.sort');
+  if (!b) return;
+  if (b.dataset.sort === 'near' && !S.me){
+    if (!navigator.geolocation){ toast('위치 기능을 쓸 수 없습니다'); return; }
+    toast('현재 위치를 확인하는 중…');
+    navigator.geolocation.getCurrentPosition(function(pos){
+      S.me = [pos.coords.latitude, pos.coords.longitude];
+      applySort(b);
+    }, function(){ toast('위치 권한이 필요합니다'); }, { timeout: 8000 });
+    return;
+  }
+  applySort(b);
+});
+function applySort(b){
+  $('sorts').querySelectorAll('.sort').forEach(function(x){ x.classList.remove('active'); });
+  b.classList.add('active');
+  S.sort = b.dataset.sort;
+  renderList();
+  $('sheet').classList.add('open');
+  syncPick();
+}
+
+/* ══════════════ 바텀시트 드래그 ══════════════ */
+(function(){
+  var sheet = $('sheet'), h = $('handle');
+  var closedY = null, startY = 0, cur = 0, dragging = false;
+  function closed(){
+    return sheet.classList.contains('open') ? 0 : sheet.offsetHeight - 148 - (window.__sb||0);
+  }
+  function setY(y){ sheet.style.setProperty('--sy', y + 'px'); }
+  function down(e){
+    dragging = true; sheet.classList.add('drag');
+    startY = (e.touches ? e.touches[0].clientY : e.clientY);
+    cur = sheet.classList.contains('open') ? 0 : sheet.offsetHeight - 148;
+    e.preventDefault();
+  }
+  function move(e){
+    if (!dragging) return;
+    var y = (e.touches ? e.touches[0].clientY : e.clientY) - startY + cur;
+    y = Math.max(0, Math.min(sheet.offsetHeight - 100, y));
+    setY(y);
+  }
+  function up(){
+    if (!dragging) return;
+    dragging = false; sheet.classList.remove('drag');
+    var y = parseFloat(getComputedStyle(sheet).getPropertyValue('--sy')) || 0;
+    var open = y < (sheet.offsetHeight - 148) / 2;
+    sheet.style.removeProperty('--sy');
+    sheet.classList.toggle('open', open);
+    syncPick();
+  }
+  h.addEventListener('touchstart', down, { passive:false });
+  h.addEventListener('mousedown', down);
+  window.addEventListener('touchmove', move, { passive:false });
+  window.addEventListener('mousemove', move);
+  window.addEventListener('touchend', up);
+  window.addEventListener('mouseup', up);
+  h.addEventListener('click', function(){
+    if (!dragging){ sheet.classList.toggle('open'); syncPick(); }
+  });
+})();
+
+/* 상세 패널 아래로 밀어 닫기 */
+(function(){
+  var p = $('detailPanel'), h = $('detailHandle');
+  var sy = 0, on = false;
+  function down(e){ on = true; sy = (e.touches?e.touches[0].clientY:e.clientY); p.classList.add('drag'); e.preventDefault(); }
+  function move(e){
+    if (!on) return;
+    var dy = Math.max(0, (e.touches?e.touches[0].clientY:e.clientY) - sy);
+    p.style.transform = 'translateY(' + dy + 'px)';
+  }
+  function up(e){
+    if (!on) return; on = false; p.classList.remove('drag');
+    var dy = parseFloat((p.style.transform.match(/([\d.]+)px/)||[0,0])[1]) || 0;
+    p.style.transform = '';
+    if (dy > 110) closeDetail();
+  }
+  h.addEventListener('touchstart', down, { passive:false });
+  h.addEventListener('mousedown', down);
+  window.addEventListener('touchmove', move, { passive:false });
+  window.addEventListener('mousemove', move);
+  window.addEventListener('touchend', up);
+  window.addEventListener('mouseup', up);
+})();
+
+/* ══════════════ 시작 ══════════════ */
+$('btnReload').onclick = function(){
+  google.script.run.withSuccessHandler(function(){}).clearCache();
+  toast('새로 계산합니다');
+  load();
+};
+// 레퍼럴 코드 보존 — 나중에 예약·결제가 붙으면 이 코드로 정산한다
+try {
+  if (BOOT.ref) localStorage.setItem('hrn_ref', JSON.stringify({ c: BOOT.ref, t: Date.now() }));
+} catch(e){}
+function lsGet(k, d){ try { return localStorage.getItem(k) || d || ''; } catch(e){ return d || ''; } }
+function favs(){
+  try { return JSON.parse(localStorage.getItem('hrn_fav') || '[]'); } catch(e){ return []; }
+}
+function toggleFav(id){
+  var f = favs(), k = f.indexOf(id);
+  if (k >= 0) f.splice(k, 1); else f.push(id);
+  try { localStorage.setItem('hrn_fav', JSON.stringify(f)); } catch(e){}
+  return k < 0;
+}
+function isPremium(){
+  try {
+    var p = JSON.parse(localStorage.getItem('hrn_premium') || 'null');
+    return !!(p && p.until > Date.now());
+  } catch(e){ return false; }
+}
+function bizClick(id, kind){
+  if (!id) return;
+  try { google.script.run.apiBizClick(id, kind); } catch(e){}
+}
+function myUid(){
+  try {
+    var u = localStorage.getItem('hrn_uid');
+    if (!u){ u = 'u' + Math.random().toString(36).slice(2, 12); localStorage.setItem('hrn_uid', u); }
+    return u;
+  } catch(e){ return 'u0'; }
+}
+function refCode(){
+  try {
+    var d = JSON.parse(localStorage.getItem('hrn_ref') || 'null');
+    if (d && Date.now() - d.t < 30*86400000) return d.c;   // 30일 귀속 창
+  } catch(e){}
+  return null;
+}
+function refEvent(ev){
+  var c = refCode();
+  if (c && window.google && google.script) try { google.script.run.apiRefEvent(c, ev); } catch(e){}
+}
+$('bootCount').textContent = BOOT.count;
+renderDates();
+movePill();
+window.addEventListener('resize', movePill);
+setTimeout(load, 120);
+
+/* ══════════════ 원픽 접기 — 지도를 가리지 않게 ══════════════ */
+function setPickMini(v){ $('pick').classList.toggle('mini', v); }
+function pickClosed(){
+  try { return localStorage.getItem('hrn_pickoff') === '1'; } catch(e){ return false; }
+}
+function setPickClosed(v){
+  try { v ? localStorage.setItem('hrn_pickoff','1') : localStorage.removeItem('hrn_pickoff'); } catch(e){}
+  $('pick').hidden = v || !S.rows.length;
+  $('pickRestore').hidden = !v || !S.rows.length;
+  $('pickRestore').classList.toggle('hasWant', !!S.want);
+}
+$('pickClose').onclick = function(e){
+  e.stopPropagation();
+  setPickClosed(true);
+  toast('원픽 카드를 닫았습니다. 위의 ★ 단추로 다시 열 수 있어요');
+};
+$('pickRestore').onclick = function(){ setPickClosed(false); };
+$('pickMin').onclick = function(e){ e.stopPropagation(); setPickMini(!$('pick').classList.contains('mini')); };
+$('pick').querySelector('.pick-inner').addEventListener('click', function(){
+  if ($('pick').classList.contains('mini')) setPickMini(false);
+});
+map.on('dragstart', function(){ setPickMini(true); });   // 지도를 만지면 비켜준다
+
+/* ══════════════ 접근 방식 필터 ══════════════ */
+$('filters').addEventListener('click', function(e){
+  var b = e.target.closest('.fchip');
+  if (!b || b.classList.contains('on')) return;
+  $('filters').querySelectorAll('.fchip').forEach(function(x){ x.classList.remove('on'); });
+  b.classList.add('on');
+  S.filter = b.dataset.f;
+  S._moved = false;
+  load();
+});
+
+/* ══════════════ 어종·지점 찾기 ══════════════ */
+function movePillIn(seg){
+  var act = seg.querySelector('.seg-btn.active'), pill = seg.querySelector('.seg-pill');
+  if (!act || !pill) return;
+  pill.style.width = act.offsetWidth + 'px';
+  pill.style.transform = 'translateX(' + (act.offsetLeft - 4) + 'px)';
+}
+function openFinder(){
+  $('finder').hidden = false;
+  S.fmode = S.mode;
+  $('fseg').querySelectorAll('.seg-btn').forEach(function(x){
+    x.classList.toggle('active', x.dataset.fmode === S.fmode);
+  });
+  setTimeout(function(){ movePillIn($('fseg')); }, 30);
+  loadSpecies();
+}
+function closeFinder(){ $('finder').hidden = true; }
+$('btnSearch').onclick = openFinder;
+$('finderScrim').onclick = closeFinder;
+$('finderHandle').onclick = closeFinder;
+$('fseg').addEventListener('click', function(e){
+  var b = e.target.closest('.seg-btn');
+  if (!b || b.classList.contains('active')) return;
+  $('fseg').querySelectorAll('.seg-btn').forEach(function(x){ x.classList.remove('active'); });
+  b.classList.add('active'); movePillIn($('fseg'));
+  S.fmode = b.dataset.fmode;
+  loadSpecies();
+});
+
+function loadSpecies(){
+  var body = $('finderBody');
+  body.innerHTML = '<div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div>';
+  google.script.run
+    .withSuccessHandler(function(list){ renderSpecies(list || []); })
+    .withFailureHandler(function(){ body.innerHTML = '<p class="gauge-l" style="padding:20px 4px">목록을 불러오지 못했습니다.</p>'; })
+    .apiSpecies(S.ds, S.fmode);
+}
+function renderSpecies(list){
+  var body = $('finderBody'); body.innerHTML = '';
+  var g = el('div','spgrid');
+  var any = el('div','spcard' + (S.want ? '' : ' on'), '<b>전체</b><span>대상 지정 없음</span>');
+  any.onclick = function(){ pickWant(null); };
+  g.appendChild(any);
+  list.forEach(function(x){
+    var cls = 'spcard' + (x.banned ? ' ban' : (x.season >= 2 ? ' peak' : '')) + (S.want === x.n ? ' on' : '');
+    var sub = x.banned ? '금어기'
+            : x.season >= 3 ? '제철 · ' + x.spots + '곳'
+            : x.season === 2 ? '시즌 · ' + x.spots + '곳'
+            : x.season > 0  ? x.spots + '곳'
+            : '철 아님';
+    var c = el('div', cls, '<b>' + x.n + '</b><span>' + sub + '</span>');
+    c.onclick = function(){
+      if (x.banned){
+        var bn = x.ban || {};
+        toast(x.n + '은(는) ' + (bn.from ? bn.from + '~' + bn.to + ' ' : '') + '금어기입니다', 3600);
+        return;
+      }
+      pickWant(x.n);
+    };
+    g.appendChild(c);
+  });
+  body.appendChild(g);
+  var note = el('div','gauge-l','철이 아닌 대상은 아래쪽에 있습니다. 금어기는 눌러도 선택되지 않습니다.');
+  note.style.padding = '12px 4px 4px';
+  body.appendChild(note);
+}
+function pickWant(name){
+  S.want = name;
+  if (name && S.fmode !== S.mode){
+    S.mode = S.fmode;
+    $('seg').querySelectorAll('.seg-btn').forEach(function(x){
+      x.classList.toggle('active', x.dataset.mode === S.mode);
+    });
+    movePill();
+  }
+  closeFinder();
+  S._moved = false;
+  load();
+  if (name) toast(name + ' 기준으로 다시 계산합니다');
+}
+$('wantbarX').onclick = function(){ S.want = null; S._moved = false; load(); };
+
+/* 지점 이름 검색 */
+(function(){
+  var inp = $('spotQ'), res = $('spotRes'), t = null;
+  inp.addEventListener('input', function(){
+    clearTimeout(t);
+    var q = inp.value.trim();
+    if (q.length < 1){ res.innerHTML = ''; return; }
+    t = setTimeout(function(){
+      google.script.run.withSuccessHandler(function(list){
+        res.innerHTML = '';
+        if (!list || !list.length){ res.appendChild(el('div','sres','찾는 이름이 없습니다')); return; }
+        list.slice(0, 25).forEach(function(x){
+          var r = el('div','sres');
+          r.innerHTML = '<b>' + x.n + '</b>'
+            + (x.curated ? '<span class="badge">정밀</span>' : '<span class="badge auto">자동</span>')
+            + '<em>' + (x.r || ({W:'서해',S:'남해',E:'동해',J:'제주'}[x.s] || '')) + '</em>';
+          r.onclick = function(){ closeFinder(); openDetail(x.i); };
+          res.appendChild(r);
+        });
+      }).withFailureHandler(function(){ res.innerHTML = ''; }).apiSearch(q);
+    }, 260);
+  });
+})();
+
+})();
+</script>
