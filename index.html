@@ -4552,12 +4552,13 @@ window.google={script:{run:{
 function updateNote(real){
   var n=document.querySelector('.demo-note');
   if (!n) return;
-  n.textContent = real
-    ? '기상은 Open-Meteo 실측 예보 · 물때는 자체 조석 계산(±10~40분) — 정밀 물때·공동 조황기록은 앱스 스크립트판에서'
-    : '기상 서버에 연결하지 못해 예시값으로 보여드리는 중입니다';
-  n.style.background = real ? 'rgba(46,230,168,.1)' : 'rgba(251,191,36,.12)';
-  n.style.borderColor = real ? 'rgba(46,230,168,.3)' : 'rgba(251,191,36,.32)';
-  n.style.color = real ? '#7fe8c4' : '#fcd34d';
+  // 정상일 때는 아무 말도 하지 않는다. 문제가 있을 때만 알린다.
+  if (real){ n.style.display = 'none'; return; }
+  n.style.display = '';
+  n.textContent = '기상 정보를 불러오지 못했습니다. 예시값으로 보여드리는 중입니다';
+  n.style.background = 'rgba(251,191,36,.12)';
+  n.style.borderColor = 'rgba(251,191,36,.32)';
+  n.style.color = '#fcd34d';
 }
 window.BOOT = {today:todayStr_(),count:POINTS.length,indexCount:allIndex_().length,species:{haeru:allSpecies_('haeru'),fish:allSpecies_('fish')},ban:BAN_META,nonpro:NONPRO,ferry:(typeof ferryInfo_==='function'?ferryInfo_():null)};
 </script>
