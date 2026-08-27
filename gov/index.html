@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>연안 안전자료 제공 — 해루낚</title>
+<meta name="description" content="갯벌 고립 위험지점 분석 자료. 공공기관에 무상으로 제공합니다.">
+<link rel="stylesheet" href="../atlas.css">
+<style>
+.gov-lead{font-size:17px;color:var(--txt);line-height:1.85;margin:0 0 24px}
+.gov-lead b{color:var(--acc)}
+.free{border:1px solid rgba(46,230,168,.34);background:rgba(46,230,168,.08);
+  border-radius:var(--r);padding:18px 20px;margin:0 0 28px}
+.free b{display:block;color:var(--acc);font-size:15px;margin-bottom:7px}
+.free p{margin:0;font-size:14.5px;line-height:1.8;color:#cfe9de}
+.eq{font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:2;
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:12px;padding:15px 18px;margin:0 0 18px;overflow-x:auto;color:#cfe3ef}
+.eq b{color:var(--acc)}
+table.dt{width:100%;border-collapse:collapse;font-size:13.5px;min-width:460px}
+table.dt th{text-align:left;font-size:11px;letter-spacing:.06em;color:var(--mut2);
+  font-weight:700;padding:10px 13px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.dt td{padding:10px 13px;border-bottom:1px solid var(--line)}
+table.dt tr:last-child td{border-bottom:0}
+table.dt td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.dt td.hot{color:#fca5a5;font-weight:700}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--bg2);margin:0 0 18px}
+.give{display:grid;gap:10px;margin:0 0 22px}
+.give>div{border:1px solid var(--line);background:var(--bg2);border-radius:var(--r);padding:15px 17px}
+.give b{display:block;font-size:14.5px;margin-bottom:4px;color:var(--txt)}
+.give p{margin:0;font-size:13.5px;color:var(--mut);line-height:1.75}
+.caveat{border:1px solid rgba(252,211,77,.3);background:rgba(252,211,77,.07);
+  border-radius:var(--r);padding:16px 18px;margin:0 0 24px}
+.caveat b{display:block;color:var(--warn);font-size:14px;margin-bottom:6px}
+.caveat p{margin:0 0 9px;font-size:13.5px;line-height:1.75;color:#e8ddc0}
+.caveat p:last-child{margin:0}
+.ask{border:1px solid rgba(53,208,255,.3);background:rgba(53,208,255,.07);
+  border-radius:20px;padding:22px 24px;margin:34px 0 0}
+.ask h2{border:0;padding:0;margin:0 0 9px;font-size:19px}
+.ask p{margin:0 0 14px;font-size:14.5px;color:var(--mut);line-height:1.8}
+.ask .mail{display:inline-block;padding:12px 20px;border-radius:14px;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;
+  font-weight:800;font-size:15px;text-decoration:none}
+.ask .mail:hover{text-decoration:none;filter:brightness(1.07)}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../index.html">해루낚</a>
+  <nav>
+    <a href="../method/">계산 근거</a>
+    <a href="../spot/">지점</a>
+    <a class="app" href="../index.html">앱 열기</a>
+  </nav>
+</header>
+<main>
+<article class="page">
+  <p class="kicker">공공기관 제공용</p>
+  <h1>갯벌 고립 위험지점 자료</h1>
+  <p class="gov-lead">전국 259개 갯벌·갯바위 지점의 고립 위험도를 물리 모형으로 계산합니다.
+    그중 <b>18곳</b>은 중간 물때에 <b>물가가 사람 걸음보다 빠릅니다.</b>
+    관할 기관에 <b>대가 없이</b> 드립니다.</p>
+
+  <div class="free">
+    <b>판매 목적이 아닙니다</b>
+    <p>연안 고립사고가 최근 5년 983건, 사망 115명입니다. 그중 75%가 개인 부주의로 분류됩니다.
+      정보를 몰라서 나는 사고라면 정보를 주면 줄어듭니다.
+      이 자료를 쓰시는 데 비용이나 조건은 없습니다.</p>
+  </div>
+
+  <section>
+    <h2>어떻게 계산했나<em>산식 공개</em></h2>
+    <p>물이 차오르는 <b>수직</b> 속도는 어디나 비슷합니다.
+      그러나 물가가 육지 쪽으로 밀려오는 <b>수평</b> 속도는 바닥 경사에 반비례합니다.
+      뻘은 경사가 1/1000 수준이라, 물이 세로로 1m 차는 동안 가로로는 1km가 옵니다.</p>
+    <div class="eq">
+      h(t) = (R/2)(1 − cos πt/T)&nbsp;&nbsp;&nbsp;조석 상승<br>
+      dh/dt = R·π / 2T · sin πt/T&nbsp;&nbsp;&nbsp;중간 물때에 최대<br>
+      <b>물가 전진 속도 = (dh/dt) ÷ 바닥경사</b><br>
+      <b>ρ = 물가 전진 속도 ÷ 사람 걸음 속도</b>
+    </div>
+    <p><b>ρ가 1을 넘으면 물이 들기 시작한 뒤에 걸어 나와서는 늦습니다.</b>
+      사고 통계를 보고 거꾸로 맞춘 값이 아니라, 물리로 먼저 계산한 결과입니다.</p>
+    <p class="cap">근거 문헌과 상수는 <a href="../method/">계산 근거</a>에 전부 공개해 두었습니다.</p>
+  </section>
+
+  <section>
+    <h2>위험등급 매우 높음<em>ρ ≥ 1.0 · 18곳</em></h2>
+    <div class="scroll"><table class="dt">
+      <thead><tr><th>지점</th><th>시군구</th><th class="n">물가 m/h</th><th class="n">걸음 m/h</th><th class="n">ρ</th></tr></thead>
+      <tbody><tr><td>궁평항</td><td>경기 화성</td><td class="n">2,356</td><td class="n">2,000</td><td class="n hot">1.18</td></tr><tr><td>인천 송도</td><td>인천 연수</td><td class="n">2,307</td><td class="n">2,000</td><td class="n hot">1.15</td></tr><tr><td>대부도 남서</td><td>경기 안산</td><td class="n">2,280</td><td class="n">2,000</td><td class="n hot">1.14</td></tr><tr><td>대부도 북측</td><td>경기 안산</td><td class="n">2,280</td><td class="n">2,000</td><td class="n hot">1.14</td></tr><tr><td>탄도항</td><td>경기 안산</td><td class="n">2,280</td><td class="n">2,000</td><td class="n hot">1.14</td></tr><tr><td>영종도</td><td>인천 중구</td><td class="n">2,280</td><td class="n">2,000</td><td class="n hot">1.14</td></tr><tr><td>강화대교</td><td>인천 강화</td><td class="n">2,254</td><td class="n">2,000</td><td class="n hot">1.13</td></tr><tr><td>장봉도</td><td>인천 옹진</td><td class="n">2,204</td><td class="n">2,000</td><td class="n hot">1.1</td></tr><tr><td>신도</td><td>인천 옹진</td><td class="n">2,204</td><td class="n">2,000</td><td class="n hot">1.1</td></tr><tr><td>시도</td><td>인천 옹진</td><td class="n">2,204</td><td class="n">2,000</td><td class="n hot">1.1</td></tr><tr><td>석모도</td><td>인천 강화</td><td class="n">2,102</td><td class="n">2,000</td><td class="n hot">1.05</td></tr><tr><td>강화 외포</td><td>인천 강화</td><td class="n">2,049</td><td class="n">2,000</td><td class="n hot">1.02</td></tr><tr><td>교동도</td><td>인천 강화</td><td class="n">2,049</td><td class="n">2,000</td><td class="n hot">1.02</td></tr><tr><td>볼음도</td><td>인천 강화</td><td class="n">2,000</td><td class="n">2,000</td><td class="n hot">1</td></tr><tr><td>주문도</td><td>인천 강화</td><td class="n">2,000</td><td class="n">2,000</td><td class="n hot">1</td></tr><tr><td>아차도</td><td>인천 강화</td><td class="n">2,000</td><td class="n">2,000</td><td class="n hot">1</td></tr><tr><td>서검도</td><td>인천 강화</td><td class="n">2,000</td><td class="n">2,000</td><td class="n hot">1</td></tr><tr><td>미법도</td><td>인천 강화</td><td class="n">2,000</td><td class="n">2,000</td><td class="n hot">1</td></tr></tbody>
+    </table></div>
+    <p>대조(사리) 기준입니다. <b>18곳이 전부 경기·인천 서해 뻘</b>이며,
+      실제 갯벌 고립사고 다발 지역과 겹칩니다.</p>
+    <p class="cap">전체 259곳 등급 분포 — 매우 높음 18 · 높음 21 · 보통 20 · 낮음 200</p>
+  </section>
+
+  <section>
+    <h2>드릴 수 있는 것</h2>
+    <div class="give">
+      <div><b>259곳 위험등급 자료</b>
+        <p>지점별 ρ 값, 물가 전진 속도, 노출 폭, 산식과 상수 일체. 파일로 드립니다.</p></div>
+      <div><b>지점별 진입·퇴로 시각</b>
+        <p>그날 물때에 맞춰 들어갈 수 있는 시각과 늦어도 나와야 하는 시각. 매일 갱신됩니다.</p></div>
+      <div><b>안전안내문자 문구</b>
+        <p>관내 지점을 지정해 주시면 그날 보낼 문구를 자동으로 만들어 드립니다.<br>
+          예 — “오늘 ○○갯벌은 22시 14분까지 나오셔야 합니다.”</p></div>
+      <div><b>외해 개방도</b>
+        <p>갯바위 지점이 어느 방위로 얼마나 트여 있는지. 너울 사고 위험 판단에 씁니다.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>한계도 함께 알려드립니다</h2>
+    <div class="caveat">
+      <b>추정치입니다</b>
+      <p>조석과 지형으로 낸 계산값이며 <b>실측이 아닙니다.</b>
+        갯골, 이안류, 지역별 특성은 반영되지 않았습니다.</p>
+      <p>바닥 경사는 현재 지형 분류 4종의 대표값을 씁니다.
+        국립해양조사원 수심 자료를 연동하면 지점별 실측 경사로 바뀝니다. 준비 중입니다.</p>
+      <p>이 자료는 현장 판단을 대체하지 않습니다.
+        기관에서 활용하실 경우 이 점을 안내에 함께 표기해 주시기 바랍니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>이미 하고 있는 것과 겹치지 않습니다</h2>
+    <p>연안 안전사고 위험예보제는 기상 중심으로 알고 있습니다.
+      너울과 이안류, 안개는 다루지만 <b>갯벌 물때 고립은 예보 대상이 아닌 것</b>으로 보입니다.</p>
+    <p>날이 맑고 파도가 없어도 물때가 나쁘면 위험한 경우가 있습니다.
+      그 빈칸에 보탬이 될까 하여 드립니다.</p>
+  </section>
+
+  <div class="ask">
+    <h2>자료를 요청하시려면</h2>
+    <p>기관명과 필요한 범위(전국 또는 관할 시군)만 적어 메일 주시면 바로 보내드립니다.
+      회신용 양식이나 절차는 없습니다.</p>
+    <a class="mail" href="mailto:thecloudstay@gmail.com?subject=%5B%ED%95%B4%EB%A3%A8%EB%82%9A%5D%20%EC%97%B0%EC%95%88%20%EC%95%88%EC%A0%84%EC%9E%90%EB%A3%8C%20%EC%9A%94%EC%B2%AD">자료 요청하기 →</a>
+  </div>
+</article>
+</main>
+<footer class="foot">
+  <p><a href="../index.html">해루낚</a> · 운영 박찬영 · thecloudstay@gmail.com</p>
+  <p class="fine">이 페이지의 수치는 조석·지형 기반 추정치이며 실측이 아닙니다. 현장 판단을 대체하지 않습니다.</p>
+  <p class="fine">연안사고 통계 출처 — 해양경찰청</p>
+</footer>
+</body>
+</html>
