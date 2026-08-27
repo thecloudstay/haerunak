@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>해루낚은 이렇게 계산합니다 | 근거와 한계</title>
+<meta name="description" content="해루낚이 쓰는 파랑·시야·조석·체감온도·활성 모형의 학술적 근거와, 어디까지가 검증된 물리이고 어디부터가 경험칙인지 그대로 밝힙니다.">
+<link rel="canonical" href="https://haerunak.com/method/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="해루낚은 이렇게 계산합니다">
+<meta property="og:description" content="파랑·시야·조석·체감온도 모형의 근거 문헌과, 우리가 모르는 것까지 함께 적었습니다.">
+<meta property="og:url" content="https://haerunak.com/method/">
+<link rel="icon" type="image/svg+xml" href="../icon.svg">
+<link rel="apple-touch-icon" href="../icon.svg">
+<meta name="theme-color" content="#05141f">
+<link rel="stylesheet" href="../atlas.css">
+<style>
+.hero3{padding:6px 0 4px}
+.hero3 .tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.14em;
+  color:#04121c;background:linear-gradient(100deg,var(--acc),var(--acc2));
+  padding:5px 11px;border-radius:6px;margin-bottom:18px}
+.hero3 h1 em{font-style:normal;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* 신뢰 등급 */
+.tiers{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:var(--r);overflow:hidden;margin:0 0 8px}
+.tier{background:var(--bg2);padding:15px 17px;display:flex;gap:13px;align-items:flex-start}
+.tier .dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;margin-top:7px}
+.t1 .dot{background:var(--acc);box-shadow:0 0 0 4px rgba(46,230,168,.16)}
+.t2 .dot{background:var(--acc2);box-shadow:0 0 0 4px rgba(53,208,255,.14)}
+.t3 .dot{background:var(--warn);box-shadow:0 0 0 4px rgba(252,211,77,.14)}
+.tier b{display:block;font-size:14.5px;font-weight:800;margin-bottom:3px}
+.t1 b{color:var(--acc)} .t2 b{color:var(--acc2)} .t3 b{color:var(--warn)}
+.tier p{margin:0;font-size:13.5px;color:var(--mut);line-height:1.7}
+
+/* 모형 블록 */
+.mod{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px 21px;margin:0 0 12px;position:relative}
+.mod.hi{border-color:rgba(46,230,168,.28)}
+.mod.mid{border-color:rgba(53,208,255,.24)}
+.mod.low{border-color:rgba(252,211,77,.28);background:rgba(252,211,77,.045)}
+.mod-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:9px}
+.mod-h h3{font-size:18px;font-weight:800;letter-spacing:-.4px;margin:0}
+.badge{font-size:10.5px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:7px}
+.badge.hi{color:#04121c;background:var(--acc)}
+.badge.mid{color:#04121c;background:var(--acc2)}
+.badge.low{color:#2a1c00;background:var(--warn)}
+.mod>p{margin:0 0 11px;font-size:14.5px;line-height:1.8;color:#cfe3ef}
+.mod>p:last-child{margin-bottom:0}
+.mod .eq{display:block;margin:12px 0;padding:12px 14px;border-radius:12px;
+  background:rgba(0,0,0,.28);border:1px solid var(--line);
+  font-size:12.5px;line-height:1.7;color:#9fd8ff;overflow-x:auto;white-space:nowrap}
+
+.refs{list-style:none;padding:0;margin:13px 0 0;display:grid;gap:7px}
+.refs li{font-size:12.5px;line-height:1.65;color:var(--mut);padding-left:16px;position:relative}
+.refs li::before{content:'';position:absolute;left:0;top:8px;width:6px;height:1.5px;background:var(--mut2)}
+.refs b{color:#cfe3ef;font-weight:600}
+.refs a{color:var(--acc2);word-break:break-all}
+
+.honest2{border:1px dashed rgba(252,211,77,.4);background:rgba(252,211,77,.06);
+  border-radius:14px;padding:15px 17px;margin:13px 0 0}
+.honest2 b{display:block;font-size:13px;font-weight:800;color:var(--warn);margin-bottom:6px}
+.honest2 p{margin:0;font-size:13.5px;line-height:1.75;color:#e6dcc4}
+
+.myth{border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.06);
+  border-radius:14px;padding:15px 17px;margin:13px 0 0}
+.myth b{display:block;font-size:13px;font-weight:800;color:var(--dan);margin-bottom:6px}
+.myth p{margin:0;font-size:13.5px;line-height:1.75;color:#f0d8d8}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../">해루낚</a>
+  <nav>
+    <a href="../species/">어종 도감</a>
+    <a href="../spot/">포인트</a>
+    <a href="../partner/">채널 제휴</a>
+    <a href="../business/">업체 등록</a>
+    <a class="app" href="../index.html">오늘 어디 갈까</a>
+  </nav>
+</header>
+
+<main>
+<article class="page hero3">
+  <span class="tag">계산 근거</span>
+  <h1>해루낚은 <em>이렇게 계산합니다</em></h1>
+  <p class="lead">
+    화면에 뜨는 숫자가 어디서 왔는지 끝까지 답할 수 있는 서비스가 되고 싶습니다.
+    그래서 계산의 각 단계가 어떤 문헌에 기대고 있는지,
+    그리고 <strong>어디서부터는 저희도 확신할 수 없는지</strong> 함께 적습니다.
+  </p>
+
+  <section>
+    <h2>먼저 — 무엇이 튼튼하고 무엇이 아닌지</h2>
+    <p class="cap" style="margin:0 0 16px">
+      같은 화면에 물리 계산과 경험칙이 나란히 놓입니다. 어느 쪽이 어느 쪽인지 구분해 표시하는 것이 저희 원칙입니다.
+    </p>
+    <div class="tiers">
+      <div class="tier t1"><span class="dot"></span><div>
+        <b>검증된 물리 — 교과서·표준 수준</b>
+        <p>파랑에서 해저 흔들림을 구하는 계산, 퇴적물이 뜨기 시작하는 문턱, 조위 예측, 체감온도.
+           100년 가까이 검증됐거나 기상청·국립해양조사원이 실제 업무에 쓰는 것과 같은 식입니다.</p>
+      </div></div>
+      <div class="tier t2"><span class="dot"></span><div>
+        <b>연구 기반 — 다만 현장 편차가 큼</b>
+        <p>부유물에서 시야를 추정하는 부분, 파랑 재부유, 냉수 노출 생리.
+           원리는 확립돼 있으나 계수가 지역·입도·개인차에 좌우돼 <strong>등급 수준</strong>으로만 신뢰할 수 있습니다.</p>
+      </div></div>
+      <div class="tier t3"><span class="dot"></span><div>
+        <b>경험칙 — 과장하지 않습니다</b>
+        <p>물고기 활성 점수. 조류·물때가 어류 행동에 영향을 준다는 것 자체는 확립돼 있지만,
+           그것이 <strong>오늘 이 자리의 조과</strong>로 이어지는 함수는 학계에도 없습니다.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>파도가 바닥을 흔드는 정도</h2>
+
+    <div class="mod hi">
+      <div class="mod-h"><h3>해저 궤도속도</h3><span class="badge hi">검증된 물리</span></div>
+      <p>파고·주기·수심을 넣으면 해저에서 물이 앞뒤로 얼마나 빠르게 흔들리는지 계산됩니다.
+         선형파 이론이라 부르는 100년 넘은 방법입니다.</p>
+      <code class="eq">u_b = (π·H) / (T · sinh(2πh / L))</code>
+      <p>이 값이 클수록 바닥의 뻘과 모래가 떠오르고, 물이 뿌옇게 됩니다.</p>
+      <ul class="refs">
+        <li><b>Dean, R.G. &amp; Dalrymple, R.A. (1991)</b> — <i>Water Wave Mechanics for Engineers and Scientists</i>, World Scientific, Advanced Series on Ocean Engineering Vol. 2</li>
+        <li><b>Bosboom, J. &amp; Stive, M.J.F.</b> — <i>Coastal Dynamics</i>, TU Delft OPEN Books (공개 교과서)</li>
+      </ul>
+    </div>
+
+    <div class="mod hi">
+      <div class="mod-h"><h3>퇴적물이 뜨기 시작하는 문턱</h3><span class="badge hi">검증된 물리</span></div>
+      <p>바닥이 흔들린다고 바로 뿌옇게 되지는 않습니다. 입자를 띄우려면 일정 세기를 넘어야 하고,
+         그 문턱을 정리한 것이 시일즈 기준입니다. 해양 모래에 맞춘 실무식은 술스비의 매뉴얼을 씁니다.</p>
+      <ul class="refs">
+        <li><b>Shields, A. (1936)</b> — Mitteilungen der Preußischen Versuchsanstalt für Wasserbau, Heft 26</li>
+        <li><b>Soulsby, R.L. (1997)</b> — <i>Dynamics of Marine Sands: A Manual for Practical Applications</i>, Thomas Telford</li>
+        <li><b>Soulsby, R.L. &amp; Whitehouse, R.J.S. (1997)</b> — Threshold of Sediment Motion in Coastal Environments, <i>Pacific Coasts and Ports '97</i></li>
+        <li><b>Green, M.O. &amp; Coco, G. (2014)</b> — Review of wave-driven sediment resuspension and transport in estuaries, <i>Reviews of Geophysics</i>, DOI 10.1002/2013RG000437</li>
+      </ul>
+      <div class="honest2">
+        <b>한계</b>
+        <p>같은 파도라도 갯벌인지 모래밭인지, 최근에 비가 왔는지에 따라 결과가 크게 달라집니다.
+           저희 예측은 「맑음 / 보통 / 탁함」 정도의 등급으로만 받아들여 주십시오.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>물속에서 얼마나 보이는가</h2>
+
+    <div class="mod mid">
+      <div class="mod-h"><h3>부유물 → 빛 감쇠 → 보이는 거리</h3><span class="badge mid">연구 기반</span></div>
+      <p>떠오른 입자가 많을수록 빛이 빨리 사라집니다. 그 감쇠 정도에서 볼 수 있는 거리를 추정합니다.
+         투명도판(하얀 원판을 내려 안 보이는 깊이를 재는 방법)과 흑판 수평 시계 측정법이 근거입니다.</p>
+      <ul class="refs">
+        <li><b>Poole, H.H. &amp; Atkins, W.R.G. (1929)</b> — <i>J. Mar. Biol. Assoc. UK</i> 16(1), 297–324</li>
+        <li><b>Preisendorfer, R.W. (1986)</b> — Secchi disk science: Visual optics of natural waters, <i>Limnology and Oceanography</i> 31(5), 909–926</li>
+        <li><b>Davies-Colley, R.J. (1988)</b> — Measuring water clarity with a black disk, <i>Limnology and Oceanography</i> 33(4), 616–623</li>
+        <li><b>Davies-Colley, R.J. &amp; Smith, D.G. (2001)</b> — Turbidity, Suspended Sediment, and Water Clarity: A Review, <i>JAWRA</i> 37(5), 1085–1101</li>
+        <li><b>Zaneveld, J.R.V. &amp; Pegau, W.S. (2003)</b> — Robust underwater visibility parameter, <i>Optics Express</i> 11(23), 2997–3009</li>
+      </ul>
+      <div class="honest2">
+        <b>여기서 저희가 모르는 것을 밝힙니다</b>
+        <p>위 연구들은 측정 장비나 표준 원판이 보이는 거리를 다룹니다.
+           물안경을 쓴 사람이 밤에 랜턴을 들고 실제로 보는 거리는 다릅니다.
+           그 변환은 <strong>저희가 유추한 것</strong>이고, 이를 직접 검증한 신뢰할 만한 연구를 아직 찾지 못했습니다.
+           시야 수치는 절대값보다 「어제보다 나은가 나쁜가」로 봐 주십시오.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>물때와 조위</h2>
+
+    <div class="mod hi">
+      <div class="mod-h"><h3>조화분석 기반 조위 예측</h3><span class="badge hi">검증된 물리</span></div>
+      <p>조위는 달과 태양이 만드는 여러 주기 성분(분조)의 합입니다.
+         관측 자료에서 각 성분의 크기와 위상을 뽑아 미래를 계산합니다.
+         저희 서비스에서 <strong>가장 정확한 부분</strong>입니다.</p>
+      <ul class="refs">
+        <li><b>Foreman, M.G.G. (1977)</b> — <i>Manual for Tidal Heights Analysis and Prediction</i>, Institute of Ocean Sciences, Pacific Marine Science Report 77-10</li>
+        <li><b>Pawlowicz, R., Beardsley, B. &amp; Lentz, S. (2002)</b> — Classical tidal harmonic analysis including error estimates in MATLAB using T_TIDE, <i>Computers &amp; Geosciences</i> 28(8), 929–937</li>
+        <li><b>Pugh, D. &amp; Woodworth, P. (2014)</b> — <i>Sea-Level Science</i>, Cambridge University Press, 4장</li>
+        <li><b>국립해양조사원</b> — 조석 관측·예보 자료 및 공개 접속 창구</li>
+      </ul>
+    </div>
+
+    <div class="mod hi">
+      <div class="mod-h"><h3>진입·퇴로 시각</h3><span class="badge hi">검증된 물리</span></div>
+      <p>갯벌 사고는 대부분 「언제 나와야 하는지」를 몰라서 납니다.
+         조위 곡선과 갯벌 경사로 시각마다 드러난 거리를 구하고,
+         바닥질별 걷는 속도로 사람 위치를 5분 간격으로 따라가며
+         <strong>물이 사람보다 먼저 닿지 않는 가장 늦은 시각</strong>을 찾습니다. 거기서 안전 여유를 더 뺍니다.</p>
+      <code class="eq">드러난 거리 E(t) = ( 저조 낙차 − 조위상승 h(t) ) / 경사</code>
+      <code class="eq">안전 조건 : 언제나  사람위치(t) + 여유 ≤ E(t)</code>
+      <p>바닥질별 경사와 걷는 속도는 뻘·혼합·모래·암반을 나눠 씁니다. 뻘은 발이 빠져 가장 느립니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>추위와 저체온</h2>
+
+    <div class="mod hi">
+      <div class="mod-h"><h3>체감온도</h3><span class="badge hi">검증된 물리</span></div>
+      <p>기상청이 쓰는 것과 <strong>완전히 동일한 식</strong>을 씁니다.</p>
+      <code class="eq">체감온도 = 13.12 + 0.6215·Ta − 11.37·V^0.16 + 0.3965·V^0.16·Ta</code>
+      <ul class="refs">
+        <li><b>Osczevski, R. &amp; Bluestein, M. (2005)</b> — The New Wind Chill Equivalent Temperature Chart, <i>Bulletin of the American Meteorological Society</i> 86(10), 1453–1458</li>
+        <li><b>기상청</b> — 기상자료개방포털 체감온도 산식 (위 논문과 동일)</li>
+      </ul>
+    </div>
+
+    <div class="mod mid">
+      <div class="mod-h"><h3>젖은 상태의 열 손실</h3><span class="badge mid">연구 기반</span></div>
+      <p>갯벌에서는 젖은 채로 바람을 맞습니다. 여기에 비까지 오면 위험 등급이 올라갑니다.</p>
+      <ul class="refs">
+        <li><b>Tipton, M.J. (1989)</b> — The Initial Responses to Cold-Water Immersion in Man, <i>Clinical Science</i> 77(6), 581–588</li>
+        <li><b>Power, J. 외 (2015)</b> — Reduction in predicted survival times in cold water due to wind and waves, <i>Applied Ergonomics</i> 49, 18–24</li>
+        <li><b>Henriksson, O. 외 (2012)</b> — Evaporative Heat Loss Reduction by Wet Clothing Removal, <i>Prehospital and Disaster Medicine</i></li>
+        <li><b>Hayward, J.S. 외 (1975)</b> — Thermal Balance and Survival Time Prediction of Man in Cold Water, <i>Can. J. Physiol. Pharmacol.</i></li>
+      </ul>
+      <div class="myth">
+        <b>「물에 젖으면 열이 25배 빨리 빠진다」에 대하여</b>
+        <p>이 숫자는 물과 공기의 열전도도 비(약 0.6 대 0.025)일 뿐,
+           사람의 실제 열손실이 25배가 된다는 연구 결과가 아닙니다.
+           널리 퍼진 표현이지만 <strong>저희는 계산에 쓰지 않습니다.</strong>
+           대신 위 논문들이 보고한 실측을 근거로 경고 등급을 매깁니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>물고기 활성 <em>가장 조심스러운 부분</em></h2>
+
+    <div class="mod low">
+      <div class="mod-h"><h3>조류·물때와 섭이 활성</h3><span class="badge low">경험칙</span></div>
+      <p>조류와 물때가 어류의 이동·섭이와 맞물려 있다는 것은 잘 확립돼 있습니다.
+         저희 활성 지표가 물때를 반영하는 근거입니다.</p>
+      <ul class="refs">
+        <li><b>Gibson, R.N. (1992)</b> — Tidally-Synchronised Behaviour in Marine Fishes, <i>Rhythms in Fishes</i>, Springer</li>
+        <li><b>Gibson, R.N. (2003)</b> — Go with the flow: tidal migration in marine animals, <i>Hydrobiologia</i></li>
+        <li><b>Stoner, A.W. (2004)</b> — Effects of environmental variables on fish feeding ecology, <i>Journal of Fish Biology</i></li>
+      </ul>
+      <div class="honest2">
+        <b>그러나</b>
+        <p>그것이 오늘 이 자리의 조과로 이어지는 함수는 학계에도 없습니다.
+           저희 점수는 검증된 예측 모형이 아니라, 확립된 생태 지식과 현장 경험을 섞은 <strong>참고 지표</strong>입니다.</p>
+      </div>
+    </div>
+
+    <div class="mod low">
+      <div class="mod-h"><h3>달과 솔루나 이론</h3><span class="badge low">근거 약함</span></div>
+      <p>솔루나 이론은 1926년 한 낚시 저술가가 제안한 상업적 달력이며, 동료심사로 검증된 이론이 아닙니다.
+         월령을 실제로 검증한 연구는 있습니다.</p>
+      <ul class="refs">
+        <li><b>Vinson, M.R. &amp; Angradi, T.R. (2014)</b> — Muskie Lunacy: Does the Lunar Cycle Influence Angler Catch of Muskellunge?, <i>PLOS ONE</i> 9(5), e98046 — 조과 차이는 있었으나 <b>「달빛 밝기」 가설은 명시적으로 기각</b></li>
+        <li><b>Stevenson, B.C. &amp; Millar, R.B. (2013)</b> — Promising the moon?, <i>Environmental and Ecological Statistics</i> 20(4), 591–608 — 효과가 통계적으로는 잡히지만 <b>「실용적 의미를 의심할 만큼 작다」</b></li>
+        <li><b>Lowry, M. 외 (2007)</b> — Lunar landings, <i>Fisheries Research</i></li>
+      </ul>
+      <div class="honest2">
+        <b>그래서</b>
+        <p>저희는 월령에 <strong>큰 가중치를 주지 않습니다.</strong> 달을 크게 내세우는 서비스와 다른 점입니다.</p>
+      </div>
+    </div>
+
+    <div class="mod low">
+      <div class="mod-h"><h3>기압</h3><span class="badge low">근거 없음에 가까움</span></div>
+      <p>기압이 떨어지면 입질이 좋아진다는 이야기는 널리 퍼져 있습니다.
+         저희도 찾아보았지만 이를 뒷받침하는 <strong>신뢰할 만한 동료심사 연구를 확인하지 못했습니다.</strong>
+         검색 결과 상위는 전부 낚시 매체와 블로그였습니다.
+         그래서 기압은 활성 계산에 거의 넣지 않으며, 넣더라도 근거가 약하다고 표시합니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>금어기와 금지체장</h2>
+    <div class="mod mid">
+      <div class="mod-h"><h3>규정 자료</h3><span class="badge mid">공식 자료 기반</span></div>
+      <p>금어기 대상은 아예 추천하지 않고, 잡아도 되는 크기와 재는 기준을 함께 띄웁니다.
+         1차 근거는 국립수산과학원 안내 자료이고, 해양수산부 어업관리단 자료로 교차 확인합니다.</p>
+      <div class="honest2">
+        <b>한계</b>
+        <p>시·도 조례와 최근 개정분이 반영되지 않았을 수 있습니다.
+           화면에는 항상 기준일자와 원문 확인 링크를 함께 띄웁니다.
+           <strong>이 자료는 참고용 경고 장치이지 법적 판단 근거가 아닙니다.</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>마지막으로</h2>
+    <p class="cap">
+      잘 확립된 물리(파랑·조석·체감온도)와 경험칙(물고기 활성)을 같은 화면에 나란히 보여드리는 것은 저희의 선택입니다.
+      다만 어느 쪽이 어느 쪽인지는 반드시 구분해 표시하겠습니다.
+      안전에 관한 판단은 언제나 현장에서 직접 하시고, 저희 숫자는 참고로만 써 주십시오.
+    </p>
+    <div class="cta">
+      <h2>직접 써보세요</h2>
+      <p>위 계산이 실제로 어떻게 나오는지는 앱에서 바로 보실 수 있습니다.</p>
+      <a class="btn" href="../index.html">오늘 어디 갈까</a>
+    </div>
+  </section>
+</article>
+</main>
+
+<footer class="foot">
+  <p><a href="../index.html">해루낚</a> — 물때 해석은 앱이 합니다. 어디 가서 뭘 잡을지 결론만 보세요.</p>
+  <p class="fine">이 쪽에 적힌 문헌은 모두 실재를 확인한 것입니다. 확인하지 못한 것은 싣지 않았습니다.</p>
+  <p class="fine">해루낚이 내는 점수는 참고용이며 안전 판단은 현장에서 직접 하셔야 합니다.</p>
+  <p class="fine">유튜브·블로그 채널 운영자시라면 <a href="../partner/">채널 제휴 안내</a>를 보세요. 문의 <a href="mailto:thecloudstay@gmail.com">thecloudstay@gmail.com</a></p>
+</footer>
+</body>
+</html>
