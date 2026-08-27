@@ -1442,13 +1442,43 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* 표준 표기 병기 */
 body { -webkit-user-select: none; user-select: none; }
 input, textarea { -webkit-user-select: text; user-select: text; }
-</style>
+
 /* 제휴 대가성 고지 — 눈에 띄되 화면을 잡아먹지 않게 */
 .affnote{
   margin:11px 0 0; padding:9px 12px; border-radius:10px;
   background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.09);
   font-size:11.5px; line-height:1.65; color:var(--mut2); letter-spacing:-.1px;
 }
+
+/* 지점 위험도 — 물가가 오는 속도 */
+.risk{margin-top:12px;padding:14px 16px;border-radius:14px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)}
+.risk.r3{background:rgba(252,211,77,.09);border-color:rgba(252,211,77,.32)}
+.risk.r4{background:rgba(252,165,165,.1);border-color:rgba(252,165,165,.4)}
+.risk-h{display:flex;align-items:baseline;gap:9px;margin-bottom:10px}
+.risk-lb{font-size:11.5px;font-weight:700;color:var(--mut2);letter-spacing:.02em}
+.risk-h b{font-size:16px;font-weight:800;letter-spacing:-.2px;color:var(--acc)}
+.risk.r3 .risk-h b{color:#fcd34d}
+.risk.r4 .risk-h b{color:#fca5a5}
+.risk-g{display:grid;grid-template-columns:1fr 1fr;gap:1px;
+  background:rgba(255,255,255,.08);border-radius:9px;overflow:hidden;margin-bottom:10px}
+.risk-g>div{background:rgba(6,21,32,.5);padding:9px 11px}
+.risk-g i{display:block;font-style:normal;font-size:10.5px;color:var(--mut2);margin-bottom:2px}
+.risk-g b{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.risk.r4 .risk-g>div:first-child b{color:#fca5a5}
+.risk-s{margin:0 0 9px;font-size:13.5px;line-height:1.7;color:#dfeaf2}
+.risk-d{margin:0;font-size:11px;line-height:1.6;color:var(--mut2);
+  padding-top:9px;border-top:1px solid rgba(255,255,255,.08)}
+.risk-d b{color:var(--mut);font-weight:700}
+.risk-d a{color:var(--acc2);text-decoration:underline}
+
+.risk-g.g3{grid-template-columns:1fr 1fr 1fr}
+.risk-g>div.hot{background:rgba(252,165,165,.1)}
+.risk-g>div.hot b{color:#fca5a5}
+.risk-x{margin:0 0 9px;padding:9px 11px;border-radius:9px;
+  background:rgba(252,211,77,.1);border:1px solid rgba(252,211,77,.28);
+  font-size:12.5px;line-height:1.7;color:#e8ddc0}
+</style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -2732,72 +2762,212 @@ function tideRise_(dtH, rangeM){
  * @param widthM 저조 때 드러나는 폭(m)
  * @return {inT, outT, dist, speed, walkMin, workMin, tight, why}
  */
+/** 목표 작업 시간(분) — 이만큼도 못 있을 거면 그 거리는 의미가 없다 */
+var WADE_TARGET = 90;
+var WADE_DMIN   = 80;
+
 function wadePlan_(lowT, rangeM, floor, widthM){
   if (lowT === null || lowT === undefined) return null;
-  var v = WADE_SPEED[floor] || 2600;
+  var v     = WADE_SPEED[floor] || 2600;
   var slope = FLAT_SLOPE[floor] || 0.003;
-  var H = Math.max(0, widthM) * slope;            // 저조 때 드러나는 수직 낙차(m)
-  /* 실제로 걸어 나가는 거리 — 갯벌이 아무리 넓어도 사람은 끝까지 가지 않는다.
-     편도 25분쯤을 상한으로 두고, 그보다 좁은 갯벌이면 폭 그대로 쓴다. */
-  var D = Math.max(60, Math.min(widthM, v * 0.42));
+  var H     = Math.max(0, widthM) * slope;
   if (!(H > 0)) return null;
 
-  /* 어느 시각에 드러난 거리가 얼마인가 */
   function E(t){
     var h = tideRise_(t - lowT, rangeM);
     return Math.max(0, (H - h) / slope);
   }
-  var STEP = 1/12;                                // 5분
+  var STEP = 1/12;
 
-  /* 퇴로 — 지금 돌아서면 물에 안 잡히는 가장 늦은 시각 */
-  function backOk(td){
-    for (var t = td; t <= td + 4; t += STEP){
-      var pos = D - v * (t - td);
-      if (pos <= 0) return true;                  // 뭍에 닿았다
-      if (pos + WADE_CLEAR > E(t)) return false;  // 물이 먼저 닿는다
+  /* 거리 D 를 정하면 진입·퇴로 시각이 정해진다 */
+  function windowFor(D){
+    function backOk(td){
+      for (var t = td; t <= td + 6; t += STEP){
+        var pos = D - v * (t - td);
+        if (pos <= 0) return true;
+        if (pos + WADE_CLEAR > E(t)) return false;
+      }
+      return true;
     }
-    return true;
-  }
-  var outT = null;
-  for (var td = lowT + 4; td >= lowT - 0.5; td -= STEP){
-    if (backOk(td)){ outT = td; break; }
-  }
+    var outT = null;
+    for (var td = lowT + 6; td >= lowT - 0.5; td -= STEP){ if (backOk(td)){ outT = td; break; } }
 
-  /* 진입 — 걸어 나가는 동안 계속 마른 갯벌을 밟을 수 있는 가장 이른 시각 */
-  function outOk(ti){
-    for (var t = ti; t <= ti + 4; t += STEP){
-      var pos = v * (t - ti);
-      if (pos >= D) return true;
-      if (pos + WADE_CLEAR > E(t)) return false;
+    function outOk(ti){
+      for (var t = ti; t <= ti + 6; t += STEP){
+        var pos = v * (t - ti);
+        if (pos >= D) return true;
+        if (pos + WADE_CLEAR > E(t)) return false;
+      }
+      return true;
     }
-    return true;
-  }
-  var inT = null;
-  for (var ti = lowT - 4; ti <= lowT + 0.5; ti += STEP){
-    if (outOk(ti)){ inT = ti; break; }
-  }
-  if (inT === null || outT === null) return null;
+    var inT = null;
+    for (var ti = lowT - 6; ti <= lowT + 0.5; ti += STEP){ if (outOk(ti)){ inT = ti; break; } }
+    if (inT === null || outT === null) return null;
 
-  var walkMin = Math.round(D / v * 60);
-  var margin  = Math.min(0.5, 0.25 + walkMin / 600);   // 15~30분 안전 여유
-  outT = outT - margin;
-  if (outT <= inT) return null;
+    var walkMin = Math.round(D / v * 60);
+    var margin  = Math.min(0.5, 0.25 + walkMin / 600);
+    outT = outT - margin;
+    if (outT <= inT) return null;
+    return {
+      D: D, inT: inT, outT: outT, walkMin: walkMin, margin: margin,
+      workMin: Math.round((outT - inT) * 60) - walkMin * 2
+    };
+  }
 
-  var workMin = Math.round((outT - inT) * 60) - walkMin * 2;
+  /* ── 순서가 중요하다 ──
+     예전에는 "걸어서 갈 수 있는 최대 거리"를 먼저 정하고 시간을 계산했다.
+     그러면 갯벌 폭이 좁은 곳에서 맨 끝까지 나가라고 해 놓고
+     "실제로 잡을 수 있는 시간 13분" 같은 말이 나온다. 쓸모가 없다.
+
+     지금은 거꾸로 한다. 목표 작업 시간(90분)이 나오는
+     '가장 먼' 거리를 고른다. 멀리 갈수록 좋지만 시간이 먼저다.        */
+  var cap = Math.max(WADE_DMIN, Math.min(widthM, v * 0.42));
+  var best = null, chosen = null;
+  for (var D = cap; D >= WADE_DMIN; D -= 20){
+    var w = windowFor(D);
+    if (!w) continue;
+    if (!best || w.workMin > best.workMin) best = w;
+    if (w.workMin >= WADE_TARGET){ chosen = w; break; }
+  }
+  var r = chosen || best;
+  if (!r) return null;
+
   var km = function(x){ return x >= 1000 ? (x/1000).toFixed(1) + 'km' : Math.round(x) + 'm'; };
+  var why = '편도 ' + km(r.D) + ' 기준 · 걷는 데 한쪽 ' + r.walkMin + '분 · 안전 여유 '
+          + Math.round(r.margin * 60) + '분을 뺐습니다';
+  if (r.D < cap - 10)
+    why += ' (저조 때는 ' + km(widthM) + '까지 드러나지만, 그만큼 나가면 머물 시간이 없어 '
+         + km(r.D) + ' 로 잡았습니다)';
+  else if (widthM > r.D * 1.25)
+    why += ' (저조 때는 ' + km(widthM) + '까지 드러나지만 그렇게 멀리 나가면 물때에 걸립니다)';
+
   return {
-    inT: (inT + 24) % 24, outT: (outT + 24) % 24,
-    dist: Math.round(D), maxWidth: Math.round(widthM), speed: v, walkMin: walkMin,
-    workMin: Math.max(0, workMin),
-    tight: workMin < 40,
-    why: '편도 ' + km(D) + ' 기준 · 걷는 데 한쪽 ' + walkMin + '분 · 안전 여유 '
-       + Math.round(margin*60) + '분을 뺐습니다'
-       + (widthM > D * 1.25
-            ? ' (저조 때는 ' + km(widthM) + '까지 드러나지만 그렇게 멀리 나가면 물때에 걸립니다)'
-            : '')
+    inT: (r.inT + 24) % 24,
+    outT: (r.outT + 24) % 24,
+    dist: Math.round(r.D),
+    maxWidth: Math.round(widthM),
+    speed: v,
+    walkMin: r.walkMin,
+    workMin: Math.max(0, r.workMin),
+    tight: r.workMin < 40,
+    why: why
   };
 }
 
+/* ══════════ 9-3. 지점 위험도 ══════════
+ *  갯벌 고립사고가 왜 뻘에서만 나는지는 물리로 설명된다.
+ *
+ *  물이 드는 속도(수직)는 어디나 비슷하지만, 물가가 육지 쪽으로
+ *  밀려오는 속도(수평)는 바닥 경사에 반비례한다.
+ *  뻘은 경사가 1/1000 수준이라, 수직으로 1m 차는 동안
+ *  물가는 수평으로 1km를 온다. 모래밭의 네 배가 넘는다.
+ *
+ *      h(t)  = (R/2)(1 - cos(pi·t/T))        조석 상승
+ *      dh/dt = (R·pi / 2T)·sin(pi·t/T)       중간 물때에 최대
+ *      물가 전진 속도 = (dh/dt) / 경사
+ *
+ *  이 값을 사람 걸음 속도로 나눈 것이 rho 다.
+ *  rho 가 1을 넘으면 물이 들기 시작한 뒤에 걸어 나와서는 늦는다.
+ *  서해 뻘은 조차 7m를 넘으면 rho 가 1을 넘는다. 인천·강화 대조가 여기다.
+ *
+ *  이 수치는 화면 경고에도 쓰고, 지점별 위험등급 자료로도 내보낸다.
+ */
+function riskOf_(rangeM, floor){
+  var slope = FLAT_SLOPE[floor];
+  var walk  = WADE_SPEED[floor];
+  if (!slope || !walk || !(rangeM > 0)) return null;
+
+  var T = 6.21;
+  var vWater = rangeM * Math.PI / (2 * T * slope);   // 물가 최대 전진 속도 (m/h)
+  var rho    = vWater / walk;
+
+  var grade, label, say;
+  if (rho >= 1.0){
+    grade = 4; label = '매우 높음';
+    say = '중간 물때에는 물가가 걸음보다 빠릅니다. 물이 들기 시작하면 이미 늦습니다.';
+  } else if (rho >= 0.6){
+    grade = 3; label = '높음';
+    say = '물가가 걸음 속도의 ' + Math.round(rho * 100) + '%로 따라옵니다. 여유를 넉넉히 두세요.';
+  } else if (rho >= 0.3){
+    grade = 2; label = '보통';
+    say = '걸어서 빠져나올 수 있는 속도지만 갯골은 먼저 잠깁니다.';
+  } else {
+    grade = 1; label = '낮음';
+    say = '경사가 있어 물가가 천천히 옵니다.';
+  }
+
+  return {
+    rho: Math.round(rho * 100) / 100,
+    water: Math.round(vWater),      // m/h
+    walk: walk,                     // m/h
+    slope: slope,
+    grade: grade,                   // 1~4
+    label: label,
+    say: say
+  };
+}
+
+/* ══════════ 9-4. 갯바위 처오름 ══════════
+ *  갯바위 사고는 갯벌보다 많다. 최근 5년 638건, 사망 71명.
+ *  그런데 원인이 다르다. 갯벌은 물때고, 갯바위는 너울이다.
+ *
+ *  사람들이 "갑자기 큰 파도가 왔다"고 하는 것은 착각이 아니다.
+ *  파고는 유의파고(상위 1/3의 평균)라 개별 파는 그보다 크다.
+ *  레일리 분포에서 1000파 중 최대파는 유의파고의 약 1.86배다.
+ *
+ *      Hmax ≈ 1.86 · Hs
+ *      L0   = g·T² / 2π                      심해 파장
+ *      ξ    = tanβ / √(Hmax/L0)              이리바렌 수
+ *      R    = Hmax · ξ                        헌트(1959) 급경사 밀려오름
+ *
+ *  핵심은 주기다. 같은 파고 1m라도 주기 6초면 처오름 2.0m,
+ *  14초면 4.8m가 된다. 파고만 보는 앱이 놓치는 자리가 여기다.
+ *
+ *  Hunt, I.A. (1959) Design of seawalls and breakwaters
+ *  Longuet-Higgins, M.S. (1952) 파고의 통계 분포
+ */
+var ROCK_BETA = 0.20;        // 갯바위 앞면 경사 (약 11도)
+var WAVE_MAX_RATIO = 1.86;   // 1000파 중 최대파 / 유의파고
+
+function runupOf_(waveM, periodS){
+  if (waveM === null || waveM === undefined) return null;
+  if (periodS === null || periodS === undefined || !(periodS > 0)) return null;
+  if (!(waveM > 0)) waveM = 0.1;
+
+  var Hmax = WAVE_MAX_RATIO * waveM;
+  var L0   = 9.81 * periodS * periodS / (2 * Math.PI);
+  var xi   = ROCK_BETA / Math.sqrt(Hmax / L0);
+  var R    = Hmax * Math.min(xi, 3.0);
+
+  var grade, label, say;
+  if (R >= 4.0){
+    grade = 4; label = '매우 높음';
+    say = '큰 파 하나가 ' + R.toFixed(1) + 'm까지 올라옵니다. 갯바위에 서 있을 높이가 아닙니다.';
+  } else if (R >= 2.5){
+    grade = 3; label = '높음';
+    say = '드물게 오는 큰 파가 ' + R.toFixed(1) + 'm까지 칩니다. 발밑까지 옵니다.';
+  } else if (R >= 1.5){
+    grade = 2; label = '보통';
+    say = '큰 파는 ' + R.toFixed(1) + 'm까지 올라옵니다. 낮은 자리는 피하세요.';
+  } else {
+    grade = 1; label = '낮음';
+    say = '처오름 ' + R.toFixed(1) + 'm. 갯바위 높이면 대체로 넘지 않습니다.';
+  }
+
+  return {
+    runup: Math.round(R * 10) / 10,        // 처오름 높이 (m)
+    hs: Math.round(waveM * 100) / 100,     // 유의파고
+    hmax: Math.round(Hmax * 10) / 10,      // 최대파
+    period: Math.round(periodS * 10) / 10,
+    wavelen: Math.round(L0),
+    xi: Math.round(xi * 100) / 100,
+    grade: grade,
+    label: label,
+    say: say,
+    swell: periodS >= 9,                   // 장주기 너울
+    ratio: Math.round(R / Math.max(0.1, waveM) * 10) / 10
+  };
+}
 /* ══════════ 10. 해안 방위와 바람 방향 ══════════ */
 /**
  * 그 자리가 바라보는 바다 방향(방위각, 도).
@@ -3825,6 +3995,8 @@ function analyze_(p, ds, tide, wxRec, want){
       vis: Math.round(vis.vis*100)/100, visWord: vis.word, ssc: Math.round(vis.ssc),
       flatWidth: Math.round(width),
       wade: (typeof wadePlan_ === 'function') ? wadePlan_(lowT, range, p.f, width) : null,
+      risk: (typeof riskOf_ === 'function') ? riskOf_(range, p.f) : null,
+      runup: (typeof runupOf_ === 'function') ? runupOf_(fWx.wave, fWx.wper) : null,
       curPeak: Math.round(flow.peak*100)/100,
       solunar: { major: sol.major, minor: sol.minor, strength: Math.round(sol.strength*100),
                  moonrise: sol.ev.rise, moonset: sol.ev.set, transit: sol.ev.transit },
@@ -5510,7 +5682,55 @@ function renderDetail(d){
           ? '<p class="wade-w">⚠ 머물 수 있는 시간이 짧습니다. 물가까지 다 나가지 마시고 중간에서 도세요.</p>'
           : '<p class="wade-w ok">나오는 시각은 이미 안전 여유를 뺀 값입니다. 이 시각에는 뭍 쪽으로 돌아서 걷고 계셔야 합니다.</p>');
     wsec.appendChild(wbox);
+
+    /* 물가가 얼마나 빨리 오는가 — 고립사고의 물리적 원인이다.
+       추정치라는 고지를 접지 않고 여기에 같이 둔다. */
+    if (meta.risk){
+      var rk = meta.risk;
+      var rbox = el('div','risk r' + rk.grade);
+      rbox.innerHTML =
+          '<div class="risk-h"><span class="risk-lb">이 자리 위험도</span>'
+        + '<b>' + rk.label + '</b></div>'
+        + '<div class="risk-g">'
+        +   '<div><i>물가가 오는 속도</i><b>' + rk.water.toLocaleString() + ' m/h</b></div>'
+        +   '<div><i>걷는 속도</i><b>' + rk.walk.toLocaleString() + ' m/h</b></div>'
+        + '</div>'
+        + '<p class="risk-s">' + rk.say + '</p>'
+        + '<p class="risk-d">위 시각과 속도는 조석·지형으로 낸 <b>추정치</b>입니다. '
+        + '실제 물때와 기상은 다를 수 있으니 현장 상황을 우선하세요. '
+        + '<a href="method/">계산 근거 보기</a></p>';
+      wsec.appendChild(rbox);
+    }
+
     b.appendChild(wsec);
+  }
+
+  /* 갯바위 처오름 — 낚시 사고는 물때보다 너울이다 */
+  if (S.mode === 'fish' && meta.runup){
+    var ru = meta.runup;
+    var usec = el('div','sec');
+    usec.appendChild(el('div','sec-t','파도가 어디까지 올라오나'));
+    var ubox = el('div','risk r' + ru.grade);
+    ubox.innerHTML =
+        '<div class="risk-h"><span class="risk-lb">갯바위 처오름</span><b>' + ru.label + '</b></div>'
+      + '<div class="risk-g g3">'
+      +   '<div><i>유의파고</i><b>' + ru.hs.toFixed(1) + ' m</b></div>'
+      +   '<div><i>주기</i><b>' + ru.period.toFixed(0) + ' 초</b></div>'
+      +   '<div class="hot"><i>처오름</i><b>' + ru.runup.toFixed(1) + ' m</b></div>'
+      + '</div>'
+      + '<p class="risk-s">' + ru.say + '</p>'
+      + (ru.swell
+          ? '<p class="risk-x">⚠ 주기 ' + ru.period.toFixed(0) + '초 장주기 너울입니다. '
+            + '파고는 낮아 보여도 파장이 ' + ru.wavelen + 'm라 힘이 셉니다. '
+            + '갯바위 사고는 이런 날 납니다.</p>'
+          : '')
+      + '<p class="risk-d">파고 ' + ru.hs.toFixed(1) + 'm의 <b>' + ru.ratio + '배</b>까지 올라옵니다 — '
+      + '파고만 보면 안 되는 이유입니다. 유의파고는 상위 3분의 1의 평균이라 '
+      + '드물게 오는 큰 파는 ' + ru.hmax.toFixed(1) + 'm입니다. '
+      + '파랑·지형으로 낸 <b>추정치</b>이니 현장 상황을 우선하세요. '
+      + '<a href="method/">계산 근거 보기</a></p>';
+    usec.appendChild(ubox);
+    b.appendChild(usec);
   }
 
   /* 세부 포인트 (국민포인트) */
