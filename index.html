@@ -1489,7 +1489,7 @@ input, textarea { -webkit-user-select: text; user-select: text; }
   to  { opacity:1; transform:none }
 }
 .sec.rise,.verdict.rise,.dt-head.rise,.wade.rise,.risk.rise{
-  animation:riseIn .5s cubic-bezier(.16,1,.3,1) both;
+  animation:riseIn .75s cubic-bezier(.16,1,.3,1) both;
 }
 
 /* 점수 링 — 테두리와 숫자가 함께 차오른다 (그리기는 자바스크립트가 한다) */
@@ -1498,45 +1498,45 @@ input, textarea { -webkit-user-select: text; user-select: text; }
   60% { transform:scale(1.04) }
   100%{ transform:scale(1) }
 }
-.ring.ring-go{ animation:ringPop .62s cubic-bezier(.16,1,.3,1) both }
+.ring.ring-go{ animation:ringPop .95s cubic-bezier(.16,1,.3,1) both }
 
 /* 막대는 전부 0에서 자란다 */
-.gauge-t i{ width:0; transition:width .95s cubic-bezier(.16,1,.3,1) }
-.wade-bar i{ width:0; transition:width 1.05s cubic-bezier(.16,1,.3,1) .12s }
+.gauge-t i{ width:0; transition:width 1.4s cubic-bezier(.16,1,.3,1) }
+.wade-bar i{ width:0; transition:width 1.6s cubic-bezier(.16,1,.3,1) .18s }
 
 /* 진입·퇴로 시각이 툭 나타난다 */
 @keyframes timePop{
   0%  { opacity:0; transform:translateY(6px) scale(.96) }
   100%{ opacity:1; transform:none }
 }
-.wade-t b.pop{ animation:timePop .5s cubic-bezier(.16,1,.3,1) both }
+.wade-t b.pop{ animation:timePop .75s cubic-bezier(.16,1,.3,1) both }
 
 /* 물때 곡선이 왼쪽부터 그려진다 */
 @keyframes drawLine{ to{ stroke-dashoffset:0 } }
 .tide-line{
   stroke-dasharray:1400; stroke-dashoffset:1400;
-  animation:drawLine 1.5s cubic-bezier(.35,.9,.3,1) .1s forwards;
+  animation:drawLine 2.3s cubic-bezier(.35,.9,.3,1) .15s forwards;
 }
 @keyframes fadeUpSvg{ from{ opacity:0 } to{ opacity:1 } }
-.tide-area{ animation:fadeUpSvg 1.1s ease .5s both }
+.tide-area{ animation:fadeUpSvg 1.6s ease .75s both }
 
 /* 추천 구간이 가운데에서 펼쳐진다 */
 @keyframes winOpen{
   from{ opacity:0; transform:scaleX(.2) }
   to  { opacity:1; transform:none }
 }
-.tide-win{ transform-origin:center; animation:winOpen .6s cubic-bezier(.16,1,.3,1) 1.0s both }
-.tide-win-lb{ animation:fadeUpSvg .5s ease 1.3s both }
+.tide-win{ transform-origin:center; animation:winOpen .9s cubic-bezier(.16,1,.3,1) 1.5s both }
+.tide-win-lb{ animation:fadeUpSvg .75s ease 1.95s both }
 
 /* 점수표 막대 — 이미 폭이 움직이므로 결만 맞춘다 */
-.bar-fl{ transition:width .9s cubic-bezier(.16,1,.3,1) }
+.bar-fl{ transition:width 1.35s cubic-bezier(.16,1,.3,1) }
 
 /* 위험도 숫자에 시선을 한 번 준다 */
 @keyframes riskGlow{
   0%,100%{ box-shadow:0 0 0 0 rgba(252,165,165,0) }
   35%    { box-shadow:0 0 0 5px rgba(252,165,165,.16) }
 }
-.risk.r4.rise .risk-g>div:first-child{ animation:riskGlow 1.7s ease .7s 2 }
+.risk.r4.rise .risk-g>div:first-child{ animation:riskGlow 2.2s ease 1.1s 2 }
 
 /* 손이 닿는 곳은 눌리는 느낌을 준다 */
 .row{ transition:transform .16s ease, background .16s ease }
@@ -1551,6 +1551,72 @@ input, textarea { -webkit-user-select: text; user-select: text; }
   .gauge-t i,.wade-bar i,.bar-fl{ transition:none!important }
   .tide-line{ stroke-dashoffset:0!important }
 }
+
+/* ══════════ 속보 줄 — 최상단, 사이트 톤 ══════════ */
+.ticker{
+  position:fixed; left:0; right:0; top:0; z-index:23;
+  display:flex; align-items:center;
+  height:calc(28px + var(--safeT)); padding-top:var(--safeT);
+  background:rgba(6,21,32,.72);
+  border-bottom:1px solid rgba(120,190,225,.14);
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+}
+.tk-badge{
+  flex:0 0 auto; display:flex; align-items:center; gap:5px;
+  padding:0 10px 0 14px; font-size:10.5px; font-weight:800; letter-spacing:.12em;
+  color:var(--acc); opacity:.9;
+}
+.tk-badge::before{
+  content:''; width:5px; height:5px; border-radius:50%;
+  background:var(--acc); opacity:.8;
+  animation:tkDot 2.4s ease-in-out infinite;
+}
+@keyframes tkDot{ 0%,100%{ opacity:.35 } 50%{ opacity:.95 } }
+.tk-win{ flex:1; overflow:hidden; height:100%; display:flex; align-items:center;
+  mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 14px),transparent);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 14px),transparent);
+}
+.tk-track{ display:inline-flex; align-items:center; white-space:nowrap; will-change:transform; }
+@keyframes tkIn{ from{ opacity:0; transform:translateY(6px) } to{ opacity:1; transform:none } }
+.tk-it.tk-in{ animation:tkIn .55s cubic-bezier(.16,1,.3,1) both }
+/* 한 건이 줄보다 길 때만, 천천히 갔다가 돌아온다 */
+@keyframes tkPong{ 0%,12%{ transform:translateX(0) } 46%,58%{ transform:translateX(calc(var(--ov) * -1)) } 92%,100%{ transform:translateX(0) } }
+.tk-track.pong{ animation:tkPong linear infinite }
+.ticker:hover .tk-track.pong{ animation-play-state:paused }
+.tk-it{ font-size:12px; font-weight:500; color:rgba(207,227,239,.78); letter-spacing:-.1px; }
+.tk-it .tk-tag{
+  font-style:normal; font-size:10px; font-weight:800; letter-spacing:.06em;
+  padding:2px 6px; border-radius:6px; margin-right:7px; vertical-align:1px;
+}
+.tk-tag.t-bo{ color:#7fe8c4; background:rgba(46,230,168,.12) }
+.tk-tag.t-gi{ color:#8fdcff; background:rgba(53,208,255,.12) }
+.tk-tag.t-nu{ color:#cfe3ef; background:rgba(255,255,255,.09) }
+.tk-it.go{ cursor:pointer }
+.tk-it.go:hover{ color:var(--txt) }
+.tk-track.still{ padding:0 10px }
+
+/* 속보 줄이 켜지면 위 요소들이 그만큼 내려온다 */
+body.has-ticker .topbar{ top:calc(38px + var(--safeT)) }
+body.has-ticker .datestrip{ top:calc(100px + var(--safeT)) }
+body.has-ticker .seg{ top:calc(148px + var(--safeT)) }
+body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
+@media (prefers-reduced-motion:reduce){
+  .tk-track.pong{ animation:none!important }
+  .tk-badge::before{ animation:none!important; opacity:.8 }
+}
+
+
+/* 물때만 날짜 */
+.dchip.far{ opacity:.62 }
+.dchip.far span{ color:var(--acc2); font-weight:700; font-size:9px }
+.dchip.far.on{ opacity:1 }
+.pin-tide{ background:rgba(24,56,74,.92)!important; color:#8fdcff!important;
+  border-color:rgba(120,190,225,.5)!important }
+.grade.g-tide{ color:#8fdcff; background:rgba(53,208,255,.1) }
+.ring .tide-mark{ font-size:26px; color:#8fdcff }
+.dt-verdict.tide-note{ background:rgba(53,208,255,.08); border-color:rgba(53,208,255,.3);
+  color:#cfe9f5; font-weight:500 }
+.dt-verdict.tide-note b{ color:#8fdcff }
 </style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -1641,6 +1707,12 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 </section>
 
 <!-- 바텀시트 -->
+<!-- 속보 줄 — 제보·위판 역산·오늘의 1위가 한 줄로 흐른다 -->
+<div class="ticker" id="ticker" hidden>
+  <span class="tk-badge">속보</span>
+  <div class="tk-win"><div class="tk-track" id="tkTrack"></div></div>
+</div>
+
 <section class="sheet glass" id="sheet">
   <div class="handle" id="handle"><i></i></div>
   <div class="sheet-head">
@@ -5069,6 +5141,16 @@ fetchWeather_=function(points,ds){
   return out;
 };
 function ensureWeather(ds){
+  /* 기상 예보 한계(7일) 밖 — 헛되이 부르지 않고 물때만으로 간다.
+     '오늘' 기준은 엔진(BOOT.today, 한국시)과 반드시 같아야 한다. */
+  try {
+    var _b = (window.BOOT && BOOT.today) ? BOOT.today : (typeof todayStr_==='function' ? todayStr_() : null);
+    if (_b){
+      var _q = _b.split('-'), _t = new Date(+_q[0], +_q[1]-1, +_q[2]);
+      var _p = ds.split('-'), _d = new Date(+_p[0], +_p[1]-1, +_p[2]);
+      if (Math.round((_d - _t) / 86400000) > 6) return Promise.resolve('tideonly');
+    }
+  } catch(e){}
   if (WX_REAL[ds]!==undefined) return Promise.resolve(WX_REAL[ds]);
   // 이 기기 캐시(1시간)
   try {
@@ -5208,6 +5290,14 @@ function updateNote(real){
   var n=document.querySelector('.demo-note');
   if (!n) return;
   // 정상일 때는 아무 말도 하지 않는다. 문제가 있을 때만 알린다.
+  if (real === 'tideonly'){
+    n.style.display = '';
+    n.textContent = '이 날짜는 물때·진입/퇴로만 제공됩니다 — 정확한 점수는 7일 이내만';
+    n.style.background = 'rgba(53,208,255,.1)';
+    n.style.borderColor = 'rgba(53,208,255,.3)';
+    n.style.color = '#8fdcff';
+    return;
+  }
   if (real){ n.style.display = 'none'; return; }
   n.style.display = '';
   n.textContent = '기상 정보를 불러오지 못했습니다. 예시값으로 보여드리는 중입니다';
@@ -5384,8 +5474,8 @@ function pinIcon(r, isTop, small){
   var w = small ? 26 : 38, tail = small ? PIN_TAIL_SM : PIN_TAIL;
   return L.divIcon({
     className: '',
-    html: '<div class="pin pin-'+r.grade+(small?' sm':'')+(isTop?' pin-top':'')+'" style="position:relative">'
-        + r.score + (isTop ? '<i class="halo"></i>' : '') + '</div>',
+    html: '<div class="pin '+(tideOnly_()?'pin-tide':'pin-'+r.grade)+(small?' sm':'')+(isTop&&!tideOnly_()?' pin-top':'')+'" style="position:relative">'
+        + (tideOnly_() ? '≈' : r.score) + (isTop && !tideOnly_() ? '<i class="halo"></i>' : '') + '</div>',
     iconSize: [w, w + tail],
     iconAnchor: [w/2, w + tail]
   });
@@ -5501,6 +5591,7 @@ function load(){
       S.shown = res.shown; S.total = res.total;
       S.gen = res.generated;
       render();
+      if (FEED === null) loadFeed_(); else buildTicker_();
       if (!S._routed){ S._routed = true; applyRoute_(); }
     })
     .withFailureHandler(function(e){
@@ -5543,12 +5634,134 @@ function syncPick(){
   if (!pickClosed()) $('pickRestore').hidden = true;
   else $('pickRestore').style.opacity = open ? '0' : '1';
 }
+
+/* ══════════ 속보 줄 ══════════
+   한 번에 한 건만 보여준다. 10분에 한 건씩, 하루 단위로 섞은 순서로
+   번갈아 나온다. 20건이면 한 바퀴가 약 3시간 20분 — 하루 종일 같은 줄이
+   붙어 있지 않고, 그렇다고 정신없이 흐르지도 않는다.
+   ① 제보  ② 위판 역산(항구에서 많이 잡히면 그 앞바다에 있다)  ③ 기사
+   자료가 하나도 없으면 오늘의 1~3위가 대신 돈다.                        */
+var FEED = null;
+
+function kmBetween_(la1, lo1, la2, lo2){
+  var R = 6371, d2r = Math.PI/180;
+  var dLa = (la2-la1)*d2r, dLo = (lo2-lo1)*d2r;
+  var a = Math.sin(dLa/2)*Math.sin(dLa/2)
+        + Math.cos(la1*d2r)*Math.cos(la2*d2r)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/** 위판 한 건 → 근처 지점 추천 문장 */
+function tickFromCatch_(c){
+  if (!c || !c.항구) return null;
+  var near = [];
+  if (c.la != null && c.lo != null && typeof POINTS !== 'undefined'){
+    var best = null, bd = 1e9;
+    for (var i = 0; i < POINTS.length; i++){
+      var d = kmBetween_(c.la, c.lo, POINTS[i].la, POINTS[i].lo);
+      if (d < bd){ bd = d; best = POINTS[i]; }
+    }
+    if (best && bd <= 40) near = [best];
+  }
+  var t = c.항구 + ' 위판에 ' + c.품목 + (c.양 ? ' ' + c.양 : '');
+  if (near.length)
+    return { tag:'위판', cls:'t-gi', text: t + ' — 근처 ' + near[0].n + ' 앞바다에 붙었다는 뜻', i: near[0].i };
+  return { tag:'위판', cls:'t-gi', text: t + ' — 그 앞바다가 살아 있습니다', i: null };
+}
+
+function tickerPool_(){
+  var pool = [];
+  if (FEED && FEED.제보) FEED.제보.forEach(function(r){
+    if (r && r.글) pool.push({ tag:'제보', cls:'t-bo',
+      text: (r.지점 ? r.지점 + ' · ' : '') + r.글, i: r.번호 || null });
+  });
+  if (FEED && FEED.위판) FEED.위판.forEach(function(c){
+    var t = tickFromCatch_(c); if (t) pool.push(t);
+  });
+  if (FEED && FEED.기사) FEED.기사.forEach(function(a){
+    if (a && a.제목) pool.push({ tag:'기사', cls:'t-gi',
+      text: '「' + a.제목 + '」' + (a.출처 ? ' — ' + a.출처 : ''),
+      i: a.번호 || null, url: a.url || null });
+  });
+  if (!pool.length && S.rows && S.rows.length){
+    S.rows.slice().sort(function(x,y){ return y.raw - x.raw; }).slice(0,3)
+      .forEach(function(r, k){
+        pool.push({ tag:(k+1)+'위', cls:'t-nu', text: r.n + ' ' + r.score + '점 — ' + (r.verdict||''), i: r.i });
+      });
+  }
+  return pool;
+}
+
+/** 하루 단위 고정 셔플 — 같은 날엔 누구나 같은 순서를 본다 */
+function dayShuffle_(arr){
+  var d = new Date(), seed = d.getFullYear()*372 + (d.getMonth()+1)*31 + d.getDate();
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--){
+    seed = (seed * 9301 + 49297) % 233280;
+    var j = Math.floor(seed / 233280 * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+var TK_SLOT_MIN = 10;
+function tickerShow_(){
+  var tk = $('ticker'), tr = $('tkTrack');
+  if (!tk || !tr) return;
+  var pool = dayShuffle_(tickerPool_());
+  if (!pool.length){ tk.hidden = true; document.body.classList.remove('has-ticker'); return; }
+  tk.hidden = false; document.body.classList.add('has-ticker');
+
+  var now = new Date();
+  var slot = Math.floor((now.getHours()*60 + now.getMinutes()) / TK_SLOT_MIN);
+  if (window.__tkSlot != null) slot = window.__tkSlot;      // 검증용
+  var it = pool[slot % pool.length];
+  if (tk._key === it.text) return;                          // 같은 건이면 그대로
+  tk._key = it.text;
+
+  var sp = el('span','tk-it' + ((it.i != null || it.url) ? ' go' : ''),
+    '<i class="tk-tag ' + it.cls + '">' + it.tag + '</i>' + it.text);
+  if (it.i != null) sp.onclick = function(){ openDetail(it.i); };
+  else if (it.url) sp.onclick = function(){ try { window.open(it.url, '_blank', 'noopener'); } catch(e){} };
+
+  tr.innerHTML = ''; tr.classList.add('still'); tr.appendChild(sp);
+  if (!NOMO){
+    sp.classList.add('tk-in');
+    /* 줄보다 길면 천천히 한 번 갔다 온다 — 목록 전체가 흐르는 게 아니라 이 한 건만 */
+    nextFrame_(function(){
+      var over = tr.scrollWidth - tr.parentNode.clientWidth;
+      if (over > 8){
+        tr.style.setProperty('--ov', over + 'px');
+        tr.style.animationDuration = Math.max(10, Math.round(over / 22)) + 's';
+        tr.classList.add('pong');
+      } else { tr.classList.remove('pong'); }
+    });
+  }
+}
+
+function buildTicker_(){
+  tickerShow_();
+  var tk = $('ticker');
+  if (tk && !tk._clock) tk._clock = setInterval(tickerShow_, 30000);   // 슬롯이 바뀌었나 30초마다 본다
+}
+
+function loadFeed_(){
+  try {
+    fetch('data/feed.json', { cache:'default' })
+      .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+      .then(function(j){ FEED = j; buildTicker_(); })
+      .catch(function(){ buildTicker_(); });
+  } catch(e){ buildTicker_(); }
+}
+
 function render(){
   drawPins();
   renderPick();
   renderList();
-  $('tagline').textContent = MODE_NAME[S.mode] + ' · ' + S.rows.length + '곳'
-    + (S.total && S.rows.length < S.total ? ' / ' + S.total : '') + ' 분석';
+  $('tagline').textContent = tideOnly_()
+    ? '물때만 · 점수는 7일 이내 제공'
+    : MODE_NAME[S.mode] + ' · ' + S.rows.length + '곳'
+      + (S.total && S.rows.length < S.total ? ' / ' + S.total : '') + ' 분석';
   $('wantbar').hidden = !S.want;
   $('pick').classList.toggle('hasWant', !!S.want);
   if (S.want) $('wantbarT').textContent = S.want + ' 기준으로 순위를 냈습니다';
@@ -5574,11 +5787,16 @@ function renderPick(){
   S.cur = top;
   if (pickClosed()){ $('pick').hidden = true; $('pickRestore').hidden = false; $('pickRestore').classList.toggle('hasWant', !!S.want); }
   else { $('pick').hidden = false; $('pickRestore').hidden = true; }
-  $('pickScore').textContent = top.score;
-  $('pickRing').style.setProperty('--v', top.score);
-  $('pickRing').style.background = 'conic-gradient(var(--'+top.grade+') calc('+top.score+'*1%),rgba(255,255,255,.08) 0)';
+  var TO = tideOnly_();
+  $('pickScore').textContent = TO ? '≈' : top.score;
+  $('pickRing').style.setProperty('--v', TO ? 0 : top.score);
+  $('pickRing').style.background = TO
+    ? 'conic-gradient(rgba(120,190,225,.4) 100%,rgba(255,255,255,.08) 0)'
+    : 'conic-gradient(var(--'+top.grade+') calc('+top.score+'*1%),rgba(255,255,255,.08) 0)';
   $('pickName').textContent = top.n;
-  $('pickVerdict').textContent = top.verdict;
+  $('pickVerdict').textContent = TO
+    ? '물때만 보는 날짜입니다. 정확한 점수는 7일 이내만 제공됩니다 — 물때·진입/퇴로 시각만 참고하세요.'
+    : top.verdict;
   var c = $('pickChips'); c.innerHTML = '';
   c.appendChild(el('span','chip', top.r));
   c.appendChild(el('span','chip hot', top.mul + ' · 조차 ' + top.range + 'm'));
@@ -5640,7 +5858,9 @@ function renderList(){
     if (r.isl) top.appendChild(el('span','row-isl', r.fr ? '배 '+r.fr[1]+'분' : '섬'));
     top.appendChild(el('span','row-reg', r.r + (r._d!=null ? ' · '+Math.round(r._d)+'km' : '')));
     body.appendChild(top);
-    body.appendChild(el('div','row-verdict', r.verdict));
+    body.appendChild(el('div','row-verdict', tideOnly_()
+      ? '물때·진입/퇴로만 제공 — 점수는 7일 이내'
+      : r.verdict));
 
     var ch = el('div','row-chips');
     if (r.win) ch.appendChild(el('span','chip hot', hm(r.win[0])+'~'+hm(r.win[1])));
@@ -5653,7 +5873,9 @@ function renderList(){
     body.appendChild(ch);
     row.appendChild(body);
 
-    row.appendChild(el('div','grade g-'+r.grade, r.grade + '<small>'+r.score+'</small>'));
+    row.appendChild(tideOnly_()
+      ? el('div','grade g-tide', '≈<small>물때</small>')
+      : el('div','grade g-'+r.grade, r.grade + '<small>'+r.score+'</small>'));
     row.onclick = function(){ openDetail(r.i); };
     l.appendChild(row);
   });
@@ -5730,7 +5952,7 @@ function playIn_(root){
   var secs = root.querySelectorAll('.sec, .verdict, .dt-head, .wade, .risk');
   for (var i = 0; i < secs.length; i++){
     secs[i].classList.remove('rise');
-    if (!NOMO) secs[i].style.animationDelay = Math.min(i * 45, 520) + 'ms';
+    if (!NOMO) secs[i].style.animationDelay = Math.min(i * 70, 780) + 'ms';
   }
   nextFrame_(function(){
     for (var j = 0; j < secs.length; j++) secs[j].classList.add('rise');
@@ -5753,11 +5975,15 @@ function renderDetail(d){
     ring.style.background = 'conic-gradient(' + rcol + ' ' + pct + '%,rgba(255,255,255,.08) 0)';
   }
   paintRing_(NOMO ? m.score : 0);
+  if (tideOnly_()){
+    ring.innerHTML = '<span class="tide-mark">≈</span>';
+    ring.style.background = 'conic-gradient(rgba(120,190,225,.4) 100%,rgba(255,255,255,.08) 0)';
+  }
   head.appendChild(ring);
-  if (!NOMO){
+  if (!NOMO && !tideOnly_()){
     /* 숫자와 테두리를 같은 프레임에서 함께 올린다 — 따로 돌면 어긋나 보인다 */
     ring.classList.add('ring-go');
-    var rspan = ring.querySelector('span'), t0 = null, DUR = 1000;
+    var rspan = ring.querySelector('span'), t0 = null, DUR = 1500;
     requestAnimationFrame(function tick(t){
       if (t0 === null) t0 = t;
       var k = Math.min(1, (t - t0) / DUR);
@@ -5797,7 +6023,11 @@ function renderDetail(d){
   b.appendChild(head);
 
   /* 결론 */
-  b.appendChild(el('div','dt-verdict' + (m.score < 46 ? ' bad' : ''), m.verdict));
+  b.appendChild(tideOnly_()
+    ? el('div','dt-verdict tide-note',
+        '<b>물때만 보는 날짜입니다.</b> 기상 예보가 닿지 않아 <b>정확한 점수는 7일 이내</b>만 제공됩니다. '
+      + '아래 물때·만조 간조·진입/퇴로 시각은 조석 계산이라 그대로 믿으셔도 됩니다.')
+    : el('div','dt-verdict' + (m.score < 46 ? ' bad' : ''), m.verdict));
 
   /* 진입·퇴로 — 갯벌에서 사고는 대부분 "언제 나와야 하는지" 몰라서 난다 */
   if (S.mode === 'haeru' && meta.wade){
@@ -6382,6 +6612,17 @@ function renderDetail(d){
   act.appendChild(cl);
   b.appendChild(act);
 
+  if (tideOnly_()){
+    var KILL = ['수중 시야', '바다와 하늘', '점수를 이렇게', '파도가 어디까지', '근거와 주의', '같은 날 낚시는', '조건 맞춤 장비'];
+    var secs2 = b.querySelectorAll('.sec');
+    for (var q = 0; q < secs2.length; q++){
+      var tt = secs2[q].querySelector('.sec-t');
+      if (!tt) continue;
+      for (var q2 = 0; q2 < KILL.length; q2++)
+        if (tt.textContent.indexOf(KILL[q2]) >= 0){ secs2[q].remove(); break; }
+    }
+  }
+
   b.scrollTop = 0;
   playIn_(b);
 }
@@ -6716,16 +6957,32 @@ function tideSVG(meta, win){
 }
 
 /* ══════════════ 날짜 ══════════════ */
+/* ── 물때만 날짜 ──
+   기상 예보는 7일이 한계다. 그 너머 날짜는 점수를 지어내지 않고
+   물때·진입/퇴로처럼 조석만으로 계산되는 것만 보여준다. */
+var WX_DAYS = 6;                       // 오늘 포함 7일 (오늘+6)
+function tideOnlyDs_(ds){
+  try {
+    var b = parseDs(BOOT.today), d = parseDs(ds);
+    return Math.round((d - b) / 86400000) > WX_DAYS;
+  } catch(e){ return false; }
+}
+function tideOnly_(){ return tideOnlyDs_(S.ds); }
+
 function renderDates(){
   var n = $('datestrip'); n.innerHTML = '';
   var base = parseDs(BOOT.today);   // 서버 기준 오늘
-  for (var k=-1; k<=8; k++){
+  for (var k=-1; k<=13; k++){
     var d = new Date(base.getTime() + k*86400000);
     var ds = dstr(d);
+    var far = k > WX_DAYS;
     var lbl = k===0 ? '오늘' : k===1 ? '내일' : k===-1 ? '어제' : (d.getMonth()+1)+'/'+d.getDate();
-    var c = el('button','dchip'+(ds===S.ds?' on':''),
-      '<b>'+lbl+'</b><span>'+WD[d.getDay()]+'</span>');
-    (function(x){ c.onclick = function(){ if (S.ds===x) return; S.ds = x; renderDates(); load(); }; })(ds);
+    var c = el('button','dchip'+(ds===S.ds?' on':'')+(far?' far':''),
+      '<b>'+lbl+'</b><span>'+(far?'물때만':WD[d.getDay()])+'</span>');
+    (function(x, fx){ c.onclick = function(){
+      if (S.ds===x) return; S.ds = x; renderDates(); load();
+      if (fx) toast('정확한 점수는 7일 이내만 제공됩니다 — 이 날짜는 물때·진입/퇴로만 보여드립니다', 3600);
+    }; })(ds, far);
     n.appendChild(c);
   }
   var on = n.querySelector('.dchip.on');
