@@ -714,24 +714,27 @@ h1,h2,h3,h4,p{margin:0}
 .leaflet-control-zoom{display:none}
 
 /* 베이스맵 전환 (지도·위성·밝게) — 바텀시트 접힌 높이(148px) 위 */
-.leaflet-bottom.leaflet-left{z-index:19}
+.leaflet-bottom.leaflet-left{z-index:650}
 .leaflet-bottom.leaflet-left .leaflet-control.basesw{
   margin:0 0 calc(162px + var(--safeB)) 12px;
 }
 .basesw{
-  display:flex;gap:2px;padding:3px;
-  background:rgba(6,22,33,.82);border:1px solid rgba(255,255,255,.13);
-  border-radius:11px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  box-shadow:0 6px 18px rgba(0,0,0,.4);
+  display:flex;gap:3px;padding:4px;
+  background:#0a1e2b;border:1px solid rgba(140,200,235,.3);
+  border-radius:13px;
+  box-shadow:0 8px 24px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.25);
 }
 .basebtn{
   -webkit-appearance:none;appearance:none;border:0;cursor:pointer;
-  padding:6px 10px;border-radius:8px;background:transparent;
-  color:var(--mut);font-family:inherit;font-size:11.5px;font-weight:600;line-height:1;
+  padding:8px 13px;border-radius:10px;background:transparent;
+  color:#cadeeb;font-family:inherit;font-size:12.5px;font-weight:700;line-height:1;
   letter-spacing:-.2px;transition:background .16s,color .16s;
 }
-.basebtn:hover{color:var(--txt)}
-.basebtn.on{background:rgba(46,230,168,.16);color:#7fe8c4}
+.basebtn:hover{color:#fff;background:rgba(255,255,255,.09)}
+.basebtn.on{
+  background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;font-weight:800;
+  box-shadow:0 2px 9px rgba(46,230,168,.4);
+}
 
 /* 위성 모드: 배경이 밝아 핀 테두리·비네트를 강하게 */
 body.map-sat .vignette{
@@ -756,17 +759,35 @@ body.map-sat .leaflet-container{background:#0b1a22}
   color:#04121c;border:2px solid rgba(255,255,255,.35);
   box-shadow:0 4px 16px rgba(0,0,0,.5);
   transition:transform .25s var(--sp);
+  transform-origin:50% 124%;            /* 꼬리 끝을 축으로 커진다 — 지점이 안 밀린다 */
 }
-.pin.sm{width:26px;height:26px;font-size:10.5px;opacity:.82;border-width:1.5px}
+/* 꼬리 — 이 삼각형 끝이 실제 좌표다 */
+.pin::before{
+  content:'';position:absolute;left:50%;top:calc(100% - 1px);
+  width:0;height:0;margin-left:-5px;
+  border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:10px solid var(--pinc,#2ee6a8);
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));
+}
+/* 좌표 자리에 찍는 점 — 어느 배율에서도 정확히 어디인지 보인다 */
+.pin::after{
+  content:'';position:absolute;left:50%;top:calc(100% + 8px);
+  width:5px;height:5px;margin-left:-2.5px;border-radius:50%;
+  background:#fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.6);
+}
+.pin.sm{width:26px;height:26px;font-size:10.5px;opacity:.85;border-width:1.5px;transform-origin:50% 127%}
+.pin.sm::before{margin-left:-4px;border-left-width:4px;border-right-width:4px;border-top-width:8px}
+.pin.sm::after{top:calc(100% + 6px);width:4px;height:4px;margin-left:-2px}
 .pin.on{transform:scale(1.28);border-color:#fff;z-index:999}
-.pin-S{background:linear-gradient(140deg,#2ee6a8,#0fb98a)}
-.pin-A{background:linear-gradient(140deg,#b9f04a,#84cc16)}
-.pin-B{background:linear-gradient(140deg,#fcd34d,#f59e0b)}
-.pin-C{background:linear-gradient(140deg,#fdba74,#f97316);color:#2a1000}
-.pin-D{background:linear-gradient(140deg,#fca5a5,#ef4444);color:#2a0808}
-.pin-top::after{
-  content:'';position:absolute;inset:-7px;border-radius:50%;
-  border:2px solid var(--acc);animation:pulse 2.2s infinite;
+.pin-S{background:linear-gradient(140deg,#2ee6a8,#0fb98a);--pinc:#16c497}
+.pin-A{background:linear-gradient(140deg,#b9f04a,#84cc16);--pinc:#96d92f}
+.pin-B{background:linear-gradient(140deg,#fcd34d,#f59e0b);--pinc:#f7bd2b}
+.pin-C{background:linear-gradient(140deg,#fdba74,#f97316);color:#2a1000;--pinc:#fa8b3a}
+.pin-D{background:linear-gradient(140deg,#fca5a5,#ef4444);color:#2a0808;--pinc:#f47070}
+.pin-top{box-shadow:0 0 0 3px rgba(46,230,168,.35),0 4px 18px rgba(0,0,0,.55)}
+.pin-top .halo{
+  position:absolute;inset:-7px;border-radius:50%;
+  border:2px solid var(--acc);animation:pulse 2.2s infinite;pointer-events:none;
 }
 @keyframes pulse{0%{transform:scale(.85);opacity:.9}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}
 
@@ -974,7 +995,18 @@ body.map-sat .leaflet-container{background:#0b1a22}
 
 .dt-head{display:flex;gap:14px;align-items:center;margin-bottom:14px}
 .dt-head h2{font-size:23px;font-weight:800;letter-spacing:-.7px}
-.dt-head p{font-size:11.5px;color:var(--mut);margin-top:2px}
+.dt-head p{font-size:13px;color:var(--mut);margin-top:3px}
+.dt-sub{
+  display:block;margin-top:6px;font-size:15px;font-weight:700;line-height:1.5;
+  color:var(--acc);letter-spacing:-.3px;
+}
+.dt-sub .lb{
+  display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;
+  color:#04121c;background:var(--acc);border-radius:6px;padding:2px 6px;
+  margin-right:7px;vertical-align:2px;
+}
+.dt-sub b{font-weight:700}
+.dt-sub .sep{color:rgba(46,230,168,.45);margin:0 5px;font-weight:400}
 .dt-verdict{
   font-size:15px;line-height:1.6;font-weight:600;padding:15px;border-radius:var(--r2);
   background:linear-gradient(135deg,rgba(46,230,168,.14),rgba(53,208,255,.07));
@@ -1300,12 +1332,37 @@ body.map-sat .leaflet-container{background:#0b1a22}
   border:1px solid var(--line);margin-bottom:8px}
 .spot.best{border-color:rgba(46,230,168,.4);background:rgba(46,230,168,.06)}
 .spot-h{display:flex;align-items:center;gap:7px;margin-bottom:6px}
-.spot-h b{font-size:13.5px;font-weight:800;letter-spacing:-.3px}
-.spot-star{font-size:9px;font-weight:800;padding:3px 7px;border-radius:7px;
+.spot-h b{font-size:16px;font-weight:800;letter-spacing:-.4px}
+.spot-star{font-size:10px;font-weight:800;padding:3px 8px;border-radius:7px;
   background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;flex:0 0 auto}
 .spot-t{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
-.spot-d{font-size:12px;line-height:1.55;color:#bcd6e5}
-.spot-w{font-size:11.5px;line-height:1.5;color:#fcb3b3;margin-top:5px}
+.spot-d{font-size:13.5px;line-height:1.65;color:#cfe3ef}
+.spot-w{font-size:12.5px;line-height:1.6;color:#fcb3b3;margin-top:6px}
+
+/* 진입·퇴로 */
+.wade{
+  background:linear-gradient(135deg,rgba(46,230,168,.11),rgba(53,208,255,.05));
+  border:1px solid rgba(46,230,168,.3);border-radius:var(--r2);padding:15px 16px;
+}
+.wade.tight{background:linear-gradient(135deg,rgba(251,191,36,.13),rgba(248,113,113,.06));
+  border-color:rgba(251,191,36,.36)}
+.wade-row{display:flex;align-items:center;gap:12px}
+.wade-t{flex:1;min-width:0}
+.wade-t span{display:block;font-size:11px;color:var(--mut);margin-bottom:2px}
+.wade-t b{font-size:26px;font-weight:800;letter-spacing:-1px;color:var(--acc);
+  font-variant-numeric:tabular-nums}
+.wade-t.out b{color:#fcd34d}
+.wade.tight .wade-t b{color:#fcd34d}
+.wade.tight .wade-t.out b{color:#fca5a5}
+.wade-arrow{flex:0 0 auto;font-size:16px;color:var(--mut2)}
+.wade-bar{height:5px;border-radius:4px;background:rgba(255,255,255,.09);margin:12px 0 10px;overflow:hidden}
+.wade-bar i{display:block;height:100%;border-radius:4px;
+  background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.wade.tight .wade-bar i{background:linear-gradient(90deg,#fcd34d,#f97316)}
+.wade-n b{display:block;font-size:14px;font-weight:800;margin-bottom:3px}
+.wade-n span{font-size:12px;color:var(--mut);line-height:1.6}
+.wade-w{margin:10px 0 0;font-size:12px;line-height:1.6;color:#e6dcc4}
+.wade-w.ok{color:var(--mut)}
 </style><style>
 .adcard{display:block;margin:18px 0 0;padding:12px 14px;border-radius:var(--r2);
   background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.22);
@@ -1359,6 +1416,9 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { -webkit-user-select: none; user-select: none; }
 input, textarea { -webkit-user-select: text; user-select: text; }
 </style>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="mask-icon" href="icon.svg" color="#2ee6a8">
 <meta name="naver-site-verification" content="91e427302481f46851e378e769ad02f7d8660b2d">
 <meta name="description" content="물때 해석은 앱이 합니다. 전국 259곳을 조석·수중시야·조류·바람·수온·금어기로 분석해 오늘 어디 가서 뭐를 잡을지 결론만 알려드립니다.">
 <link rel="canonical" href="https://haerunak.com/">
@@ -2607,6 +2667,103 @@ function flatWidth_(mslCm, lowCm, floor){
   return drop / (FLAT_SLOPE[floor] || 0.003);
 }
 
+/* ══════════ 9-2. 진입·퇴로 시각 ══════════
+ *  갯벌은 "몇 시가 좋다"만으로는 안전하지 않다.
+ *  물가까지 걸어 나가는 데 시간이 걸리고, 돌아올 때는 물이 쫓아온다.
+ *  그래서 조위 곡선과 걷는 속도를 함께 풀어 진입 시각과 퇴로 시각을 낸다.
+ *
+ *  조위(저조 기준 상승고)  h(Δt) = (R/2)(1 − cos(π·Δt / 6.21))
+ *  드러난 거리            E(t)  = max(0, (H − h) / 경사)
+ *  사람 위치              pos(t) = 걷기속도 × 경과시간
+ *  안전 조건              언제나  pos(t) + 여유 ≤ E(t)
+ */
+
+/** 바닥질별 도보 속도 (m/h) — 펄은 발이 빠져 느리다 */
+var WADE_SPEED = { mud:2000, mix:2600, sand:3200, rock:1600, none:2600 };
+/** 물가와 유지할 여유 거리(m) */
+var WADE_CLEAR = 25;
+
+/** 저조로부터 Δt 시간 떨어진 시점의 조위 상승고(m) */
+function tideRise_(dtH, rangeM){
+  var T = 6.21;                                  // 저조→만조 반주기(시간)
+  var x = Math.min(1, Math.abs(dtH) / T);
+  return (rangeM / 2) * (1 - Math.cos(Math.PI * x));
+}
+
+/**
+ * 진입·퇴로 계산
+ * @param lowT   저조 시각(소수 시간, 0~24)
+ * @param rangeM 그날 조차(m)
+ * @param floor  바닥질 키 (mud/mix/sand/rock)
+ * @param widthM 저조 때 드러나는 폭(m)
+ * @return {inT, outT, dist, speed, walkMin, workMin, tight, why}
+ */
+function wadePlan_(lowT, rangeM, floor, widthM){
+  if (lowT === null || lowT === undefined) return null;
+  var v = WADE_SPEED[floor] || 2600;
+  var slope = FLAT_SLOPE[floor] || 0.003;
+  var H = Math.max(0, widthM) * slope;            // 저조 때 드러나는 수직 낙차(m)
+  /* 실제로 걸어 나가는 거리 — 갯벌이 아무리 넓어도 사람은 끝까지 가지 않는다.
+     편도 25분쯤을 상한으로 두고, 그보다 좁은 갯벌이면 폭 그대로 쓴다. */
+  var D = Math.max(60, Math.min(widthM, v * 0.42));
+  if (!(H > 0)) return null;
+
+  /* 어느 시각에 드러난 거리가 얼마인가 */
+  function E(t){
+    var h = tideRise_(t - lowT, rangeM);
+    return Math.max(0, (H - h) / slope);
+  }
+  var STEP = 1/12;                                // 5분
+
+  /* 퇴로 — 지금 돌아서면 물에 안 잡히는 가장 늦은 시각 */
+  function backOk(td){
+    for (var t = td; t <= td + 4; t += STEP){
+      var pos = D - v * (t - td);
+      if (pos <= 0) return true;                  // 뭍에 닿았다
+      if (pos + WADE_CLEAR > E(t)) return false;  // 물이 먼저 닿는다
+    }
+    return true;
+  }
+  var outT = null;
+  for (var td = lowT + 4; td >= lowT - 0.5; td -= STEP){
+    if (backOk(td)){ outT = td; break; }
+  }
+
+  /* 진입 — 걸어 나가는 동안 계속 마른 갯벌을 밟을 수 있는 가장 이른 시각 */
+  function outOk(ti){
+    for (var t = ti; t <= ti + 4; t += STEP){
+      var pos = v * (t - ti);
+      if (pos >= D) return true;
+      if (pos + WADE_CLEAR > E(t)) return false;
+    }
+    return true;
+  }
+  var inT = null;
+  for (var ti = lowT - 4; ti <= lowT + 0.5; ti += STEP){
+    if (outOk(ti)){ inT = ti; break; }
+  }
+  if (inT === null || outT === null) return null;
+
+  var walkMin = Math.round(D / v * 60);
+  var margin  = Math.min(0.5, 0.25 + walkMin / 600);   // 15~30분 안전 여유
+  outT = outT - margin;
+  if (outT <= inT) return null;
+
+  var workMin = Math.round((outT - inT) * 60) - walkMin * 2;
+  var km = function(x){ return x >= 1000 ? (x/1000).toFixed(1) + 'km' : Math.round(x) + 'm'; };
+  return {
+    inT: (inT + 24) % 24, outT: (outT + 24) % 24,
+    dist: Math.round(D), maxWidth: Math.round(widthM), speed: v, walkMin: walkMin,
+    workMin: Math.max(0, workMin),
+    tight: workMin < 40,
+    why: '편도 ' + km(D) + ' 기준 · 걷는 데 한쪽 ' + walkMin + '분 · 안전 여유 '
+       + Math.round(margin*60) + '분을 뺐습니다'
+       + (widthM > D * 1.25
+            ? ' (저조 때는 ' + km(widthM) + '까지 드러나지만 그렇게 멀리 나가면 물때에 걸립니다)'
+            : '')
+  };
+}
+
 /* ══════════ 10. 해안 방위와 바람 방향 ══════════ */
 /**
  * 그 자리가 바라보는 바다 방향(방위각, 도).
@@ -3632,6 +3789,7 @@ function analyze_(p, ds, tide, wxRec, want){
       ferry: p.isl ? ferryPlan_(lowT, hWx.wave, hWx.wind, p.fr ? p.fr[2] : 1) : null,
       vis: Math.round(vis.vis*100)/100, visWord: vis.word, ssc: Math.round(vis.ssc),
       flatWidth: Math.round(width),
+      wade: (typeof wadePlan_ === 'function') ? wadePlan_(lowT, range, p.f, width) : null,
       curPeak: Math.round(flow.peak*100)/100,
       solunar: { major: sol.major, minor: sol.minor, strength: Math.round(sol.strength*100),
                  moonrise: sol.ev.rise, moonset: sol.ev.set, transit: sol.ev.transit },
@@ -4922,12 +5080,17 @@ baseCtl.onAdd = function(){
 baseCtl.addTo(map);
 try { var sv = localStorage.getItem('hrn_base'); if (sv && sv !== 'base' && sv !== 'dark') setBase_(sv); } catch(e){}
 
+/* 핀 — 원은 좌표 위에 뜨고, 꼬리 끝과 흰 점이 실제 좌표를 가리킨다.
+   iconAnchor 의 세로값 = 원 높이 + 꼬리 + 점까지의 거리 */
+var PIN_TAIL = 13, PIN_TAIL_SM = 10;
 function pinIcon(r, isTop, small){
+  var w = small ? 26 : 38, tail = small ? PIN_TAIL_SM : PIN_TAIL;
   return L.divIcon({
     className: '',
-    html: '<div class="pin pin-'+r.grade+(small?' sm':'')+(isTop?' pin-top':'')+'" style="position:relative">'+r.score+'</div>',
-    iconSize: small ? [26,26] : [38,38],
-    iconAnchor: small ? [13,13] : [19,19]
+    html: '<div class="pin pin-'+r.grade+(small?' sm':'')+(isTop?' pin-top':'')+'" style="position:relative">'
+        + r.score + (isTop ? '<i class="halo"></i>' : '') + '</div>',
+    iconSize: [w, w + tail],
+    iconAnchor: [w/2, w + tail]
   });
 }
 function drawPins(){
@@ -5096,6 +5259,7 @@ function render(){
   $('sheetFoot').innerHTML = (S.gen || '') + ' 기준 · 물때 자체 조석계산 · 기상 Open-Meteo · 점수는 참고용이며 안전 판단은 직접 하세요'
     + '<br><a href="species/" style="color:var(--acc2);text-decoration:none">어종 도감</a>'
     + ' · <a href="spot/" style="color:var(--acc2);text-decoration:none">전국 포인트 목록</a>'
+    + ' · <a href="partner/" style="color:var(--acc2);text-decoration:none">채널 제휴</a>'
     + '<br>제휴·광고 문의 <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc);text-decoration:none">thecloudstay@gmail.com</a>'
     + ' · <a href="#" id="redeemLink" style="color:var(--mut);text-decoration:underline">' + (isPremium() ? '프리미엄 이용 중' : '이용권 등록') + '</a>'
     + ' · <a href="#" id="partnerLink" style="color:var(--mut);text-decoration:underline">파트너 모집</a>';
@@ -5238,7 +5402,23 @@ function renderDetail(d){
   var ring = el('div','ring', '<span>'+m.score+'</span>');
   ring.style.background = 'conic-gradient(var(--'+m.grade+') calc('+m.score+'*1%),rgba(255,255,255,.08) 0)';
   head.appendChild(ring);
-  head.appendChild(el('div','', '<h2>'+d.point.n+'</h2><p>'+d.point.r+' · '+d.point.floor+' · '+(d.point.tag||'')+'</p>'));
+  /* 세부 자리(서브 로케이션) — 실제로 어디로 들어가는지가 이 앱에서 가장 중요한 정보다.
+     등록된 세부 포인트가 있으면 그 이름을, 없으면 지점 설명을 크게 올린다. */
+  var subNames = (d.spots || []).map(function(x){ return x.n; }).filter(Boolean);
+  var labeled = subNames.length > 0;
+  var subs = labeled
+    ? subNames.slice(0, 4)
+    : String(d.point.tag || '').split(/[·,]/).map(function(x){ return x.trim(); }).filter(Boolean);
+  var more = labeled && subNames.length > 4 ? ' 외 ' + (subNames.length - 4) + '곳' : '';
+  head.appendChild(el('div','',
+      '<h2>' + d.point.n + '</h2>'
+    + '<p>' + d.point.r + ' · ' + d.point.floor + '</p>'
+    + (subs.length
+        ? '<span class="dt-sub">'
+            + (labeled ? '<span class="lb">세부 자리</span>' : '')
+            + subs.join('<span class="sep">·</span>') + more
+          + '</span>'
+        : '')));
   var fav = el('button','fav-btn' + (favs().indexOf(d.point.i) >= 0 ? ' on' : ''), '★');
   fav.onclick = function(){
     var on = toggleFav(d.point.i);
@@ -5251,6 +5431,33 @@ function renderDetail(d){
 
   /* 결론 */
   b.appendChild(el('div','dt-verdict' + (m.score < 46 ? ' bad' : ''), m.verdict));
+
+  /* 진입·퇴로 — 갯벌에서 사고는 대부분 "언제 나와야 하는지" 몰라서 난다 */
+  if (S.mode === 'haeru' && meta.wade){
+    var wd = meta.wade;
+    var wsec = el('div','sec');
+    wsec.appendChild(el('div','sec-t','언제 들어가고 언제 나오나'));
+    var wbox = el('div','wade' + (wd.tight ? ' tight' : ''));
+    wbox.innerHTML =
+        '<div class="wade-row">'
+      +   '<div class="wade-t"><span>들어가기</span><b>' + hmH(wd.inT) + '</b></div>'
+      +   '<div class="wade-arrow" aria-hidden="true">→</div>'
+      +   '<div class="wade-t out"><span>늦어도 나오기</span><b>' + hmH(wd.outT) + '</b></div>'
+      + '</div>'
+      + '<div class="wade-bar"><i style="width:' + Math.max(6, Math.min(100,
+            Math.round(wd.workMin / Math.max(1, wd.workMin + wd.walkMin*2) * 100))) + '%"></i></div>'
+      + '<div class="wade-n">'
+      +   '<b>실제로 잡을 수 있는 시간 ' + (wd.workMin >= 60
+            ? Math.floor(wd.workMin/60) + '시간 ' + (wd.workMin%60) + '분'
+            : wd.workMin + '분') + '</b>'
+      +   '<span>' + wd.why + '</span>'
+      + '</div>'
+      + (wd.tight
+          ? '<p class="wade-w">⚠ 머물 수 있는 시간이 짧습니다. 물가까지 다 나가지 마시고 중간에서 도세요.</p>'
+          : '<p class="wade-w ok">나오는 시각은 이미 안전 여유를 뺀 값입니다. 이 시각에는 뭍 쪽으로 돌아서 걷고 계셔야 합니다.</p>');
+    wsec.appendChild(wbox);
+    b.appendChild(wsec);
+  }
 
   /* 세부 포인트 (국민포인트) */
   {
