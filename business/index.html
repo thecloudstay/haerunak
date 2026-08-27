@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>업체 등록 안내 | 해루낚</title>
+<meta name="description" content="낚싯배·민박·낚시점·어촌체험마을을 해루낚 지점 화면에 올립니다. 등록은 무료이고, 성사된 건에만 수수료를 받습니다.">
+<link rel="canonical" href="https://haerunak.com/business/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="업체 등록 안내 | 해루낚">
+<meta property="og:description" content="출조 직전에 그 자리를 보고 있는 손님에게 바로 노출됩니다. 등록 무료.">
+<meta property="og:url" content="https://haerunak.com/business/">
+<link rel="icon" type="image/svg+xml" href="../icon.svg">
+<link rel="apple-touch-icon" href="../icon.svg">
+<meta name="theme-color" content="#05141f">
+<link rel="stylesheet" href="../atlas.css">
+<style>
+.hero4{padding:6px 0 4px}
+.hero4 .tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.14em;
+  color:#04121c;background:linear-gradient(100deg,var(--acc),var(--acc2));
+  padding:5px 11px;border-radius:6px;margin-bottom:18px}
+.hero4 h1 em{font-style:normal;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+
+.who{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:var(--r);overflow:hidden;margin:0 0 10px}
+.who>div{background:var(--bg2);padding:15px 17px;display:flex;gap:13px;align-items:flex-start}
+.who>div>div{flex:1;min-width:0}
+.who em{font-style:normal;font-size:20px;flex:0 0 auto;line-height:1.3}
+.who b{display:block;font-size:15px;font-weight:800;margin-bottom:3px}
+.who p{margin:0;font-size:13.5px;color:var(--mut);line-height:1.7}
+
+.money2{border:1px solid rgba(46,230,168,.3);background:rgba(46,230,168,.06);
+  border-radius:var(--r);overflow:hidden;margin:0}
+.money2 .row{display:flex;align-items:center;gap:14px;padding:15px 17px;
+  border-bottom:1px solid rgba(46,230,168,.16)}
+.money2 .row:last-child{border-bottom:0}
+.money2 .row div{flex:1;min-width:0}
+.money2 b{display:block;font-size:14.5px;font-weight:700}
+.money2 span{display:block;font-size:12.5px;color:var(--mut2);line-height:1.6}
+.money2 em{font-style:normal;font-size:19px;font-weight:800;color:var(--acc);
+  letter-spacing:-.4px;text-align:right;flex:0 0 auto}
+
+.mock2{background:var(--bg2);border:1px solid var(--line2);border-radius:20px;padding:19px;margin:0 0 14px}
+.mock2 .lb{font-size:10.5px;font-weight:800;letter-spacing:.14em;color:var(--mut2);margin-bottom:13px}
+.pcard2{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 15px}
+.pcard2 .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.pcard2 .h em{font-style:normal;font-size:12px;color:var(--mut)}
+.pcard2 .h b{font-size:15px;font-weight:800}
+.pcard2 .h .tg{font-size:10px;font-weight:800;color:#04121c;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));border-radius:6px;padding:2px 7px}
+.pcard2 p{margin:0 0 11px;font-size:13px;color:var(--mut);line-height:1.7}
+.pcard2 .acts{display:flex;gap:7px}
+.pcard2 .acts span{font-size:13px;font-weight:700;padding:8px 15px;border-radius:11px;
+  background:rgba(53,208,255,.13);border:1px solid rgba(53,208,255,.3);color:#8fdcff}
+.pcard2 .acts span.p{background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;border-color:transparent}
+.mockcap{font-size:12px;color:var(--mut2);margin:12px 0 0;line-height:1.7}
+
+.need2{list-style:none;padding:0;margin:0 0 18px;display:grid;gap:8px}
+.need2 li{font-size:14px;color:#cfe3ef;padding-left:22px;position:relative;line-height:1.75}
+.need2 li::before{content:'—';position:absolute;left:0;color:var(--acc)}
+.need2 li b{color:var(--acc);font-weight:700}
+
+.apply2{border:1px solid rgba(46,230,168,.3);background:rgba(46,230,168,.07);
+  border-radius:20px;padding:26px;margin-top:16px}
+.apply2 h3{margin:0 0 8px;font-size:19px;font-weight:800;letter-spacing:-.3px}
+.apply2>p{margin:0 0 18px;font-size:14.5px;color:var(--mut);line-height:1.8}
+.apply2 .sub{font-size:12.5px;color:var(--mut2);margin:14px 0 0;line-height:1.7}
+.btn2{display:inline-block;padding:13px 20px;border-radius:15px;font-weight:700;font-size:14.5px;
+  background:rgba(255,255,255,.06);border:1px solid var(--line2);color:var(--txt);text-decoration:none}
+.btn2:hover{background:rgba(255,255,255,.1);text-decoration:none}
+.row2{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+
+.honest3{margin-top:16px;padding:17px 19px;border-radius:16px;
+  background:rgba(255,255,255,.045);border:1px dashed var(--line2)}
+.honest3 b.h{display:block;font-size:14px;font-weight:800;color:var(--warn);margin-bottom:8px}
+.honest3 p{margin:0 0 10px;font-size:14px;color:#cfe3ef;line-height:1.85}
+.honest3 p:last-child{margin:0}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../">해루낚</a>
+  <nav>
+    <a href="../species/">어종 도감</a>
+    <a href="../spot/">포인트</a>
+    <a href="../method/">계산 근거</a>
+    <a href="stats/">실적 조회</a>
+    <a class="app" href="../index.html">오늘 어디 갈까</a>
+  </nav>
+</header>
+
+<main>
+<article class="page hero4">
+  <span class="tag">업체 등록 안내</span>
+  <h1>출조 직전에 <em>그 자리를 보고 있는 손님</em>에게 바로 붙습니다</h1>
+  <p class="lead">
+    해루낚은 오늘 어디 가서 뭘 잡을지 결론만 내주는 서비스입니다. 전국 259곳을 분석합니다.
+    손님은 <strong>나가기 직전에</strong> 그 자리 화면을 봅니다.
+    그 화면 안에 배·숙소·낚시점 자리가 있습니다. <strong>등록은 무료입니다.</strong>
+  </p>
+
+  <section>
+    <h2>어떤 곳을 받나</h2>
+    <div class="who">
+      <div><em>⛴</em><div><b>낚싯배 · 유어선</b>
+        <p>출항 시각·인원·요금을 올려드립니다. 빈자리가 있는 날 그 지점을 보는 손님에게 바로 보입니다.</p></div></div>
+      <div><em>🏠</em><div><b>섬 민박 · 펜션 · 차박터</b>
+        <p>물때가 새벽이면 1박이 필요합니다. 앱이 "당일치기 안 됩니다"라고 알려주는 그 자리에 숙소가 붙습니다.</p></div></div>
+      <div><em>🎣</em><div><b>낚시점 · 미끼점</b>
+        <p>야간 영업, 미끼·장비 대여를 적어드립니다. 준비물 화면에서 바로 이어집니다.</p></div></div>
+      <div><em>🦪</em><div><b>어촌체험마을 · 갯벌체험장</b>
+        <p>체험료와 운영 시간을 올려드립니다. 그 지역이 원픽인 날 함께 노출됩니다.</p></div></div>
+      <div><em>🍜</em><div><b>근처 식당</b>
+        <p>새벽 영업이나 잡은 것 손질해 주는 곳이면 특히 반응이 좋습니다.</p></div></div>
+    </div>
+    <p class="cap">전국 어디든 받습니다. 다만 <strong>등록된 지점 259곳 근처</strong>여야 화면에 붙습니다.</p>
+  </section>
+
+  <section>
+    <h2>이렇게 보입니다</h2>
+    <div class="mock2">
+      <div class="lb">지점 화면 · 이 근처 (제휴)</div>
+      <div class="pcard2">
+        <div class="h"><em>⛴ 낚싯배</em><b>○○호 (우럭·광어)</b><span class="tg">오늘 자리 있음</span></div>
+        <p>진두항 05:30 출항 · 1인 9만원 · 채비 포함 · 초보 환영</p>
+        <div class="acts"><span class="p">전화</span><span>자세히</span><span>예약 문의</span></div>
+      </div>
+      <p class="mockcap">
+        손님이 <strong>전화</strong>를 누르면 바로 사장님 번호로 연결됩니다.
+        누른 횟수는 저희가 셉니다 — <a href="stats/">실적 조회 화면</a>에서 직접 확인하실 수 있습니다.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>돈은 이렇게 받습니다</h2>
+    <p class="cap" style="margin:0 0 16px">등록은 무료입니다. <strong>성사된 것에만</strong> 받습니다. 선지급도 월정액도 없습니다.</p>
+    <div class="money2">
+      <div class="row"><div><b>등록</b><span>지점 화면에 올리는 것 자체</span></div><em>무료</em></div>
+      <div class="row"><div><b>전화 연결</b><span>손님이 전화 버튼을 누른 것</span></div><em>무료</em></div>
+      <div class="row"><div><b>선상 예약 성사</b><span>실제로 배를 탄 인원 기준</span></div><em>1인 1~2만원</em></div>
+      <div class="row"><div><b>숙박 예약 성사</b><span>실제 투숙 기준</span></div><em>10~15%</em></div>
+      <div class="row"><div><b>맨 위 고정 노출</b><span>같은 지점에 여러 곳이 있을 때</span></div><em>월정액 협의</em></div>
+    </div>
+    <p class="cap">
+      성사 여부는 사장님이 알려주시는 대로 정산합니다. 저희가 예약 시스템을 붙들고 있지 않습니다.
+      <strong>못 미더우시면 전화 연결 횟수만 보시고 그만두셔도 됩니다.</strong> 그건 언제나 무료입니다.
+    </p>
+  </section>
+
+  <section>
+    <h2>신청하실 때 적어주실 것</h2>
+    <ul class="need2">
+      <li><b>업체 이름</b>과 종류 (낚싯배 / 민박 / 낚시점 / 체험마을 / 식당)</li>
+      <li><b>주소</b> 또는 가까운 항·해변 이름 — 어느 지점에 붙일지 정하는 데 씁니다</li>
+      <li><b>손님 받는 전화번호</b> — 화면에 그대로 뜹니다</li>
+      <li><b>한 줄 소개</b> — 출항 시각, 요금, 영업 시간, 특징 등 손님이 알고 싶은 것</li>
+      <li>홈페이지·블로그·예약 페이지가 있으면 <b>주소</b></li>
+      <li>담당자 성함과 연락 받으실 <b>메일</b></li>
+    </ul>
+
+    <div class="apply2">
+      <h3>메일 한 통이면 됩니다</h3>
+      <p>아래를 누르면 항목이 채워진 메일 창이 열립니다. 빈칸만 메워 보내주세요.
+         계약서도 없고 최소 기간도 없습니다. 보통 하루 안에 답을 드립니다.</p>
+      <div class="row2">
+        <a class="btn" href="mailto:thecloudstay@gmail.com?subject=%5B%ED%95%B4%EB%A3%A8%EB%82%9A%5D%20%EC%97%85%EC%B2%B4%20%EB%93%B1%EB%A1%9D%20%EC%8B%A0%EC%B2%AD&amp;body=%EC%97%85%EC%B2%B4%20%EC%9D%B4%EB%A6%84%3A%0A%EC%A2%85%EB%A5%98%20(%EB%82%9A%EC%8B%A3%EB%B0%B0%2F%EB%AF%BC%EB%B0%95%2F%EB%82%9A%EC%8B%9C%EC%A0%90%2F%EC%B2%B4%ED%97%98%EB%A7%88%EC%9D%84%2F%EC%8B%9D%EB%8B%B9)%3A%0A%EC%A3%BC%EC%86%8C%20%EB%98%90%EB%8A%94%20%EA%B0%80%EA%B9%8C%EC%9A%B4%20%ED%95%AD%C2%B7%ED%95%B4%EB%B3%80%3A%0A%EC%86%90%EB%8B%98%20%EB%B0%9B%EB%8A%94%20%EC%A0%84%ED%99%94%EB%B2%88%ED%98%B8%3A%0A%ED%95%9C%20%EC%A4%84%20%EC%86%8C%EA%B0%9C%20(%EC%B6%9C%ED%95%AD%20%EC%8B%9C%EA%B0%81%C2%B7%EC%9A%94%EA%B8%88%C2%B7%EC%98%81%EC%97%85%EC%8B%9C%EA%B0%84%20%EB%93%B1)%3A%0A%ED%99%88%ED%8E%98%EC%9D%B4%EC%A7%80%C2%B7%EB%B8%94%EB%A1%9C%EA%B7%B8%20%EC%A3%BC%EC%86%8C%3A%0A%EB%8B%B4%EB%8B%B9%EC%9E%90%20%EC%84%B1%ED%95%A8%3A%0A%EC%97%B0%EB%9D%BD%20%EB%B0%9B%EC%9C%BC%EC%8B%A4%20%EB%A9%94%EC%9D%BC%3A%0A%0A---%0A%ED%95%B4%EB%A3%A8%EB%82%9A%20haerunak.com">메일로 신청하기</a>
+        <a class="btn2" href="../index.html">앱 먼저 보기</a>
+      </div>
+      <p class="sub">
+        정산에 필요한 정보(사업자 정보, 입금 계좌)는 첫 정산 직전에 따로 여쭙습니다.
+        지금 단계에서는 보내지 마세요. 받은 정보는 정산 외 용도로 쓰지 않습니다.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>솔직히 말씀드리면</h2>
+    <div class="honest3">
+      <b class="h">아직 작은 서비스입니다</b>
+      <p>해루낚은 2026년에 시작한 서비스입니다. 지금 등록하신다고 내일부터 전화가 쏟아지지 않습니다.
+         <strong>이런 걸 부풀려 말하고 싶지 않습니다.</strong></p>
+      <p>다만 두 가지는 말씀드릴 수 있습니다.
+         하나, <strong>등록에 돈이 들지 않습니다.</strong> 손해 볼 일이 없습니다.
+         둘, 저희 화면을 보는 사람은 <strong>이미 나가기로 마음먹은 사람</strong>입니다.
+         광고를 흘려보내는 것과 다릅니다.</p>
+      <p>먼저 등록해 두신 곳이 지점당 맨 위에 놓입니다. 나중에 같은 지점에 여러 곳이 들어오면 순서를 협의합니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>궁금하신 것</h2>
+    <p class="cap">
+      <strong>중간에 그만둘 수 있나요?</strong> 메일 한 통이면 바로 내려드립니다. 위약금 없습니다.<br><br>
+      <strong>전화번호가 노출되면 광고 전화가 오지 않나요?</strong> 화면에는 버튼으로만 걸리고, 번호 자체를 긁어가기 어렵게 해 두었습니다. 다만 완전히 막을 수는 없습니다.<br><br>
+      <strong>예약 시스템을 붙여야 하나요?</strong> 아닙니다. 전화만 받으시면 됩니다.<br><br>
+      <strong>정말 몇 통이 왔는지 알 수 있나요?</strong> 네. <a href="stats/">실적 조회 화면</a>에서 업체 코드로 직접 보십니다.
+    </p>
+  </section>
+</article>
+</main>
+
+<footer class="foot">
+  <p><a href="../index.html">해루낚</a> — 물때 해석은 앱이 합니다. 어디 가서 뭘 잡을지 결론만 보세요.</p>
+  <p class="fine">업체 정보는 사장님이 알려주신 그대로 싣습니다. 요금·시간이 바뀌면 알려주세요.</p>
+  <p class="fine">유튜브·블로그 채널 운영자시라면 <a href="../partner/">채널 제휴 안내</a>를 보세요.</p>
+  <p class="fine">업체 문의 <a href="mailto:thecloudstay@gmail.com">thecloudstay@gmail.com</a></p>
+</footer>
+</body>
+</html>

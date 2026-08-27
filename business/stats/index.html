@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>업체 실적 조회 | 해루낚</title>
+<meta name="description" content="해루낚에 등록된 업체의 노출·전화 연결·예약 실적을 업체 코드로 조회합니다.">
+<meta name="robots" content="noindex,follow">
+<link rel="canonical" href="https://haerunak.com/business/stats/">
+<link rel="icon" type="image/svg+xml" href="../../icon.svg">
+<link rel="apple-touch-icon" href="../../icon.svg">
+<meta name="theme-color" content="#05141f">
+<link rel="stylesheet" href="../../atlas.css">
+<style>
+.lookup{
+  background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);
+  padding:22px;margin:0 0 26px;
+}
+.lookup label{display:block;font-size:13px;color:var(--mut);margin-bottom:9px}
+.lookup .row{display:flex;gap:8px;flex-wrap:wrap}
+.lookup input{
+  flex:1 1 200px;min-width:0;padding:13px 15px;border-radius:13px;
+  background:rgba(255,255,255,.05);border:1px solid var(--line2);
+  color:var(--txt);font-size:15px;font-family:inherit;
+}
+.lookup input:focus{outline:2px solid var(--acc);outline-offset:1px}
+.lookup button{
+  padding:13px 22px;border-radius:13px;border:0;cursor:pointer;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));
+  color:#04121c;font-weight:800;font-size:15px;font-family:inherit;
+}
+.lookup button:active{transform:scale(.97)}
+
+.result{display:none}
+.result.on{display:block}
+.rhead{
+  display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;
+  padding-bottom:13px;margin-bottom:18px;border-bottom:1px solid var(--line);
+}
+.rhead b{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.rhead code{
+  font-size:12px;color:var(--acc);background:rgba(46,230,168,.11);
+  border:1px solid rgba(46,230,168,.26);border-radius:7px;padding:3px 9px;
+}
+.rhead em{font-style:normal;font-size:12.5px;color:var(--mut2);margin-left:auto}
+
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.num{background:var(--bg2);padding:17px 18px}
+.num span{display:block;font-size:11.5px;color:var(--mut2);margin-bottom:5px}
+.num b{font-size:23px;font-weight:800;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.num b.acc{color:var(--acc)}
+.num small{display:block;font-size:11px;color:var(--mut2);margin-top:3px;font-weight:400}
+
+.tier{
+  margin-top:16px;padding:15px 17px;border-radius:14px;
+  background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.24);
+  font-size:13.5px;line-height:1.75;color:#cfe8dd;
+}
+.tier b{color:var(--acc)}
+.tier .next{display:block;margin-top:7px;color:var(--mut);font-size:12.5px}
+
+.empty{
+  padding:26px;text-align:center;border-radius:var(--r);
+  background:var(--bg2);border:1px dashed var(--line2);
+  color:var(--mut);font-size:14px;line-height:1.85;
+}
+.empty b{display:block;color:var(--txt);font-size:15.5px;margin-bottom:7px;font-weight:700}
+
+.err{
+  padding:15px 17px;border-radius:13px;margin-top:14px;
+  background:rgba(252,211,77,.1);border:1px solid rgba(252,211,77,.28);
+  color:#e8ddc0;font-size:13.5px;line-height:1.75;
+}
+
+.howto{list-style:none;padding:0;margin:0;display:grid;gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.howto li{background:var(--bg2);padding:15px 18px;display:flex;gap:13px;align-items:flex-start}
+.howto i{font-style:normal;font-size:12px;font-weight:800;color:var(--acc);padding-top:2px}
+.howto b{display:block;font-size:14.5px;font-weight:700;margin-bottom:3px}
+.howto p{margin:0;font-size:13px;color:var(--mut);line-height:1.75}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../">해루낚</a>
+  <nav>
+    <a href="../../species/">어종 도감</a>
+    <a href="../../spot/">포인트</a>
+    <a href="../../method/">계산 근거</a>
+    <a href="../">업체 등록 안내</a>
+    <a class="app" href="../../index.html">오늘 어디 갈까</a>
+  </nav>
+</header>
+
+<main>
+<article class="page">
+  <h1>업체 실적 조회</h1>
+  <p class="lead">
+    받으신 업체 코드를 넣으면 이번 달 노출과 전화 연결 횟수가 나옵니다.
+    다른 업체의 수치는 보이지 않습니다.
+  </p>
+
+  <div class="lookup">
+    <label for="code">업체 코드</label>
+    <div class="row">
+      <input id="code" type="text" placeholder="예: boat_jindu_01" autocomplete="off" spellcheck="false">
+      <button id="go" type="button">조회</button>
+    </div>
+    <div id="err" class="err" hidden></div>
+  </div>
+
+  <div id="result" class="result">
+    <div class="rhead">
+      <b id="rName">—</b>
+      <code id="rCode">—</code>
+      <em id="rPeriod">—</em>
+    </div>
+    <div class="nums">
+      <div class="num"><span>화면에 뜬 횟수</span><b id="nVisit">0</b><small>회</small></div>
+      <div class="num"><span>전화 연결</span><b id="nOpen" class="acc">0</b><small>통</small></div>
+      <div class="num"><span>자세히 보기</span><b id="nRev">0</b><small>회</small></div>
+      <div class="num"><span>예약 성사</span><b id="nShare">0</b><small>건</small></div>
+    </div>
+    <div class="tier" id="tier"></div>
+  </div>
+
+  <section id="intro">
+    <h2>아직 코드가 없으시면</h2>
+    <div class="empty">
+      <b>등록은 메일 한 통이면 됩니다</b>
+      업체 이름과 전화번호만 보내주시면 전용 코드를 만들어 드립니다.<br>
+      등록은 무료이고, 성사된 것에만 수수료를 받습니다.
+      <br><br>
+      <a class="btn" href="../">등록 조건 보기</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>무엇을 세는가</h2>
+    <ul class="howto">
+      <li><i>01</i><div>
+        <b>화면에 뜬 횟수</b>
+        <p>손님이 그 지점의 상세 화면을 열어 업체 정보가 실제로 보인 횟수입니다. 스쳐 지나간 것은 세지 않습니다.</p>
+      </div></li>
+      <li><i>02</i><div>
+        <b>전화 연결</b>
+        <p>손님이 전화 버튼을 눌러 발신 화면까지 간 횟수입니다. 같은 사람이 여러 번 누른 것은 하루 한 번으로 셉니다.</p>
+      </div></li>
+      <li><i>03</i><div>
+        <b>예약 성사</b>
+        <p>사장님이 알려주신 건만 셉니다. 저희가 예약 시스템을 붙들고 있지 않기 때문입니다.</p>
+      </div></li>
+      <li><i>04</i><div>
+        <b>돈은 성사된 것에만</b>
+        <p>등록과 전화 연결은 무료입니다. 선상 예약은 1인 1~2만원, 숙박은 10~15%. 매월 말에 정리해 보내드립니다.</p>
+      </div></li>
+    </ul>
+  </section>
+</article>
+</main>
+
+<footer class="foot">
+  <p><a href="../../index.html">해루낚</a> — 물때 해석은 앱이 합니다.</p>
+  <p class="fine">집계 수치는 참고용입니다. 전화 연결은 발신 화면까지 간 것을 셀 뿐, 통화 여부는 알 수 없습니다.</p>
+  <p class="fine">업체 문의 <a href="mailto:thecloudstay@gmail.com">thecloudstay@gmail.com</a></p>
+</footer>
+
+<script>
+(function(){
+  var DATA = null;
+  var $ = function(id){ return document.getElementById(id); };
+  var won = function(n){ return (n || 0).toLocaleString('ko-KR'); };
+
+  function load(){
+    return fetch('../../data/biz.json?cb=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(j){ DATA = j; return j; })
+      .catch(function(){ return null; });
+  }
+
+  function showErr(msg){
+    var e = $('err');
+    if (!msg){ e.hidden = true; return; }
+    e.hidden = false; e.textContent = msg;
+  }
+
+  function render(ch, meta){
+    $('result').classList.add('on');
+    $('intro').style.display = 'none';
+    $('rName').textContent = ch.name || ch.code;
+    $('rCode').textContent = ch.code;
+    $('rPeriod').textContent = (meta.period || '') + ' 기준';
+
+    var st = ch.stat || {};
+    $('nVisit').textContent = won(st.visits);
+    $('nOpen').textContent  = won(st.opens);
+    $('nRev').textContent   = won(st.revenue);
+
+    $('nShare').textContent = won(st.book);
+
+    var t = $('tier');
+    var calls = st.opens || 0, shows = st.visits || 0;
+    var pct = shows ? Math.round(calls / shows * 1000) / 10 : 0;
+    var line = '화면에 뜬 <b>' + won(shows) + '회</b> 중 <b>' + won(calls) + '통</b>이 전화로 이어졌습니다'
+             + (shows ? ' (' + pct + '%)' : '') + '.';
+    if (!st.book) line += '<span class="next">예약 성사는 사장님이 알려주신 건만 셉니다. 이번 달은 아직 없습니다.</span>';
+    else line += '<span class="next">예약 성사 ' + won(st.book) + '건 — 정산은 매월 말에 정리해 보내드립니다.</span>';
+    t.innerHTML = line;
+  }
+
+  function lookup(){
+    var code = ($('code').value || '').trim();
+    if (!code){ showErr('업체 코드를 넣어주세요.'); return; }
+    showErr('');
+    var go = function(){
+      if (!DATA){ showErr('자료를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.'); return; }
+      var list = DATA.업체 || DATA.channels || [];
+      var hit = null;
+      for (var i = 0; i < list.length; i++){
+        if (String(list[i].code).toLowerCase() === code.toLowerCase()){ hit = list[i]; break; }
+      }
+      if (!hit){
+        $('result').classList.remove('on');
+        $('intro').style.display = '';
+        showErr('그 코드로 등록된 업체가 없습니다. 코드를 다시 확인하시거나 등록 문의를 주세요.');
+        return;
+      }
+      try { history.replaceState(null, '', '?biz=' + encodeURIComponent(hit.code)); } catch(e){}
+      render(hit, DATA);
+    };
+    if (DATA) go(); else load().then(go);
+  }
+
+  $('go').addEventListener('click', lookup);
+  $('code').addEventListener('keydown', function(e){ if (e.key === 'Enter') lookup(); });
+
+  // 주소로 바로 조회 — 유튜버가 북마크해 둘 수 있게
+  var m = (location.search || '').match(/[?&]biz=([^&]+)/);
+  if (m){
+    try { $('code').value = decodeURIComponent(m[1]); } catch(e){ $('code').value = m[1]; }
+    load().then(lookup);
+  } else {
+    load();
+  }
+})();
+</script>
+</body>
+</html>
