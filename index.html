@@ -1478,6 +1478,79 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .risk-x{margin:0 0 9px;padding:9px 11px;border-radius:9px;
   background:rgba(252,211,77,.1);border:1px solid rgba(252,211,77,.28);
   font-size:12.5px;line-height:1.7;color:#e8ddc0}
+
+/* ══════════ 상세를 열 때의 움직임 ══════════
+   값을 바꾸는 게 아니라 값이 정해지는 과정을 보여준다.
+   움직임을 끄도록 설정한 사람에게는 맨 아래에서 전부 무력화한다. */
+
+/* 각 구획이 아래에서 떠오른다 */
+@keyframes riseIn{
+  from{ opacity:0; transform:translateY(14px) }
+  to  { opacity:1; transform:none }
+}
+.sec.rise,.verdict.rise,.dt-head.rise,.wade.rise,.risk.rise{
+  animation:riseIn .5s cubic-bezier(.16,1,.3,1) both;
+}
+
+/* 점수 링 — 테두리와 숫자가 함께 차오른다 (그리기는 자바스크립트가 한다) */
+@keyframes ringPop{
+  0%  { transform:scale(.86) }
+  60% { transform:scale(1.04) }
+  100%{ transform:scale(1) }
+}
+.ring.ring-go{ animation:ringPop .62s cubic-bezier(.16,1,.3,1) both }
+
+/* 막대는 전부 0에서 자란다 */
+.gauge-t i{ width:0; transition:width .95s cubic-bezier(.16,1,.3,1) }
+.wade-bar i{ width:0; transition:width 1.05s cubic-bezier(.16,1,.3,1) .12s }
+
+/* 진입·퇴로 시각이 툭 나타난다 */
+@keyframes timePop{
+  0%  { opacity:0; transform:translateY(6px) scale(.96) }
+  100%{ opacity:1; transform:none }
+}
+.wade-t b.pop{ animation:timePop .5s cubic-bezier(.16,1,.3,1) both }
+
+/* 물때 곡선이 왼쪽부터 그려진다 */
+@keyframes drawLine{ to{ stroke-dashoffset:0 } }
+.tide-line{
+  stroke-dasharray:1400; stroke-dashoffset:1400;
+  animation:drawLine 1.5s cubic-bezier(.35,.9,.3,1) .1s forwards;
+}
+@keyframes fadeUpSvg{ from{ opacity:0 } to{ opacity:1 } }
+.tide-area{ animation:fadeUpSvg 1.1s ease .5s both }
+
+/* 추천 구간이 가운데에서 펼쳐진다 */
+@keyframes winOpen{
+  from{ opacity:0; transform:scaleX(.2) }
+  to  { opacity:1; transform:none }
+}
+.tide-win{ transform-origin:center; animation:winOpen .6s cubic-bezier(.16,1,.3,1) 1.0s both }
+.tide-win-lb{ animation:fadeUpSvg .5s ease 1.3s both }
+
+/* 점수표 막대 — 이미 폭이 움직이므로 결만 맞춘다 */
+.bar-fl{ transition:width .9s cubic-bezier(.16,1,.3,1) }
+
+/* 위험도 숫자에 시선을 한 번 준다 */
+@keyframes riskGlow{
+  0%,100%{ box-shadow:0 0 0 0 rgba(252,165,165,0) }
+  35%    { box-shadow:0 0 0 5px rgba(252,165,165,.16) }
+}
+.risk.r4.rise .risk-g>div:first-child{ animation:riskGlow 1.7s ease .7s 2 }
+
+/* 손이 닿는 곳은 눌리는 느낌을 준다 */
+.row{ transition:transform .16s ease, background .16s ease }
+.row:active{ transform:scale(.985) }
+.joinbox-a,.btn,.chip.buy{ transition:transform .14s ease, filter .14s ease }
+.joinbox-a:active,.btn:active,.chip.buy:active{ transform:scale(.96) }
+
+@media (prefers-reduced-motion:reduce){
+  .sec.rise,.verdict.rise,.dt-head.rise,.wade.rise,.risk.rise,
+  .ring.ring-go,.tide-line,.tide-area,.tide-win,.tide-win-lb,
+  .wade-t b.pop,.risk.r4.rise .risk-g>div:first-child{ animation:none!important }
+  .gauge-t i,.wade-bar i,.bar-fl{ transition:none!important }
+  .tide-line{ stroke-dashoffset:0!important }
+}
 </style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -5615,6 +5688,55 @@ function closeDetail(){
 }
 $('detailScrim').onclick = closeDetail;
 
+/* ── 화면이 살아나는 느낌 ──
+   숫자가 갑자기 튀어나오는 것보다, 차오르는 걸 눈으로 보는 편이
+   "계산해서 낸 값"이라는 인상을 준다. 값 자체는 건드리지 않는다.
+   움직임을 싫어하는 사람(운영체제 설정)에게는 전부 끈다. */
+var NOMO = false;
+try { NOMO = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+
+/** 다음 프레임에 실행 — 브라우저가 시작값을 먼저 그리게 한다 */
+function nextFrame_(fn){
+  if (NOMO) { fn(); return; }
+  requestAnimationFrame(function(){ requestAnimationFrame(fn); });
+}
+
+/** 숫자가 올라가는 효과 */
+function countUp_(node, to, ms){
+  if (NOMO || !node) { if (node) node.textContent = to; return; }
+  var from = 0, t0 = null;
+  function step(t){
+    if (t0 === null) t0 = t;
+    var k = Math.min(1, (t - t0) / (ms || 900));
+    var e = 1 - Math.pow(1 - k, 3);                 // 끝에서 부드럽게 멈춘다
+    node.textContent = Math.round(from + (to - from) * e);
+    if (k < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/** 상세를 열 때마다 등장 효과를 다시 태운다 */
+function fillBars_(root){
+  if (!root) return;
+  var bs = root.querySelectorAll('.gauge-t i[data-w], .wade-bar i[data-w]');
+  nextFrame_(function(){
+    for (var i = 0; i < bs.length; i++) bs[i].style.width = bs[i].getAttribute('data-w') + '%';
+  });
+}
+
+function playIn_(root){
+  if (!root) return;
+  fillBars_(root);
+  var secs = root.querySelectorAll('.sec, .verdict, .dt-head, .wade, .risk');
+  for (var i = 0; i < secs.length; i++){
+    secs[i].classList.remove('rise');
+    if (!NOMO) secs[i].style.animationDelay = Math.min(i * 45, 520) + 'ms';
+  }
+  nextFrame_(function(){
+    for (var j = 0; j < secs.length; j++) secs[j].classList.add('rise');
+  });
+}
+
 function renderDetail(d){
   window.__detail = d;            // shopChip 이 제휴 링크를 찾을 때 쓴다
   if (!d || d.error){ $('detailBody').innerHTML = '<p style="padding:30px 0;text-align:center;color:#8ba6b8">'+((d&&d.error)||'오류')+'</p>'; return; }
@@ -5625,9 +5747,28 @@ function renderDetail(d){
 
   /* 헤더 */
   var head = el('div','dt-head');
-  var ring = el('div','ring', '<span>'+m.score+'</span>');
-  ring.style.background = 'conic-gradient(var(--'+m.grade+') calc('+m.score+'*1%),rgba(255,255,255,.08) 0)';
+  var ring = el('div','ring', '<span>' + (NOMO ? m.score : 0) + '</span>');
+  var rcol = 'var(--' + m.grade + ')';
+  function paintRing_(pct){
+    ring.style.background = 'conic-gradient(' + rcol + ' ' + pct + '%,rgba(255,255,255,.08) 0)';
+  }
+  paintRing_(NOMO ? m.score : 0);
   head.appendChild(ring);
+  if (!NOMO){
+    /* 숫자와 테두리를 같은 프레임에서 함께 올린다 — 따로 돌면 어긋나 보인다 */
+    ring.classList.add('ring-go');
+    var rspan = ring.querySelector('span'), t0 = null, DUR = 1000;
+    requestAnimationFrame(function tick(t){
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / DUR);
+      var e = 1 - Math.pow(1 - k, 3);
+      var v = m.score * e;
+      paintRing_(v);
+      rspan.textContent = Math.round(v);
+      if (k < 1) requestAnimationFrame(tick);
+      else { paintRing_(m.score); rspan.textContent = m.score; }
+    });
+  }
   /* 세부 자리(서브 로케이션) — 실제로 어디로 들어가는지가 이 앱에서 가장 중요한 정보다.
      등록된 세부 포인트가 있으면 그 이름을, 없으면 지점 설명을 크게 올린다. */
   var subNames = (d.spots || []).map(function(x){ return x.n; }).filter(Boolean);
@@ -5670,8 +5811,8 @@ function renderDetail(d){
       +   '<div class="wade-arrow" aria-hidden="true">→</div>'
       +   '<div class="wade-t out"><span>늦어도 나오기</span><b>' + hmH(wd.outT) + '</b></div>'
       + '</div>'
-      + '<div class="wade-bar"><i style="width:' + Math.max(6, Math.min(100,
-            Math.round(wd.workMin / Math.max(1, wd.workMin + wd.walkMin*2) * 100))) + '%"></i></div>'
+      + '<div class="wade-bar"><i data-w="' + Math.max(6, Math.min(100,
+            Math.round(wd.workMin / Math.max(1, wd.workMin + wd.walkMin*2) * 100))) + '"></i></div>'
       + '<div class="wade-n">'
       +   '<b>실제로 잡을 수 있는 시간 ' + (wd.workMin >= 60
             ? Math.floor(wd.workMin/60) + '시간 ' + (wd.workMin%60) + '분'
@@ -5682,6 +5823,13 @@ function renderDetail(d){
           ? '<p class="wade-w">⚠ 머물 수 있는 시간이 짧습니다. 물가까지 다 나가지 마시고 중간에서 도세요.</p>'
           : '<p class="wade-w ok">나오는 시각은 이미 안전 여유를 뺀 값입니다. 이 시각에는 뭍 쪽으로 돌아서 걷고 계셔야 합니다.</p>');
     wsec.appendChild(wbox);
+    (function(){
+      var bar = wbox.querySelector('.wade-bar i');
+      var t1 = wbox.querySelector('.wade-t b'), t2 = wbox.querySelector('.wade-t.out b');
+      if (bar) nextFrame_(function(){ bar.style.width = bar.getAttribute('data-w') + '%'; });
+      if (t1) t1.classList.add('pop');
+      if (t2){ t2.classList.add('pop'); t2.style.animationDelay = '.22s'; }
+    })();
 
     /* 물가가 얼마나 빨리 오는가 — 고립사고의 물리적 원인이다.
        추정치라는 고지를 접지 않고 여기에 같이 둔다. */
@@ -5845,7 +5993,7 @@ function renderDetail(d){
     var vcol = vv >= 2.5 ? '#2ee6a8' : vv >= 1.2 ? '#a3e635' : vv >= 0.5 ? '#fbbf24' : '#f87171';
     var g = el('div','gauge');
     g.innerHTML = '<div class="gauge-v" style="color:'+vcol+'">' + (vv >= 1 ? vv.toFixed(1)+'m' : Math.round(vv*100)+'cm') + '</div>'
-      + '<div class="gauge-b"><div class="gauge-t"><i style="width:'+vpct+'%;background:'+vcol+'"></i></div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+vpct+'" style="background:'+vcol+'"></i></div>'
       + '<div class="gauge-l">' + meta.visWord + ' · 부유물 ' + meta.ssc + 'mg/L 추정<br>'
       + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
     vs.appendChild(g);
@@ -5856,7 +6004,7 @@ function renderDetail(d){
     var fw = meta.flatWidth;
     var fg = el('div','gauge');
     fg.innerHTML = '<div class="gauge-v" style="color:#35d0ff">' + (fw >= 1000 ? (fw/1000).toFixed(1)+'km' : Math.round(fw/10)*10+'m') + '</div>'
-      + '<div class="gauge-b"><div class="gauge-t"><i style="width:'+Math.min(100,Math.round(fw/2500*100))+'%;background:#35d0ff"></i></div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+Math.min(100,Math.round(fw/2500*100))+'" style="background:#35d0ff"></i></div>'
       + '<div class="gauge-l">' + d.point.floor + ' 경사로 계산한 물가에서의 거리<br>돌아올 시간을 여기에 맞춰 잡으세요</div></div>';
     fs2.appendChild(fg);
     b.appendChild(fs2);
@@ -6235,6 +6383,7 @@ function renderDetail(d){
   b.appendChild(act);
 
   b.scrollTop = 0;
+  playIn_(b);
 }
 
 /* 낚싯배 예약 문의 양식 */
@@ -6379,7 +6528,7 @@ function renderCatch(box, cd, d){
     var head = el('div','gauge');
     var col = cd.rate >= 62 ? '#2ee6a8' : cd.rate >= 40 ? '#fbbf24' : '#f87171';
     head.innerHTML = '<div class="gauge-v" style="color:'+col+'">'+cd.rate+'%</div>'
-      + '<div class="gauge-b"><div class="gauge-t"><i style="width:'+cd.rate+'%;background:'+col+'"></i></div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+cd.rate+'" style="background:'+col+'"></i></div>'
       + '<div class="gauge-l">기록 '+cd.n+'건의 성공률'
       + (cd.byMul && cd.byMul.length ? ' · 잘 나온 물때: ' + cd.byMul.slice(0,3).map(function(m){ return m.mul+'('+m.rate+'%)'; }).join(' ') : '')
       + '</div></div>';
@@ -6395,6 +6544,7 @@ function renderCatch(box, cd, d){
   var btn = el('button','act primary catch-open','다녀온 기록 남기기');
   btn.onclick = function(){ openCatchForm(box, d); };
   box.appendChild(btn);
+  fillBars_(box);
 }
 function openCatchForm(box, d){
   var old = box.querySelector('.catch-form');
@@ -6503,11 +6653,13 @@ function tideSVG(meta, win){
       hi.setAttribute('width', X(b3)-X(a2)); hi.setAttribute('height', H-PB);
       hi.setAttribute('fill','rgba(46,230,168,.16)');
       hi.setAttribute('stroke','rgba(46,230,168,.5)'); hi.setAttribute('stroke-width','1');
+      hi.setAttribute('class','tide-win');
       svg.appendChild(hi);
       var lb = document.createElementNS(ns,'text');
       lb.setAttribute('x', (X(a2)+X(b3))/2); lb.setAttribute('y', H-PB-5);
       lb.setAttribute('text-anchor','middle'); lb.setAttribute('font-size','9');
       lb.setAttribute('fill','#2ee6a8'); lb.setAttribute('font-weight','800');
+      lb.setAttribute('class','tide-win-lb');
       lb.textContent = '추천';
       svg.appendChild(lb);
     }
@@ -6521,9 +6673,11 @@ function tideSVG(meta, win){
 
   var area = document.createElementNS(ns,'path');
   area.setAttribute('d', apath); area.setAttribute('fill','url(#tg)');
+  area.setAttribute('class','tide-area');
   svg.appendChild(area);
   var line = document.createElementNS(ns,'path');
   line.setAttribute('d', dpath); line.setAttribute('fill','none');
+  line.setAttribute('class','tide-line');
   line.setAttribute('stroke','#35d0ff'); line.setAttribute('stroke-width','2'); line.setAttribute('stroke-linecap','round');
   svg.appendChild(line);
 
