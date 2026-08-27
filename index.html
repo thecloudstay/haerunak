@@ -1363,6 +1363,20 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .wade-n span{font-size:12px;color:var(--mut);line-height:1.6}
 .wade-w{margin:10px 0 0;font-size:12px;line-height:1.6;color:#e6dcc4}
 .wade-w.ok{color:var(--mut)}
+
+/* 금지체장 */
+.sizes{display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--r2);overflow:hidden}
+.size-row{background:var(--card);padding:12px 14px;display:grid;
+  grid-template-columns:auto 1fr;column-gap:10px;align-items:baseline}
+.size-row b{font-size:15px;font-weight:800;letter-spacing:-.3px}
+.size-v{font-size:15px;font-weight:800;color:var(--acc);text-align:right;
+  font-variant-numeric:tabular-nums}
+.size-v.none{color:var(--mut2);font-weight:600;font-size:13px}
+.size-u{grid-column:1/-1;font-size:11.5px;color:var(--mut);margin-top:3px}
+.size-row.none b{color:var(--mut)}
+.size-src{font-size:11.5px;color:var(--mut2);line-height:1.7;margin-top:9px}
+.size-src a{color:var(--acc2)}
 </style><style>
 .adcard{display:block;margin:18px 0 0;padding:12px 14px;border-radius:var(--r2);
   background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.22);
@@ -3218,8 +3232,9 @@ function spotsExtra_(id){
 /** 섬 들어가는 길 — data/ferry.json {book,status,tel,portInfo,tips}
  *  예약처가 바뀌거나 전화번호가 생기면 이 파일만 고치면 된다. */
 var FERRY_FALLBACK = {
-  book: [{ n:'가보고 싶은 섬 (해양수산부 공식)', u:'https://island.haewoon.co.kr/', note:'연안여객선 통합 예약·예매' },
-         { n:'한국해운조합 여객선예매',        u:'https://island.theksa.co.kr/',  note:'회원 9매·비회원 3매까지' }],
+  /* 2025-04-01 '가보고싶은섬'(island.haewoon.co.kr) 종료 → 한국해운조합으로 통합됨.
+     바깥 링크는 죽으면 신뢰를 깎으므로 확인된 것만 남긴다. */
+  book: [{ n:'한국해운조합 여객선예매', u:'https://island.theksa.co.kr/', note:'연안여객선 통합 예매 — 회원 9매·비회원 3매까지' }],
   status:[{ n:'실시간 운항현황', u:'https://www.komsa.or.kr/prog/dailyCurState/kor/sub03_0201/list.do', note:'해양교통안전공단 — 지금 뜨는지' },
           { n:'내일의 운항 예보', u:'https://www.komsa.or.kr/prog/tmmrwSailing/kor/sub03_0207/list.do', note:'전날 미리 확인' }],
   tel:  [{ n:'여객선 예매 고객센터', v:'1599-5985', note:'한국해운조합 · 옹진 항로는 2번' }],
@@ -4795,6 +4810,23 @@ function ensureWeather(ds){
     var c=JSON.parse(localStorage.getItem('hrn_wx_'+ds)||'null');
     if (c && Date.now()-c.t<3600000){ Object.assign(WXC,c.d); WX_REAL[ds]=true; return Promise.resolve(true); }
   } catch(e){}
+  /* 1순위 — 우리 저장소에 미리 받아 둔 자료.
+     사람이 몰려도 외부 한도에 걸리지 않는다. 세 시간마다 갱신된다. */
+  return fetch('data/wx/'+ds+'.json', {cache:'default'})
+    .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+    .then(function(j){
+      if (!j || !j.자료) throw 0;
+      var n=0;
+      for (var k in j.자료){ WXC[ds+'|'+k]=j.자료[k]; n++; }
+      if (!n) throw 0;
+      WX_REAL[ds]=true;
+      try { localStorage.setItem('hrn_wx_'+ds,JSON.stringify({t:Date.now(),d:(function(){var d={};for(var k2 in WXC){if(k2.indexOf(ds+'|')===0)d[k2]=WXC[k2];}return d;})()})); } catch(e){}
+      return true;
+    })
+    .catch(function(){ return ensureWeatherLive_(ds); });
+}
+/* 2순위 — 미리 받아 둔 자료가 없으면 그때만 직접 부른다 */
+function ensureWeatherLive_(ds){
   var cells={};
   POINTS.forEach(function(p){ var k=gridKey_(p.la,p.lo); if(!cells[k]) cells[k]={la:+k.split(',')[0],lo:+k.split(',')[1]}; });
   var keys=Object.keys(cells);
@@ -5259,7 +5291,9 @@ function render(){
   $('sheetFoot').innerHTML = (S.gen || '') + ' 기준 · 물때 자체 조석계산 · 기상 Open-Meteo · 점수는 참고용이며 안전 판단은 직접 하세요'
     + '<br><a href="species/" style="color:var(--acc2);text-decoration:none">어종 도감</a>'
     + ' · <a href="spot/" style="color:var(--acc2);text-decoration:none">전국 포인트 목록</a>'
+    + ' · <a href="method/" style="color:var(--acc2);text-decoration:none">계산 근거</a>'
     + ' · <a href="partner/" style="color:var(--acc2);text-decoration:none">채널 제휴</a>'
+    + ' · <a href="business/" style="color:var(--acc2);text-decoration:none">업체 등록</a>'
     + '<br>제휴·광고 문의 <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc);text-decoration:none">thecloudstay@gmail.com</a>'
     + ' · <a href="#" id="redeemLink" style="color:var(--mut);text-decoration:underline">' + (isPremium() ? '프리미엄 이용 중' : '이용권 등록') + '</a>'
     + ' · <a href="#" id="partnerLink" style="color:var(--mut);text-decoration:underline">파트너 모집</a>';
@@ -5513,6 +5547,35 @@ function renderDetail(d){
     b.appendChild(wb);
   }
 
+  /* 금지체장 — 잡아도 되는 크기. 모르고 작은 것을 가져오면 그대로 위반이다 */
+  {
+    var szList = (m.targets || []).map(function(t){ return { n:t.n, ban:t.ban }; });
+    if (szList.length){
+      var zs = el('div','sec');
+      zs.appendChild(el('div','sec-t','잡아도 되는 크기 — 금지체장'));
+      var tb = el('div','sizes');
+      szList.forEach(function(t){
+        var bn = t.ban || null;
+        var has = bn && bn.size;
+        var row = el('div','size-row' + (has ? '' : ' none'));
+        row.innerHTML = '<b>' + t.n + '</b>'
+          + (has
+              ? '<span class="size-v">' + sizeText_(bn) + ' 이상</span>'
+                + '<span class="size-u">' + measureHow_(bn.unit) + '</span>'
+              : '<span class="size-v none">규정 없음</span>'
+                + '<span class="size-u">크기 제한이 정해져 있지 않습니다</span>');
+        tb.appendChild(row);
+      });
+      zs.appendChild(tb);
+      var mt0 = meta.banMeta || {};
+      zs.appendChild(el('div','size-src',
+          '작은 것은 놓아주세요. 기준 미달을 가지고 나오면 금어기가 아니어도 위반입니다.<br>'
+        + '근거 ' + (mt0.basis || '') + ' (' + (mt0.asOf || '') + ' 기준) · '
+        + '<a href="' + (mt0.law || '#') + '" target="_blank" rel="noopener">원문 확인</a>'));
+      b.appendChild(zs);
+    }
+  }
+
   /* 금어기 경고 */
   var bt = (m.bannedTargets || []);
   if (bt.length){
@@ -5523,7 +5586,7 @@ function renderDetail(d){
       var box = el('div','banbox');
       box.innerHTML = '<h4>⛔ ' + t.n + ' 금어기</h4><p>'
         + (bn.from ? bn.from + ' ~ ' + bn.to + ' (' + bn.scope + ') 포획·채취가 금지됩니다.' : '포획이 제한됩니다.')
-        + (bn.size ? ' 기간이 아니어도 ' + bn.size + (bn.unit ? bn.unit : '') + ' 미만은 잡을 수 없습니다.' : '')
+        + (bn.size ? ' 기간이 아니어도 ' + sizeText_(bn) + ' 미만은 잡을 수 없습니다.' : '')
         + (bn.note ? ' ' + bn.note : '') + '</p>';
       bw.appendChild(box);
     });
@@ -6378,9 +6441,62 @@ function isPremium(){
     return !!(p && p.until > Date.now());
   } catch(e){ return false; }
 }
-function bizClick(id, kind){
+/* 업체 클릭 집계 —
+   "우리 번호로 몇 통 왔냐"에 답할 수 있어야 업체에서 돈을 받을 수 있다.
+   앱스판은 서버가 받고, 정적판은 data/track.json 에 적힌 곳으로 흘려보낸다.
+   보낼 곳이 없으면 이 기기에만 쌓아 두었다가 나중에 올린다. */
+function bizClick(id, kind, extra){
   if (!id) return;
-  try { google.script.run.apiBizClick(id, kind); } catch(e){}
+  var rec = { id:id, kind:kind||'partner', t:Date.now(),
+              spot:(window.__detail && window.__detail.point) ? window.__detail.point.i : null,
+              ref:(typeof refCode==='function' ? refCode() : ''),
+              uid:(typeof myUid==='function' ? myUid() : ''),
+              extra: extra||'' };
+  /* 앱스 스크립트판 */
+  try { if (window.google && google.script && google.script.run) google.script.run.apiBizClick(id, rec.kind); } catch(e){}
+  /* 이 기기 기록 — 보낼 곳이 없어도 잃지 않는다 */
+  try {
+    var q = JSON.parse(localStorage.getItem('hrn_biz') || '[]');
+    q.push(rec); if (q.length > 500) q = q.slice(-500);
+    localStorage.setItem('hrn_biz', JSON.stringify(q));
+  } catch(e){}
+  bizFlush_();
+}
+var BIZ_CFG = null, BIZ_SENDING = false;
+function bizFlush_(){
+  if (BIZ_SENDING) return;
+  var go = function(cfg){
+    if (!cfg || !cfg.url) return;
+    var q = [];
+    try { q = JSON.parse(localStorage.getItem('hrn_biz') || '[]'); } catch(e){}
+    if (!q.length) return;
+    BIZ_SENDING = true;
+    var send = function(r){
+      if (cfg.form){
+        /* 구글 폼으로 보내는 방식 — 서버 없이도 시트에 쌓인다 */
+        var fd = new FormData();
+        var f = cfg.form;
+        if (f.id)   fd.append(f.id,   r.id);
+        if (f.kind) fd.append(f.kind, r.kind);
+        if (f.spot) fd.append(f.spot, r.spot === null ? '' : String(r.spot));
+        if (f.ref)  fd.append(f.ref,  r.ref || '');
+        if (f.uid)  fd.append(f.uid,  r.uid || '');
+        if (f.t)    fd.append(f.t,    new Date(r.t).toISOString());
+        return fetch(cfg.url, { method:'POST', mode:'no-cors', body:fd });
+      }
+      return fetch(cfg.url, { method:'POST', mode:'no-cors',
+        headers:{'content-type':'text/plain'}, body: JSON.stringify(r) });
+    };
+    Promise.all(q.map(function(r){ return send(r).catch(function(){}); }))
+      .then(function(){ try { localStorage.setItem('hrn_biz','[]'); } catch(e){} })
+      .catch(function(){})
+      .then(function(){ BIZ_SENDING = false; });
+  };
+  if (BIZ_CFG !== null) return go(BIZ_CFG);
+  fetch('data/track.json', {cache:'default'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ BIZ_CFG = (j && j.url) ? j : {}; go(BIZ_CFG); })
+    .catch(function(){ BIZ_CFG = {}; });
 }
 function myUid(){
   try {
@@ -6398,6 +6514,32 @@ function refCode(){
 }
 
 /* 준비물 칩 — 제휴 링크가 걸린 도구만 누를 수 있게 만든다 */
+
+/* 금지체장 표기 — size 는 숫자, unit 은 재는 기준(전장·각장·두동장 등)
+   'g' 로 끝나는 기준은 무게다 */
+function sizeText_(bn){
+  if (!bn || !bn.size) return '';
+  var u = String(bn.unit || '');
+  if (/무게|중량|g$/.test(u)) return bn.size + 'g';
+  return (u ? u + ' ' : '') + bn.size + 'cm';
+}
+function measureHow_(unit){
+  var M = {
+    '전장': '주둥이 끝부터 꼬리 끝까지',
+    '체장': '주둥이 끝부터 꼬리자루까지',
+    '항문장': '입에서 항문까지 (전장 아님)',
+    '각장': '껍데기의 가장 긴 쪽',
+    '각고': '껍데기 높이',
+    '두동장': '몸통(머리) 길이',
+    '갑장': '등딱지 너비',
+    '두흉갑장': '등딱지 길이',
+    '무게': '손질하지 않은 상태의 무게'
+  };
+  var u = String(unit || '');
+  for (var k in M) if (u.indexOf(k) >= 0) return M[k] + ' 기준';
+  return u ? u + ' 기준' : '';
+}
+
 function shopChip(name){
   var esc = function(v){ return String(v).replace(/[&<>"]/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
