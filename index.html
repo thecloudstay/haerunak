@@ -4124,13 +4124,17 @@ function apiRefLookup(code){
 function shopFor_(names){
   var j = remoteJson_('gear') || {};
   var shop = j.shop || {};
-  var out = [], seen = {};
+  var out = [], idx = {};
   (names || []).forEach(function(n){
     var k = (typeof gearKey_ === 'function') ? gearKey_(n) : n;
-    if (!k || seen[k]) return;
-    seen[k] = 1;
-    var s = shop[k];
-    out.push({ n: k, u: (s && s.u) ? s.u : '', why: (s && s.why) ? s.why : '' });
+    if (!k) return;
+    if (idx[k] === undefined){
+      var s = shop[k];
+      idx[k] = out.length;
+      // src 에 원본 도구 이름을 모아둔다 — 화면에서 '긴 장화' 같은 변형도 링크를 찾게
+      out.push({ n: k, u: (s && s.u) ? s.u : '', why: (s && s.why) ? s.why : '', src: [] });
+    }
+    if (out[idx[k]].src.indexOf(n) < 0) out[idx[k]].src.push(n);
   });
   return out;
 }
@@ -6193,10 +6197,16 @@ function shopChip(name){
   var d = window.__detail;
   var hit = null;
   if (d && d.shop && d.shop.items){
-    for (var i = 0; i < d.shop.items.length; i++){
-      var it = d.shop.items[i];
+    var items = d.shop.items;
+    // 1순위 — 이 도구가 실제로 묶인 상품군
+    for (var i = 0; i < items.length && !hit; i++){
+      if (items[i].u && items[i].src && items[i].src.indexOf(name) >= 0) hit = items[i];
+    }
+    // 2순위 — 이름이 같거나 서로를 포함
+    for (var j = 0; j < items.length && !hit; j++){
+      var it = items[j];
       if (!it.u) continue;
-      if (name === it.n || String(name).indexOf(it.n) >= 0 || String(it.n).indexOf(name) >= 0){ hit = it; break; }
+      if (name === it.n || String(name).indexOf(it.n) >= 0 || String(it.n).indexOf(name) >= 0) hit = it;
     }
   }
   if (!hit) return '<span class="chip">' + esc(name) + '</span>';
