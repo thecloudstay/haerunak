@@ -1,0 +1,36 @@
+name: 전송량 점검
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'data/**'
+      - 'scripts/check-size.js'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 21 * * 0'      # 매주 월요일 06:00 (한국시각)
+
+permissions:
+  contents: write
+
+jobs:
+  점검:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 크기 재고 한계 방문 수 계산
+        run: node scripts/check-size.js
+      - name: 결과 저장
+        if: always()
+        run: |
+          git config user.name  "haerunak-bot"
+          git config user.email "bot@haerunak.com"
+          if [ -n "$(git status --porcelain 전송량점검.md)" ]; then
+            git add 전송량점검.md
+            git commit -m "전송량 점검 갱신"
+            git push
+          fi
