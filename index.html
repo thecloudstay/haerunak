@@ -1377,6 +1377,19 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .size-row.none b{color:var(--mut)}
 .size-src{font-size:11.5px;color:var(--mut2);line-height:1.7;margin-top:9px}
 .size-src a{color:var(--acc2)}
+
+/* 제휴 권유 */
+.joinbox{margin-top:12px;padding:14px 16px;border-radius:15px;position:relative}
+.jb-ch{background:rgba(53,208,255,.08);border:1px dashed rgba(53,208,255,.34)}
+.jb-biz{background:rgba(46,230,168,.08);border:1px dashed rgba(46,230,168,.34)}
+.joinbox b{display:block;font-size:14px;font-weight:800;margin-bottom:5px;letter-spacing:-.2px}
+.jb-ch b{color:var(--acc2)} .jb-biz b{color:var(--acc)}
+.joinbox p{margin:0 0 11px;font-size:12.5px;line-height:1.75;color:var(--mut)}
+.joinbox-a{display:inline-block;font-size:12.5px;font-weight:800;padding:8px 14px;border-radius:11px;
+  text-decoration:none;color:#04121c}
+.jb-ch .joinbox-a{background:var(--acc2)}
+.jb-biz .joinbox-a{background:var(--acc)}
+.joinbox-a:active{transform:scale(.97)}
 </style><style>
 .adcard{display:block;margin:18px 0 0;padding:12px 14px;border-radius:var(--r2);
   background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.22);
@@ -1430,6 +1443,13 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { -webkit-user-select: none; user-select: none; }
 input, textarea { -webkit-user-select: text; user-select: text; }
 </style>
+/* 제휴 대가성 고지 — 눈에 띄되 화면을 잡아먹지 않게 */
+.affnote{
+  margin:11px 0 0; padding:9px 12px; border-radius:10px;
+  background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.09);
+  font-size:11.5px; line-height:1.65; color:var(--mut2); letter-spacing:-.1px;
+}
+
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="mask-icon" href="icon.svg" color="#2ee6a8">
@@ -5514,6 +5534,7 @@ function renderDetail(d){
     sgBtn.onclick = function(){ openSuggestForm(sp0, d); };
     sp0.appendChild(sgBtn);
     b.appendChild(sp0);
+    
   }
 
   /* 조석 그래프 */
@@ -5788,6 +5809,7 @@ function renderDetail(d){
     });
     if (!(rlist || []).length)
       rs2.appendChild(el('div','gauge-l','오늘 대상에 등록된 채비 정보가 없습니다.'));
+    if (rs2.querySelector('.chip.buy')) rs2.appendChild(aff_());
     if (S.mode === 'haeru' && d.rigs.safe){
       var sf = el('div','rig safe');
       sf.innerHTML = '<div class="rig-h"><b>🦺 안전 장비 — 대상과 무관하게 항상</b></div>'
@@ -5820,7 +5842,20 @@ function renderDetail(d){
       vw.appendChild(a);
     });
     vs.appendChild(vw);
+    vs.appendChild(joinBox_('ch',
+      '이 자리 영상 가지고 계신가요',
+      '해루낚을 소개해 주시면 이 자리가 좋은 날마다 그 영상을 여기에 겁니다. 노출료는 받지 않습니다.',
+      'partner/', '채널 제휴 보기'));
     b.appendChild(vs);
+  } else {
+    var vs0 = el('div','sec');
+    vs0.appendChild(el('div','sec-t','잡는 법 영상'));
+    vs0.appendChild(el('div','gauge-l','이 대상물 영상이 아직 없습니다.'));
+    vs0.appendChild(joinBox_('ch',
+      '이 자리 영상 가지고 계신가요',
+      '유튜브·블로그 하시면 여기에 영상을 걸어드립니다. 이 자리가 좋은 날마다 자동으로 노출됩니다. 노출료는 받지 않습니다.',
+      'partner/', '채널 제휴 보기'));
+    b.appendChild(vs0);
   }
 
   /* 오늘 조건에 맞는 준비물 (제휴 링크) */
@@ -5840,10 +5875,21 @@ function renderDetail(d){
       gw.appendChild(c);
     });
     gs.appendChild(gw);
+    gs.appendChild(aff_());
     b.appendChild(gs);
   }
 
-  /* 이 근처 제휴처 */
+  /* 이 근처 제휴처 — 비어 있으면 업체를 부른다 */
+  if (!(d.partners && d.partners.length)){
+    var ps0 = el('div','sec');
+    ps0.appendChild(el('div','sec-t','이 근처 <span style="font-weight:600;color:var(--mut2)">(제휴)</span>'));
+    ps0.appendChild(el('div','gauge-l','이 자리 근처에 등록된 배·숙소·낚시점이 아직 없습니다.'));
+    ps0.appendChild(joinBox_('biz',
+      '여기서 배나 숙소, 낚시점 하시나요',
+      '이 화면에 올려드립니다. 나가기 직전에 이 자리를 보고 있는 손님에게 바로 붙습니다. 등록은 무료이고 성사된 것에만 수수료를 받습니다.',
+      'business/', '업체 등록 보기'));
+    b.appendChild(ps0);
+  }
   if (d.partners && d.partners.length){
     var ps = el('div','sec');
     ps.appendChild(el('div','sec-t','이 근처 <span style="font-weight:600;color:var(--mut2)">(제휴)</span>'));
@@ -6538,6 +6584,26 @@ function measureHow_(unit){
   var u = String(unit || '');
   for (var k in M) if (u.indexOf(k) >= 0) return M[k] + ' 기준';
   return u ? u + ' 기준' : '';
+}
+
+
+/* 쿠팡 파트너스 대가성 고지 — 공정위 추천·보증 심사지침상 링크가 보이는 자리에 함께 떠야 한다.
+   숨기거나 접어두면 고지로 인정되지 않는다. */
+function aff_(){
+  return el('p','affnote',
+    '이 화면의 「사기」와 장비 링크는 쿠팡 파트너스 활동의 일환으로, '
+  + '이를 통해 일정액의 수수료를 제공받습니다. 구매자가 더 내는 금액은 없습니다.');
+}
+
+/* 제휴 권유 상자 — 이 화면을 보고 있는 사람이 곧 그 자리의 업자이거나 촬영자다.
+   가장 반응이 좋은 자리에만 놓는다. 아무 데나 붙이면 광고가 된다. */
+function joinBox_(kind, title, body, href, cta){
+  var box = el('div','joinbox ' + (kind === 'biz' ? 'jb-biz' : 'jb-ch'));
+  box.innerHTML = '<b>' + title + '</b><p>' + body + '</p>';
+  var a = el('a','joinbox-a', cta + ' →');
+  a.href = href;
+  box.appendChild(a);
+  return box;
 }
 
 function shopChip(name){
