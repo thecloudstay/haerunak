@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>제휴 채널 정산 조회 | 해루낚</title>
+<meta name="description" content="해루낚 제휴 채널의 유입과 정산 내역을 채널 코드로 조회합니다.">
+<meta name="robots" content="noindex,follow">
+<link rel="canonical" href="https://haerunak.com/partner/stats/">
+<link rel="icon" type="image/svg+xml" href="../../icon.svg">
+<link rel="apple-touch-icon" href="../../icon.svg">
+<meta name="theme-color" content="#05141f">
+<link rel="stylesheet" href="../../atlas.css">
+<style>
+.lookup{
+  background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);
+  padding:22px;margin:0 0 26px;
+}
+.lookup label{display:block;font-size:13px;color:var(--mut);margin-bottom:9px}
+.lookup .row{display:flex;gap:8px;flex-wrap:wrap}
+.lookup input{
+  flex:1 1 200px;min-width:0;padding:13px 15px;border-radius:13px;
+  background:rgba(255,255,255,.05);border:1px solid var(--line2);
+  color:var(--txt);font-size:15px;font-family:inherit;
+}
+.lookup input:focus{outline:2px solid var(--acc);outline-offset:1px}
+.lookup button{
+  padding:13px 22px;border-radius:13px;border:0;cursor:pointer;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));
+  color:#04121c;font-weight:800;font-size:15px;font-family:inherit;
+}
+.lookup button:active{transform:scale(.97)}
+
+.result{display:none}
+.result.on{display:block}
+.rhead{
+  display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;
+  padding-bottom:13px;margin-bottom:18px;border-bottom:1px solid var(--line);
+}
+.rhead b{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.rhead code{
+  font-size:12px;color:var(--acc);background:rgba(46,230,168,.11);
+  border:1px solid rgba(46,230,168,.26);border-radius:7px;padding:3px 9px;
+}
+.rhead em{font-style:normal;font-size:12.5px;color:var(--mut2);margin-left:auto}
+
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.num{background:var(--bg2);padding:17px 18px}
+.num span{display:block;font-size:11.5px;color:var(--mut2);margin-bottom:5px}
+.num b{font-size:23px;font-weight:800;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.num b.acc{color:var(--acc)}
+.num small{display:block;font-size:11px;color:var(--mut2);margin-top:3px;font-weight:400}
+
+.tier{
+  margin-top:16px;padding:15px 17px;border-radius:14px;
+  background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.24);
+  font-size:13.5px;line-height:1.75;color:#cfe8dd;
+}
+.tier b{color:var(--acc)}
+.tier .next{display:block;margin-top:7px;color:var(--mut);font-size:12.5px}
+
+.empty{
+  padding:26px;text-align:center;border-radius:var(--r);
+  background:var(--bg2);border:1px dashed var(--line2);
+  color:var(--mut);font-size:14px;line-height:1.85;
+}
+.empty b{display:block;color:var(--txt);font-size:15.5px;margin-bottom:7px;font-weight:700}
+
+.err{
+  padding:15px 17px;border-radius:13px;margin-top:14px;
+  background:rgba(252,211,77,.1);border:1px solid rgba(252,211,77,.28);
+  color:#e8ddc0;font-size:13.5px;line-height:1.75;
+}
+
+.howto{list-style:none;padding:0;margin:0;display:grid;gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.howto li{background:var(--bg2);padding:15px 18px;display:flex;gap:13px;align-items:flex-start}
+.howto i{font-style:normal;font-size:12px;font-weight:800;color:var(--acc);padding-top:2px}
+.howto b{display:block;font-size:14.5px;font-weight:700;margin-bottom:3px}
+.howto p{margin:0;font-size:13px;color:var(--mut);line-height:1.75}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../../">해루낚</a>
+  <nav>
+    <a href="../../species/">어종 도감</a>
+    <a href="../../spot/">포인트</a>
+    <a href="../">제휴 안내</a>
+    <a class="app" href="../../index.html">오늘 어디 갈까</a>
+  </nav>
+</header>
+
+<main>
+<article class="page">
+  <h1>제휴 채널 정산 조회</h1>
+  <p class="lead">
+    받으신 채널 코드를 넣으면 유입과 정산 내역이 나옵니다.
+    다른 채널의 수치는 보이지 않습니다.
+  </p>
+
+  <div class="lookup">
+    <label for="code">채널 코드</label>
+    <div class="row">
+      <input id="code" type="text" placeholder="예: haeru_tv" autocomplete="off" spellcheck="false">
+      <button id="go" type="button">조회</button>
+    </div>
+    <div id="err" class="err" hidden></div>
+  </div>
+
+  <div id="result" class="result">
+    <div class="rhead">
+      <b id="rName">—</b>
+      <code id="rCode">—</code>
+      <em id="rPeriod">—</em>
+    </div>
+    <div class="nums">
+      <div class="num"><span>이번 달 유입</span><b id="nVisit">0</b><small>명</small></div>
+      <div class="num"><span>상세 조회</span><b id="nOpen">0</b><small>회</small></div>
+      <div class="num"><span>발생 수익</span><b id="nRev">0</b><small>원</small></div>
+      <div class="num"><span>채널 몫</span><b id="nShare" class="acc">0</b><small>원</small></div>
+    </div>
+    <div class="tier" id="tier"></div>
+  </div>
+
+  <section id="intro">
+    <h2>아직 코드가 없으시면</h2>
+    <div class="empty">
+      <b>제휴는 메일 한 통이면 시작됩니다</b>
+      채널 주소만 보내주시면 전용 코드와 링크를 만들어 드립니다.<br>
+      조건과 배분율은 제휴 안내 페이지에 전부 적어 두었습니다.
+      <br><br>
+      <a class="btn" href="../">제휴 조건 보기</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>어떻게 집계되나</h2>
+    <ul class="howto">
+      <li><i>01</i><div>
+        <b>전용 링크로 들어온 사람이 기준입니다</b>
+        <p>채널 코드가 붙은 주소(<code>?ref=코드</code>)로 처음 들어온 방문자가 그 채널에 귀속됩니다.</p>
+      </div></li>
+      <li><i>02</i><div>
+        <b>귀속은 그 기기에 남습니다</b>
+        <p>한 번 들어오면 이후 직접 접속해도 계속 그 채널 몫으로 잡힙니다.</p>
+      </div></li>
+      <li><i>03</i><div>
+        <b>배분율은 그달 유입으로 정해집니다</b>
+        <p>기본 30%, 월 유입 100명 이상 35%, 1,000명 이상 40%. 선상 예약 중개 수수료는 20%입니다.</p>
+      </div></li>
+      <li><i>04</i><div>
+        <b>매달 정산합니다</b>
+        <p>전달 실적을 정리해 메일로 보내드립니다. 이 화면에서도 언제든 확인하실 수 있습니다.</p>
+      </div></li>
+    </ul>
+  </section>
+</article>
+</main>
+
+<footer class="foot">
+  <p><a href="../../index.html">해루낚</a> — 물때 해석은 앱이 합니다.</p>
+  <p class="fine">집계 수치는 참고용이며 최종 정산액은 매월 정산서 기준입니다.</p>
+  <p class="fine">제휴 문의 <a href="mailto:thecloudstay@gmail.com">thecloudstay@gmail.com</a></p>
+</footer>
+
+<script>
+(function(){
+  var DATA = null;
+  var $ = function(id){ return document.getElementById(id); };
+  var won = function(n){ return (n || 0).toLocaleString('ko-KR'); };
+
+  function load(){
+    return fetch('../../data/channels.json?cb=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(j){ DATA = j; return j; })
+      .catch(function(){ return null; });
+  }
+
+  function showErr(msg){
+    var e = $('err');
+    if (!msg){ e.hidden = true; return; }
+    e.hidden = false; e.textContent = msg;
+  }
+
+  function render(ch, meta){
+    $('result').classList.add('on');
+    $('intro').style.display = 'none';
+    $('rName').textContent = ch.name || ch.code;
+    $('rCode').textContent = ch.code;
+    $('rPeriod').textContent = (meta.period || '') + ' 기준';
+
+    var st = ch.stat || {};
+    $('nVisit').textContent = won(st.visits);
+    $('nOpen').textContent  = won(st.opens);
+    $('nRev').textContent   = won(st.revenue);
+
+    var th = meta.thresholds || { t1:100, t2:1000 };
+    var rt = meta.rates || { base:30, t1:35, t2:40 };
+    var v = st.visits || 0;
+    var rate = v >= th.t2 ? rt.t2 : (v >= th.t1 ? rt.t1 : rt.base);
+    var share = st.share != null ? st.share : Math.round((st.revenue || 0) * rate / 100);
+    $('nShare').textContent = won(share);
+
+    var t = $('tier');
+    var line = '지금 배분율 <b>' + rate + '%</b> 입니다.';
+    if (v < th.t1)      line += '<span class="next">이번 달 유입이 ' + won(th.t1 - v) + '명 더 늘면 ' + rt.t1 + '% 가 됩니다.</span>';
+    else if (v < th.t2) line += '<span class="next">이번 달 유입이 ' + won(th.t2 - v) + '명 더 늘면 ' + rt.t2 + '% 가 됩니다.</span>';
+    else                line += '<span class="next">최고 구간입니다.</span>';
+    t.innerHTML = line;
+  }
+
+  function lookup(){
+    var code = ($('code').value || '').trim();
+    if (!code){ showErr('채널 코드를 넣어주세요.'); return; }
+    showErr('');
+    var go = function(){
+      if (!DATA){ showErr('자료를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.'); return; }
+      var list = DATA.channels || [];
+      var hit = null;
+      for (var i = 0; i < list.length; i++){
+        if (String(list[i].code).toLowerCase() === code.toLowerCase()){ hit = list[i]; break; }
+      }
+      if (!hit){
+        $('result').classList.remove('on');
+        $('intro').style.display = '';
+        showErr('그 코드로 등록된 채널이 없습니다. 코드를 다시 확인하시거나 제휴 문의를 주세요.');
+        return;
+      }
+      try { history.replaceState(null, '', '?ch=' + encodeURIComponent(hit.code)); } catch(e){}
+      render(hit, DATA);
+    };
+    if (DATA) go(); else load().then(go);
+  }
+
+  $('go').addEventListener('click', lookup);
+  $('code').addEventListener('keydown', function(e){ if (e.key === 'Enter') lookup(); });
+
+  // 주소로 바로 조회 — 유튜버가 북마크해 둘 수 있게
+  var m = (location.search || '').match(/[?&]ch=([^&]+)/);
+  if (m){
+    try { $('code').value = decodeURIComponent(m[1]); } catch(e){ $('code').value = m[1]; }
+    load().then(lookup);
+  } else {
+    load();
+  }
+})();
+</script>
+</body>
+</html>
