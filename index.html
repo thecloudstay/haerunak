@@ -4939,6 +4939,74 @@ function drawPins(){
 map.on('zoomend', function(){ if (S.rows.length) drawPins(); });
 
 /* ══════════════ 데이터 ══════════════ */
+
+/* ══════════════ 주소로 바로 들어오기 ══════════════
+ * 유튜버가 "영흥도 편" 영상에 링크를 걸면 그 지점이 바로 열려야 한다.
+ * 홈으로만 보내면 사용자가 직접 찾아야 하고, 대부분 거기서 이탈한다.
+ *   ?spot=151        지점 상세 바로 열기
+ *   ?sp=낙지         그 대상을 노릴 수 있는 자리만 추려서 보기
+ *   ?d=2026-08-30    날짜 지정
+ *   ?ref=haeru_tv    레퍼럴 코드 (기존)
+ * 해시 형태도 받는다: #/spot/151 · #/species/낙지
+ */
+function parseRoute_(){
+  var q = {};
+  (location.search || '').replace(/^\?/, '').split('&').forEach(function(kv){
+    if (!kv) return;
+    var i = kv.indexOf('=');
+    var k = i < 0 ? kv : kv.slice(0, i);
+    var v = i < 0 ? '' : kv.slice(i + 1).replace(/\+/g, ' ');
+    try { q[k] = decodeURIComponent(v); } catch(e){ q[k] = v; }
+  });
+  var h = (location.hash || '').replace(/^#\/?/, '');
+  if (h){
+    var seg = h.split('/');
+    try {
+      if (seg[0] === 'spot' && seg[1]) q.spot = decodeURIComponent(seg[1]);
+      if ((seg[0] === 'species' || seg[0] === 'sp') && seg[1]) q.sp = decodeURIComponent(seg[1]);
+    } catch(e){}
+  }
+  return q;
+}
+
+/* 주소를 지금 보고 있는 화면에 맞춘다 — 뒤로가기로 상세가 닫히게 한다 */
+function pushRoute_(kind, val){
+  if (!window.history || !history.pushState) return;
+  var ref = '';
+  try { var rj = JSON.parse(localStorage.getItem('hrn_ref') || 'null'); if (rj && rj.c) ref = rj.c; } catch(e){}
+  var qs = [];
+  if (kind === 'spot' && val) qs.push('spot=' + encodeURIComponent(val));
+  if (kind === 'sp' && val)   qs.push('sp=' + encodeURIComponent(val));
+  if (S.ds && S.ds !== todayStr_()) qs.push('d=' + S.ds);
+  if (ref) qs.push('ref=' + encodeURIComponent(ref));
+  var url = location.pathname + (qs.length ? '?' + qs.join('&') : '');
+  try { history.pushState({ k: kind, v: val }, '', url); } catch(e){}
+}
+
+/* 지금 화면의 공유 주소 */
+function shareUrl_(kind, val){
+  var ref = '';
+  try { var rj = JSON.parse(localStorage.getItem('hrn_ref') || 'null'); if (rj && rj.c) ref = rj.c; } catch(e){}
+  var qs = [];
+  if (kind === 'spot' && val) qs.push('spot=' + encodeURIComponent(val));
+  if (kind === 'sp' && val)   qs.push('sp=' + encodeURIComponent(val));
+  if (ref) qs.push('ref=' + encodeURIComponent(ref));
+  return location.origin + location.pathname + (qs.length ? '?' + qs.join('&') : '');
+}
+
+/* 첫 로딩이 끝난 뒤 주소대로 화면을 연다 */
+function applyRoute_(){
+  var q = parseRoute_();
+  if (q.sp && !S.want){
+    S.want = q.sp;
+    if (typeof renderWant === 'function') try { renderWant(); } catch(e){}
+  }
+  if (q.spot){
+    var id = parseInt(q.spot, 10);
+    if (!isNaN(id)) setTimeout(function(){ openDetail(id); }, 260);
+  }
+}
+
 function load(){
   if (S.loading) return;
   S.loading = true;
@@ -4959,6 +5027,7 @@ function load(){
       S.shown = res.shown; S.total = res.total;
       S.gen = res.generated;
       render();
+      if (!S._routed){ S._routed = true; applyRoute_(); }
     })
     .withFailureHandler(function(e){
       S.loading = false;
@@ -5114,7 +5183,13 @@ function renderList(){
 }
 
 /* ══════════════ 상세 ══════════════ */
+window.addEventListener('popstate', function(){
+  var q = parseRoute_();
+  if (!q.spot){ if (typeof closeDetail === 'function') closeDetail(); }
+});
+
 function openDetail(id){
+  pushRoute_('spot', id);
   refEvent('open');
   S.sel = id;
   var d = $('detail'); d.hidden = false;
@@ -5582,6 +5657,24 @@ function renderDetail(d){
   bt.href = 'https://m.badatime.com/' + d.point.i + '.html';
   bt.target = '_blank'; bt.rel = 'noopener';
   act.appendChild(bt);
+  var sh = el('button','act','링크 복사');
+  sh.onclick = function(){
+    var u = shareUrl_('spot', d.point.i);
+    var done = function(){ toast('링크를 복사했습니다'); };
+    if (navigator.share){
+      navigator.share({ title: '해루낚 · ' + d.point.n, url: u }).catch(function(){});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(u).then(done, function(){ prompt('복사하세요', u); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = u; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch(e){}
+      document.body.removeChild(ta);
+    }
+  };
+  act.appendChild(sh);
   var cl = el('button','act','닫기'); cl.onclick = closeDetail;
   act.appendChild(cl);
   b.appendChild(act);
