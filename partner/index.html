@@ -89,6 +89,28 @@
 .btn2{display:inline-block;padding:13px 20px;border-radius:15px;font-weight:700;font-size:14.5px;
   background:rgba(255,255,255,.06);border:1px solid var(--line2);color:var(--txt);text-decoration:none}
 .btn2:hover{background:rgba(255,255,255,.1);text-decoration:none}
+
+/* 정산 조회 미리보기 */
+.peek{background:var(--bg2);border:1px solid var(--line2);border-radius:20px;padding:20px;margin:0 0 14px}
+.peek-lb{font-size:10.5px;font-weight:800;letter-spacing:.14em;color:var(--mut2);margin-bottom:13px}
+.peek-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  padding-bottom:12px;margin-bottom:15px;border-bottom:1px solid var(--line)}
+.peek-head b{font-size:19px;font-weight:800;letter-spacing:-.5px}
+.peek-head code{font-size:11.5px;color:var(--acc);background:rgba(46,230,168,.11);
+  border:1px solid rgba(46,230,168,.26);border-radius:6px;padding:2px 8px}
+.peek-head em{font-style:normal;font-size:11.5px;color:var(--mut2);margin-left:auto}
+.peek-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.peek-num{background:var(--card);padding:14px 15px}
+.peek-num span{display:block;font-size:11px;color:var(--mut2);margin-bottom:4px}
+.peek-num b{font-size:21px;font-weight:800;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.peek-num b.acc{color:var(--acc)}
+.peek-num small{display:block;font-size:10.5px;color:var(--mut2);margin-top:2px;font-weight:400}
+.peek-tier{margin-top:13px;padding:12px 14px;border-radius:12px;
+  background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.24);
+  font-size:13px;line-height:1.7;color:#cfe8dd}
+.peek-tier b{color:var(--acc)}
+.peek-cap{margin:14px 0 0;font-size:12.5px;color:var(--mut2);line-height:1.7}
 </style>
 </head>
 <body>
@@ -97,6 +119,8 @@
   <nav>
     <a href="../species/">어종 도감</a>
     <a href="../spot/">포인트</a>
+    <a href="../method/">계산 근거</a>
+    <a href="../business/">업체 등록</a>
     <a href="stats/">정산 조회</a>
     <a class="app" href="../index.html">오늘 어디 갈까</a>
   </nav>
@@ -126,8 +150,11 @@
       <p><strong>그 지점이나 그날 대상물과 맞는 영상</strong>이 자동으로 걸립니다.
          영흥도가 원픽인 날에는 영흥도 편이, 낙지철에는 낙지 편이 뜹니다.</p>
       <div class="cond">
-        <b>조건</b> 해루낚을 소개한 영상이 <b>1편 이상</b> 있는 채널에 드립니다.
-        따로 제작하지 않으셔도 됩니다 — 기존 영상 안에서 한 번 언급하고 링크를 걸어주시면 그것으로 충분합니다.
+        <b>조건</b> <b>해루낚(haerunak.com)을 소개한 영상이 1편 이상</b> 있는 채널에 드립니다.
+        사용법 영상을 따로 제작하지 않으셔도 됩니다 —
+        기존 출조 영상 안에서 한 번 언급하시고 설명란에 링크를 걸어주시면 그것으로 충분합니다.
+        <span class="cond-sub">다만 한 번 제대로 소개해 주시면 구독자분들께 실질적으로 도움이 많이 될 거라고 생각합니다.
+        "오늘 어디 가면 되냐"는 질문에 링크 하나로 답이 되니까요.</span>
       </div>
       <span class="free">노출료 없음</span>
     </div>
@@ -198,6 +225,37 @@
   </section>
 
   <section>
+    <h2>정산은 이 화면에서 직접 보십니다 <em>말로만 하지 않습니다</em></h2>
+    <p class="cap" style="margin:0 0 16px">
+      채널 코드를 받으시면 <a href="stats/">정산 조회 화면</a>이 열립니다.
+      제가 정리해 보내드리는 것과 별개로, 언제든 직접 들어가 몇 명이 들어왔고 얼마가 잡혔는지 보실 수 있습니다.
+      다른 채널의 수치는 보이지 않습니다.
+    </p>
+
+    <div class="peek" aria-hidden="true">
+      <div class="peek-lb">화면 예시</div>
+      <div class="peek-head">
+        <b>○○○ 채널</b><code>haeru_tv</code><em>2026-09 기준</em>
+      </div>
+      <div class="peek-nums">
+        <div class="peek-num"><span>이번 달 유입</span><b>320</b><small>명</small></div>
+        <div class="peek-num"><span>상세 조회</span><b>880</b><small>회</small></div>
+        <div class="peek-num"><span>발생 수익</span><b>98,400</b><small>원</small></div>
+        <div class="peek-num"><span>채널 몫</span><b class="acc">34,440</b><small>원</small></div>
+      </div>
+      <div class="peek-tier">지금 배분율 <b>35%</b> 입니다. 이번 달 유입이 680명 더 늘면 40% 가 됩니다.</div>
+    </div>
+
+    <p class="peek-cap">
+      위는 형식을 보여드리는 예시 화면입니다. 숫자는 실제 값이 아닙니다.
+      배분율은 그달 유입에 따라 화면에서 자동으로 바뀌고, 계산식은 <a href="stats/">조회 화면 아래쪽</a>에 그대로 적어 두었습니다.
+    </p>
+    <div class="row" style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">
+      <a class="btn2" href="stats/">정산 조회 화면 열어보기</a>
+    </div>
+  </section>
+
+  <section>
     <h2>채널에 도움이 되는 지점</h2>
     <ul class="steps">
       <li><div><b>영상 수명이 길어집니다</b>
@@ -219,8 +277,9 @@
         <p>원하시는 코드가 있으면 함께 적어주세요. 예를 들어 haeru_tv 같은 형태입니다.</p></div></li>
       <li><div><b>전용 링크를 보내드립니다</b>
         <p>홈 링크, 특정 지점 링크, 특정 대상물 링크를 다 만들어 드립니다. 영상 설명란에 맞는 것을 거시면 됩니다.</p></div></li>
-      <li><div><b>소개 영상을 한 편 올려주세요</b>
-        <p>새로 찍지 않으셔도 됩니다. 출조 영상 안에서 해루낚을 한 번 언급하고 설명란에 링크를 걸어주시면 됩니다. 이 시점부터 원픽 노출이 열립니다.</p></div></li>
+      <li><div><b>해루낚을 소개한 영상을 한 편 올려주세요</b>
+        <p>사용법 영상을 새로 찍지 않으셔도 됩니다. 출조 영상 안에서 해루낚(haerunak.com)을 한 번 언급하시고 설명란에 링크를 걸어주시면 됩니다. 이 시점부터 원픽 노출이 열립니다.</p>
+        <p style="margin-top:6px">한 번 제대로 소개해 주시면 구독자분들이 실제로 많이 쓰십니다. 물때표 캡처를 매번 올리실 필요가 없어집니다.</p></div></li>
       <li><div><b>영상 정보를 주시면 원픽에 겁니다</b>
         <p>어느 지점·어떤 대상물 편인지만 알려주세요. 나머지는 저희가 연결합니다.</p></div></li>
       <li><div><b>매달 정산합니다</b>
