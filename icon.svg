@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="해루낚">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2ee6a8"/>
+      <stop offset="1" stop-color="#35d0ff"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 밤바다 -->
+  <rect width="64" height="64" rx="14" fill="#04121c"/>
+
+  <!-- 랜턴 불빛 — 물속을 비춘다 -->
+  <path d="M32 13 L47 44 L17 44 Z" fill="url(#beam)"/>
+
+  <!-- 물결 두 줄 -->
+  <path d="M4 44c5.5 0 5.5-4.6 11-4.6S20.5 44 26 44s5.5-4.6 11-4.6S42.5 44 48 44s5.5-4.6 11-4.6"
+        fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M4 54c5.5 0 5.5-4.6 11-4.6S20.5 54 26 54s5.5-4.6 11-4.6S42.5 54 48 54s5.5-4.6 11-4.6"
+        fill="none" stroke="url(#g)" stroke-width="3.4" stroke-linecap="round" opacity=".5"/>
+
+  <!-- 랜턴 -->
+  <rect x="26" y="7" width="12" height="9" rx="2.5" fill="url(#g)"/>
+  <rect x="29.5" y="4" width="5" height="4" rx="1.6" fill="#7fe8c4"/>
+</svg>
