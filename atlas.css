@@ -1,0 +1,194 @@
+/* 해루낚 도감 — 검색으로 들어온 사람이 처음 보는 화면 */
+:root{
+  --bg:#061520; --bg2:#0b2333; --card:#0e2938;
+  --line:rgba(120,190,225,.16); --line2:rgba(120,190,225,.3);
+  --txt:#e9f3fa; --mut:#93aec0; --mut2:#68889b;
+  --acc:#2ee6a8; --acc2:#35d0ff; --warn:#fcd34d; --dan:#fca5a5;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--txt);
+  font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,
+    system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+  font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--acc2);text-decoration:none}
+a:hover{text-decoration:underline}
+a:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+img{max-width:100%}
+
+/* 머리 */
+.top{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px 20px;border-bottom:1px solid var(--line);
+  background:rgba(6,21,32,.9);position:sticky;top:0;z-index:10;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);flex-wrap:wrap;
+}
+.brand{
+  font-size:20px;font-weight:800;letter-spacing:-.5px;text-decoration:none;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.top nav{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.top nav a{
+  font-size:13px;font-weight:600;color:var(--mut);padding:7px 11px;
+  border-radius:10px;text-decoration:none;
+}
+.top nav a:hover{color:var(--txt);background:rgba(255,255,255,.06);text-decoration:none}
+.top nav a.app{
+  background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;font-weight:800;
+}
+
+main{max-width:780px;margin:0 auto;padding:0 20px}
+.page{padding:34px 0 20px}
+
+/* 제목 */
+.crumb{font-size:12.5px;color:var(--mut2);margin-bottom:14px}
+.crumb a{color:var(--mut)}
+.crumb span{margin:0 6px;opacity:.5}
+h1{font-size:clamp(28px,6vw,40px);font-weight:800;letter-spacing:-.9px;line-height:1.2;margin:0 0 8px;text-wrap:balance}
+.kicker{color:var(--acc);font-size:13.5px;font-weight:700;margin:0 0 20px}
+.lead{font-size:17px;color:var(--mut);margin:0 0 26px;line-height:1.8}
+
+section{margin:0 0 34px}
+h2{font-size:20px;font-weight:800;letter-spacing:-.4px;margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+h2 em{font-style:normal;font-size:13px;font-weight:600;color:var(--mut2);margin-left:7px}
+h3.sub{font-size:14.5px;font-weight:700;color:var(--mut);margin:20px 0 9px}
+h3.sub em{font-style:normal;font-size:12px;color:var(--mut2);font-weight:500;margin-left:5px}
+.cap{font-size:13px;color:var(--mut2);margin:10px 0 0;line-height:1.7}
+
+/* 금어기 경고 */
+.alert{
+  border:1px solid rgba(252,211,77,.34);background:rgba(252,211,77,.09);
+  border-radius:var(--r);padding:16px 18px;margin:0 0 26px;
+}
+.alert strong{display:block;color:var(--warn);font-size:14px;margin-bottom:6px}
+.alert p{margin:0;font-size:14.5px;line-height:1.75;color:#e8ddc0}
+.alert .note{margin-top:8px;font-size:13px;color:var(--mut)}
+
+/* 제철 달력 */
+.season{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin:6px 0 0}
+.mo{
+  border-radius:7px;padding:9px 2px;text-align:center;
+  background:rgba(255,255,255,.045);border:1px solid transparent;
+}
+.mo .m{display:block;font-size:11.5px;font-weight:700;color:var(--mut2)}
+.mo .v{display:block;font-size:8.5px;color:var(--mut2);margin-top:2px;line-height:1.3}
+.mo.peak{background:rgba(46,230,168,.26);border-color:rgba(46,230,168,.45)}
+.mo.peak .m,.mo.peak .v{color:#a8f5d8}
+.mo.good{background:rgba(46,230,168,.15)}
+.mo.good .m,.mo.good .v{color:#7fe8c4}
+.mo.ok{background:rgba(46,230,168,.07)}
+.mo.ok .m{color:var(--mut)}
+
+/* 칩 */
+.chips{display:flex;flex-wrap:wrap;gap:7px;list-style:none;padding:0;margin:0}
+.chips li{
+  font-size:13px;font-weight:600;padding:7px 12px;border-radius:11px;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);color:#cfe3ef;
+}
+.chips.lk li{padding:0;background:none;border:0}
+.chips.lk a{
+  display:inline-block;font-size:13px;font-weight:600;padding:7px 12px;border-radius:11px;
+  background:rgba(53,208,255,.11);border:1px solid rgba(53,208,255,.26);
+  color:#8fdcff;text-decoration:none;
+}
+.chips.lk a:hover{background:rgba(53,208,255,.19);text-decoration:none}
+.chips.sm a,.chips.sm li{font-size:11.5px;padding:5px 9px}
+
+.bait,.tip,.warn{margin:12px 0 0;font-size:14.5px;line-height:1.75}
+.bait b,.tip b,.warn b{color:var(--acc);font-weight:700;margin-right:6px}
+.warn{color:#e8ddc0}
+.warn b{color:var(--warn)}
+.warn.sm{font-size:12px;margin-top:8px;color:var(--mut)}
+
+/* 사실 표 */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0}
+.facts div{background:var(--bg2);padding:14px 16px}
+.facts dt{font-size:11px;color:var(--mut2);margin:0 0 4px;letter-spacing:.02em}
+.facts dd{margin:0;font-size:15.5px;font-weight:700}
+
+/* 목록 */
+.linklist{list-style:none;padding:0;margin:0;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.linklist li{background:var(--bg2);padding:0}
+.linklist a{display:block;padding:11px 14px;font-size:14px;font-weight:600;color:var(--txt);text-decoration:none}
+.linklist a:hover{background:rgba(53,208,255,.09);text-decoration:none}
+.linklist span{display:block;padding:0 14px 10px;font-size:11.5px;color:var(--mut2);margin-top:-8px}
+.linklist.out a{color:#8fdcff}
+
+.grid{list-style:none;padding:0;margin:0;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.grid a{
+  display:block;padding:13px 14px;border-radius:13px;text-decoration:none;
+  background:var(--bg2);border:1px solid var(--line);transition:.16s;
+}
+.grid a:hover{border-color:var(--line2);background:var(--card);text-decoration:none}
+.grid b{display:block;font-size:14.5px;font-weight:700;color:var(--txt)}
+.grid span{display:block;font-size:11.5px;color:var(--mut2);margin-top:2px}
+.grid i{
+  display:inline-block;font-style:normal;font-size:10px;font-weight:800;
+  color:var(--warn);margin-top:5px;
+}
+
+/* 세부 자리 */
+.spots{display:flex;flex-direction:column;gap:10px}
+.sp{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:15px 17px}
+.sp b{display:block;font-size:15px;font-weight:700;margin-bottom:5px}
+.sp p{margin:0 0 8px;font-size:13.5px;color:var(--mut);line-height:1.7}
+
+/* 앱으로 */
+.cta{
+  border:1px solid rgba(46,230,168,.28);background:rgba(46,230,168,.07);
+  border-radius:20px;padding:24px;margin-top:40px;
+}
+.cta h2{border:0;padding:0;margin:0 0 8px;font-size:18px}
+.cta p{margin:0 0 16px;font-size:14.5px;color:var(--mut);line-height:1.75}
+.btn{
+  display:inline-block;padding:13px 22px;border-radius:15px;
+  background:linear-gradient(100deg,var(--acc),var(--acc2));
+  color:#04121c;font-weight:800;font-size:15px;text-decoration:none;
+}
+.btn:hover{text-decoration:none;filter:brightness(1.07)}
+
+/* 꼬리 */
+.foot{
+  max-width:780px;margin:50px auto 0;padding:24px 20px 44px;
+  border-top:1px solid var(--line);color:var(--mut2);font-size:13px;line-height:1.8;
+}
+.foot p{margin:0 0 8px}
+.foot .fine{font-size:11.5px;color:var(--mut2);opacity:.85}
+
+@media (max-width:560px){
+  .page{padding:24px 0 16px}
+  .season{grid-template-columns:repeat(6,1fr);gap:4px}
+  .mo .v{font-size:9px}
+  .facts{grid-template-columns:repeat(2,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* 월별 대상물 */
+.montab{display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.mrow{display:flex;align-items:flex-start;gap:12px;background:var(--bg2);padding:9px 14px}
+.mrow.empty{opacity:.5}
+.mn{flex:0 0 42px;font-size:12.5px;font-weight:700;color:var(--mut);padding-top:5px}
+.ml{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.ml a{display:inline-block;font-size:12.5px;font-weight:600;padding:4px 9px;border-radius:9px;
+  background:rgba(46,230,168,.11);border:1px solid rgba(46,230,168,.22);
+  color:#7fe8c4;text-decoration:none}
+.ml a:hover{background:rgba(46,230,168,.2);text-decoration:none}
+.ml i{font-style:normal;font-size:12px;color:var(--mut2);padding:4px 0}
+
+/* 규정 */
+.rules{display:flex;flex-direction:column;gap:9px}
+.rule{background:rgba(252,211,77,.07);border:1px solid rgba(252,211,77,.22);
+  border-radius:13px;padding:13px 15px}
+.rule b{display:block;font-size:14px;font-weight:700;color:var(--warn);margin-bottom:4px}
+.rule p{margin:0;font-size:13.5px;color:#e0dac8;line-height:1.7}
+
+section p strong{color:var(--acc)}

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://thecloudstay.github.io/haerunak/sitemap.xml

@@ -5080,6 +5080,8 @@ function render(){
   if (S.want) $('wantbarT').textContent = S.want + ' 기준으로 순위를 냈습니다';
   syncPick();
   $('sheetFoot').innerHTML = (S.gen || '') + ' 기준 · 물때 자체 조석계산 · 기상 Open-Meteo · 점수는 참고용이며 안전 판단은 직접 하세요'
+    + '<br><a href="species/" style="color:var(--acc2);text-decoration:none">어종 도감</a>'
+    + ' · <a href="spot/" style="color:var(--acc2);text-decoration:none">전국 포인트 목록</a>'
     + '<br>제휴·광고 문의 <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc);text-decoration:none">thecloudstay@gmail.com</a>'
     + ' · <a href="#" id="redeemLink" style="color:var(--mut);text-decoration:underline">' + (isPremium() ? '프리미엄 이용 중' : '이용권 등록') + '</a>'
     + ' · <a href="#" id="partnerLink" style="color:var(--mut);text-decoration:underline">파트너 모집</a>';
@@ -5657,6 +5659,9 @@ function renderDetail(d){
   bt.href = 'https://m.badatime.com/' + d.point.i + '.html';
   bt.target = '_blank'; bt.rel = 'noopener';
   act.appendChild(bt);
+  var info = el('a','act','이 자리 정보');
+  info.href = 'spot/' + d.point.i + '.html';
+  act.appendChild(info);
   var sh = el('button','act','링크 복사');
   sh.onclick = function(){
     var u = shareUrl_('spot', d.point.i);
