@@ -1,0 +1,33 @@
+# 해루낚 — 전국 해루질·낚시 포인트와 어종 도감
+
+User-agent: *
+Allow: /
+# 접촉용 자료 페이지 — 검색에 노출하지 않는다
+Disallow: /gov/
+Disallow: /insure/
+
+# 네이버 검색로봇 — 명시해야 잘 수집한다
+User-agent: Yeti
+Allow: /
+Disallow: /gov/
+Disallow: /insure/
+
+# 구글
+User-agent: Googlebot
+Allow: /
+Disallow: /gov/
+Disallow: /insure/
+
+# 다음
+User-agent: Daumoa
+Allow: /
+Disallow: /gov/
+Disallow: /insure/
+
+# 빙
+User-agent: bingbot
+Allow: /
+Disallow: /gov/
+Disallow: /insure/
+
+Sitemap: https://haerunak.com/sitemap.xml
