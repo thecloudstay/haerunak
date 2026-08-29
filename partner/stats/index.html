@@ -79,6 +79,12 @@
 .howto i{font-style:normal;font-size:12px;font-weight:800;color:var(--acc);padding-top:2px}
 .howto b{display:block;font-size:14.5px;font-weight:700;margin-bottom:3px}
 .howto p{margin:0;font-size:13px;color:var(--mut);line-height:1.75}
+.zero{margin:0 0 18px;padding:13px 16px;border-radius:12px;
+  background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.28);
+  font-size:13.5px;line-height:1.75;color:#cfe9de}
+.zero b{color:var(--acc,#2ee6a8)}
+.zero code{font-size:12.5px;padding:2px 6px;border-radius:5px;
+  background:rgba(255,255,255,.08);font-family:ui-monospace,Menlo,monospace}
 </style>
 </head>
 <body>
@@ -192,6 +198,19 @@
     $('rName').textContent = ch.name || ch.code;
     $('rCode').textContent = ch.code;
     $('rPeriod').textContent = (meta.period || '') + ' 기준';
+    if (!document.getElementById('zero')){
+      var zz = document.createElement('p');
+      zz.id = 'zero'; zz.className = 'zero'; zz.hidden = true;
+      zz.innerHTML = '<b>제휴가 등록되었습니다.</b> 아직 이 코드로 들어온 방문이 없어 모든 수치가 0입니다. '
+                   + '전용 링크 <code>haerunak.com/?ref=' + (ch.code || '') + '</code> 를 영상 설명란이나 '
+                   + '고정 댓글에 걸어주시면 그때부터 집계됩니다.';
+      var r = $('result'); r.insertBefore(zz, r.firstChild ? r.firstChild.nextSibling : null);
+    } else {
+      document.getElementById('zero').innerHTML =
+        '<b>제휴가 등록되었습니다.</b> 아직 이 코드로 들어온 방문이 없어 모든 수치가 0입니다. '
+      + '전용 링크 <code>haerunak.com/?ref=' + (ch.code || '') + '</code> 를 영상 설명란이나 '
+      + '고정 댓글에 걸어주시면 그때부터 집계됩니다.';
+    }
 
     var st = ch.stat || {};
     $('nVisit').textContent = won(st.visits);
@@ -206,7 +225,15 @@
     $('nShare').textContent = won(share);
 
     var t = $('tier');
+    var fresh = !(st.visits || st.opens || st.revenue);
+    var z = document.getElementById('zero');
+    if (z) z.hidden = !fresh;
     var line = '지금 배분율 <b>' + rate + '%</b> 입니다.';
+    if (fresh){
+      t.innerHTML = line + '<span class="next">아직 집계된 유입이 없습니다. '
+                  + '링크를 걸어두시면 다음 날부터 숫자가 올라갑니다.</span>';
+      return;
+    }
     if (v < th.t1)      line += '<span class="next">이번 달 유입이 ' + won(th.t1 - v) + '명 더 늘면 ' + rt.t1 + '% 가 됩니다.</span>';
     else if (v < th.t2) line += '<span class="next">이번 달 유입이 ' + won(th.t2 - v) + '명 더 늘면 ' + rt.t2 + '% 가 됩니다.</span>';
     else                line += '<span class="next">최고 구간입니다.</span>';

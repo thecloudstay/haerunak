@@ -22,6 +22,7 @@ function doGet(e){
     species: { haeru: allSpecies_('haeru'), fish: allSpecies_('fish') },
     ban: (typeof banMetaNow_==='function' ? banMetaNow_() : BAN_META),
     nonpro: NONPRO,
+    ferry: (typeof ferryInfo_==='function' ? ferryInfo_() : null),
     ref: ref
   });
   return t.evaluate()
@@ -116,7 +117,11 @@ function packRow_(p, an, mode){
     mul: an.meta.mul, range: an.meta.range, src: an.meta.src,
     vis: an.meta.vis, cur: an.meta.curPeak,
     other: (mode === 'fish' ? an.haeru.score : an.fish.score),
-    wantReason: an.want ? an.want.reason : null
+    wantReason: an.want ? an.want.reason : null,
+    // 원픽 자리에 걸 영상 — 유튜버에게 주는 대가이자 나중의 광고 자리
+    vid: (typeof pickVideo_ === 'function')
+      ? pickVideo_(p.i, p.n, m.targets.map(function(t){ return t.n; }), mode)
+      : null
   };
 }
 
@@ -139,6 +144,26 @@ function apiPoint(id, ds, want, days){
       ? pickAd_(p.r || '', ds, 'haeru', (an.meta.banned.haeru || []).concat(an.meta.banned.fish || []).map(function(x){ return x.n; }))
       : null,
     gear: (typeof gearFor_ === 'function') ? gearFor_(an.meta, 'haeru', p.f) : [],
+    rigs: (typeof rigsFor_ === 'function')
+      ? { haeru: rigsFor_(an.haeru.targets, 'haeru'), fish: rigsFor_(an.fish.targets, 'fish'),
+          safe: SAFE_KIT }
+      : null,
+    // 준비물에 걸린 제휴 링크 — 도구 이름을 상품군으로 묶어 한 번에 내려준다
+    shop: (function(){
+      if (typeof shopFor_ !== 'function' || typeof rigsFor_ !== 'function') return null;
+      var names = [];
+      ['haeru','fish'].forEach(function(m){
+        (rigsFor_(m === 'haeru' ? an.haeru.targets : an.fish.targets, m) || [])
+          .forEach(function(r){ (r.t || []).forEach(function(t){ names.push(t); }); });
+      });
+      SAFE_KIT.forEach(function(t){ names.push(t); });
+      var items = shopFor_(names);
+      return { items: items, disclosure: shopDisclosure_(items) };
+    })(),
+    videos: (typeof videosFor_ === 'function')
+      ? { haeru: videosFor_((an.haeru.targets||[]).map(function(x){return x.n;}), 'haeru'),
+          fish:  videosFor_((an.fish.targets ||[]).map(function(x){return x.n;}), 'fish') }
+      : null,
     week: apiWeek_(p, ds, want, Math.min(15, Math.max(7, Number(days) || 7)))
   };
 }

@@ -192,3 +192,17 @@ h3.sub em{font-style:normal;font-size:12px;color:var(--mut2);font-weight:500;mar
 .rule p{margin:0;font-size:13.5px;color:#e0dac8;line-height:1.7}
 
 section p strong{color:var(--acc)}
+
+
+/* 제휴 권유 */
+.joinbox{padding:17px 19px;border-radius:var(--r);margin:0}
+.jb-ch{background:rgba(53,208,255,.07);border:1px dashed rgba(53,208,255,.34)}
+.jb-biz{background:rgba(46,230,168,.07);border:1px dashed rgba(46,230,168,.34)}
+.joinbox b{display:block;font-size:15.5px;font-weight:800;margin-bottom:6px;letter-spacing:-.2px}
+.jb-ch b{color:var(--acc2)} .jb-biz b{color:var(--acc)}
+.joinbox p{margin:0 0 13px;font-size:13.5px;line-height:1.8;color:var(--mut)}
+.joinbox-a{display:inline-block;font-size:13.5px;font-weight:800;padding:10px 17px;border-radius:13px;
+  text-decoration:none;color:#04121c}
+.jb-ch .joinbox-a{background:var(--acc2)}
+.jb-biz .joinbox-a{background:var(--acc)}
+.joinbox-a:hover{text-decoration:none;filter:brightness(1.07)}

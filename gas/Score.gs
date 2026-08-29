@@ -113,10 +113,14 @@ function analyze_(p, ds, tide, wxRec, want){
   var sTime = 20 * (nl ? nl.timing : 0.3);
 
   var hWe = windEffect_(p, hWx.wind, hWx.wdir);
-  var sSafe = 18 * (0.34*lerpDown_(hWe.eff, 4, 13)
-                  + 0.28*lerpDown_(hWx.wave, 0.25, 1.1)
-                  + 0.22*band_(hWx.feel, 8, 30, 12)
-                  + 0.16*lerpDown_(Math.abs(toKnot_(hCur)), 0.6, 2.4));
+  // 작업 시간대의 실제 하늘 — 하루 총량이 아니라 그 시각 값을 본다
+  var hSky  = skyRisk_(hWx.code, hWx.vism, hWx.rain, hWx.snow);
+  var hChil = wetChill_(hWx.feel, hWx.wind, hWx.rain, true);   // 갯벌은 젖은 채로 선다
+  var sSafe = 18 * (0.30*lerpDown_(hWe.eff, 4, 13)
+                  + 0.25*lerpDown_(hWx.wave, 0.25, 1.1)
+                  + 0.22*band_(hChil === null ? hWx.feel : hChil, 8, 30, 12)
+                  + 0.13*lerpDown_(Math.abs(toKnot_(hCur)), 0.6, 2.4)
+                  + 0.10*lerpDown_(hSky.level, 2, 9));
 
   // 대상 활성 — 수온 적정 + 제철 + 야행성 보정
   var hAll = speciesOf_(p, 'haeru');
@@ -124,6 +128,8 @@ function analyze_(p, ds, tide, wxRec, want){
   var hTherm = 0;
   hSeason.forEach(function(t){ var v = thermalFit_(t.n, hWx.sst); if (v > hTherm) hTherm = v; });
   var lux = moonLux_(y, mo, d, lowT === null ? 21 : lowT, p.la, p.lo, age);
+  // 구름이 달을 가리면 실제 노출 조도는 크게 떨어진다 (야행성 대상에 유리)
+  if (hWx.cloud !== null && hWx.cloud !== undefined) lux *= (1 - 0.78 * Math.min(1, hWx.cloud/100));
   var nocturn = clamp01_(1 - Math.min(1, lux/0.22)*0.45) ;   // 어두울수록 문어·낙지 유리
   var sLive = 12 * (0.5*hTherm + 0.28*clamp01_((hSeason.length ? hSeason[0].v : 1)/3) + 0.22*nocturn);
 
@@ -142,6 +148,14 @@ function analyze_(p, ds, tide, wxRec, want){
   }
   if (Math.abs(toKnot_(hCur)) >= 2.2) hCap = Math.min(hCap, 38);
   if (day.rainSum !== null && day.rainSum >= 20) hCap = Math.min(hCap, 40);
+  if (hWx.rain !== null && hWx.rain >= 4) hCap = Math.min(hCap, 34);     // 작업 시간에 쏟아짐
+  // 뇌우 — 갯벌 한가운데서는 사람이 가장 높은 물체다. 점수가 아니라 금지에 가깝다
+  if (hSky.storm) hCap = Math.min(hCap, 8);
+  // 안개 — 갯벌 고립 사고의 첫째 원인은 방향 상실이다
+  if (hSky.fog) hCap = Math.min(hCap, hWx.vism !== null && hWx.vism < 500 ? 18 : 32);
+  if (hSky.freeze) hCap = Math.min(hCap, 20);
+  if (hSky.snow) hCap = Math.min(hCap, 38);
+  if (hChil !== null && hChil <= 0) hCap = Math.min(hCap, 26);           // 젖은 채 저체온
   if (hWx.feel !== null && hWx.feel <= 2) hCap = Math.min(hCap, 42);
   if (vis.vis < 0.25) hCap = Math.min(hCap, 45);
   if (p.f === 'none') hCap = Math.min(hCap, 28);
@@ -161,7 +175,34 @@ function analyze_(p, ds, tide, wxRec, want){
   if (Math.abs(toKnot_(hCur)) >= 1.6) hWarn.push('조류 ' + Math.abs(toKnot_(hCur)).toFixed(1) + '노트 — 발 밑 조심');
   if (hWx.wind !== null && hWe.eff >= 9) hWarn.push((hWe.wo.word||'바람') + ' ' + Math.round(hWx.wind) + 'm/s — 체온 손실·물결 주의');
   if (p.f === 'none') hWarn.push('조차가 작아 갯벌 노출이 거의 없음');
-  if (hCap <= 45) hWarn.unshift('안전 경고 — 오늘 이 지점 입수는 권하지 않습니다');
+  // 하늘 — 작업 시간대 기준
+  if (hSky.storm) hWarn.unshift('뇌우 예보 — 갯벌에서는 사람이 가장 높은 물체입니다. 나가지 마세요');
+  else if (hSky.fog) hWarn.unshift('안개' + (hWx.vism !== null ? ' (시정 ' + Math.round(hWx.vism) + 'm)' : '')
+                                   + ' — 갯벌에서 방향을 잃으면 고립됩니다');
+  else if (hSky.freeze) hWarn.unshift('얼어붙는 비 — 갯바위·경사로 결빙');
+  else if (hSky.snow) hWarn.push('눈 — 발판이 미끄럽고 갯벌 경계가 안 보임');
+  else if (hWx.rain !== null && hWx.rain >= 4) hWarn.push('작업 시간에 시간당 ' + hWx.rain.toFixed(1) + 'mm 비 — 젖고 흙탕물 짐');
+  else if (hWx.rain !== null && hWx.rain >= 0.3) hWarn.push(hSky.word + ' 예보 — 여벌 옷과 방수 준비');
+  if (hChil !== null && hWx.feel !== null && hChil <= hWx.feel - 3){
+    hWarn.push('젖으면 체감 ' + Math.round(hChil) + '도까지 떨어짐 (기상 체감 ' + Math.round(hWx.feel) + '도)');
+  }
+  if (day.rainSum !== null && day.rainSum >= 10 && (hWx.rain === null || hWx.rain < 1)){
+    hWarn.push('낮에 ' + Math.round(day.rainSum) + 'mm 내려 흙탕물 유입 — 시야는 기대 이하');
+  }
+  // 안전 경고는 반드시 '왜'를 달고 나간다 — 이유 없는 경고는 무시당한다
+  if (hCap <= 45){
+    var hRsn = hSky.storm ? '뇌우'
+             : hSky.fog ? '안개'
+             : hSky.freeze ? '결빙'
+             : (hWx.wave !== null && hWx.wave >= 0.8) ? '파고 ' + hWx.wave.toFixed(1) + 'm'
+             : (hWx.wind !== null && hWe.eff >= 9) ? '바람 ' + Math.round(hWe.eff) + 'm/s'
+             : (Math.abs(toKnot_(hCur)) >= 2.2) ? '조류 ' + Math.abs(toKnot_(hCur)).toFixed(1) + '노트'
+             : (hChil !== null && hChil <= 0) ? '저체온'
+             : (day.rainSum !== null && day.rainSum >= 20) ? '비 ' + Math.round(day.rainSum) + 'mm'
+             : hSky.snow ? '눈'
+             : (vis.vis < 0.25) ? '시야 없음' : '';
+    hWarn.unshift('안전 경고' + (hRsn ? ' (' + hRsn + ')' : '') + ' — 오늘 이 지점 입수는 권하지 않습니다');
+  }
 
   /* ── 낚시 ───────────────────────────────── */
   var fo   = feedOverlap_(ev, tw.rise, tw.set, sun.rise, sun.set);
@@ -173,13 +214,17 @@ function analyze_(p, ds, tide, wxRec, want){
   var visF = underwaterVis_({ wave: fWx.wave, period: fWx.wper, floor: p.f,
                               current: flow.peak/1.94, rain24: day.rainSum, month: mo, depth: 3 });
 
-  var sFeed = 28 * clamp01_(0.30 + (fo.ov > 0 ? fo.ov/3.2*0.40 : 0) + solV*0.30);
+  var fSky  = skyRisk_(fWx.code, fWx.vism, fWx.rain, fWx.snow);
+  var fBite = rainBite_(fWx.rain, fWx.cloud);   // 약한 비·흐림은 오히려 가점
+  var sFeed = 28 * clamp01_(0.30 + (fo.ov > 0 ? fo.ov/3.2*0.40 : 0) + solV*0.30 + fBite*0.16);
   var sFlow = 18 * (p.mr > 0.4 ? (0.6*flow.fit + 0.4*band_(relRange, 0.5, 0.92, 0.42)) : 0.68);
   // 바람은 방향까지 본다 — 등바람은 체감을 깎고, 알맞은 맞바람은 활성 가점
   var we = windEffect_(p, fWx.wind, fWx.wdir);
-  var sSea  = 20 * (0.55*lerpDown_(fWx.wave, 0.25, 1.8)
-                  + 0.33*lerpDown_(we.eff, 3.5, 13)
-                  + 0.12*we.bonus);
+  var fChil = wetChill_(fWx.feel, fWx.wind, fWx.rain, false);   // 낚시는 물에 안 들어간다
+  var sSea  = 20 * (0.48*lerpDown_(fWx.wave, 0.25, 1.8)
+                  + 0.28*lerpDown_(we.eff, 3.5, 13)
+                  + 0.10*we.bonus
+                  + 0.14*band_(fChil === null ? fWx.feel : fChil, 4, 30, 10));
 
   var fAll = speciesOf_(p, 'fish');
   var fSeason = inSeason_(fAll, mo, SEASON_FX);
@@ -207,6 +252,12 @@ function analyze_(p, ds, tide, wxRec, want){
     else if (we.eff >= 11) fCap = Math.min(fCap, 48);
   }
   if (day.rainSum !== null && day.rainSum >= 30) fCap = Math.min(fCap, 42);
+  if (fWx.rain !== null && fWx.rain >= 8) fCap = Math.min(fCap, 38);
+  // 낚싯대는 탄소 — 뇌우에는 들지 않는다
+  if (fSky.storm) fCap = Math.min(fCap, 10);
+  if (fSky.fog) fCap = Math.min(fCap, fWx.vism !== null && fWx.vism < 500 ? 30 : 52);
+  if (fSky.freeze) fCap = Math.min(fCap, 24);   // 갯바위 결빙
+  if (fChil !== null && fChil <= -2) fCap = Math.min(fCap, 32);
   var fScore = Math.round(Math.min(fRaw, fCap));
 
   var fWhy = [], fWarn = [];
@@ -231,7 +282,29 @@ function analyze_(p, ds, tide, wxRec, want){
   if (fWx.wind !== null && we.eff >= 11) fWarn.push('체감 바람 ' + Math.round(we.eff) + 'm/s — 캐스팅 어려움');
   if (visF.vis >= 3) fWhy.push('물색 맑음 (시야 ' + visF.vis.toFixed(1) + 'm)');
   else if (visF.vis < 0.6) fWarn.push('물이 탁함 (시야 ' + Math.round(visF.vis*100) + 'cm) — 루어 시인성 낮음');
-  if (fCap <= 40) fWarn.unshift('안전 경고 — 갯바위·선상 모두 위험 수준');
+  // 하늘 — 피딩타임 기준
+  if (fSky.storm) fWarn.unshift('뇌우 예보 — 낚싯대는 탄소 도체입니다. 출조 금지');
+  else if (fSky.fog) fWarn.unshift('안개' + (fWx.vism !== null ? ' (시정 ' + Math.round(fWx.vism) + 'm)' : '')
+                                   + ' — 선상·갯바위 모두 위험');
+  else if (fSky.freeze) fWarn.unshift('얼어붙는 비 — 갯바위 결빙, 진입 금지');
+  else if (fSky.snow) fWarn.push('눈 — 발판 미끄러움');
+  if (fBite > 0.35) fWhy.push(fWx.rain >= 0.3 ? '약한 비 — 수면이 깨져 경계심이 낮아짐' : '흐린 하늘 — 광량이 낮아 활성 좋음');
+  else if (fWx.rain !== null && fWx.rain >= 8) fWarn.push('시간당 ' + fWx.rain.toFixed(1) + 'mm 폭우 — 염분이 흐트러지고 입질이 끊김');
+  else if (fWx.rain !== null && fWx.rain >= 3) fWarn.push('제법 내리는 비 — 물색 탁해짐');
+  if (fChil !== null && fWx.feel !== null && fChil <= fWx.feel - 3){
+    fWarn.push('비바람에 체감 ' + Math.round(fChil) + '도 — 방한·방수 필수');
+  }
+  if (fCap <= 40){
+    var fRsn = fSky.storm ? '뇌우'
+             : fSky.freeze ? '갯바위 결빙'
+             : fSky.fog ? '안개'
+             : (fWx.wave !== null && fWx.wave >= 1.3) ? '파고 ' + fWx.wave.toFixed(1) + 'm'
+             : (fWx.wind !== null && we.eff >= 11) ? '바람 ' + Math.round(we.eff) + 'm/s'
+             : (fWx.rain !== null && fWx.rain >= 8) ? '폭우'
+             : (day.rainSum !== null && day.rainSum >= 30) ? '비 ' + Math.round(day.rainSum) + 'mm'
+             : (fChil !== null && fChil <= -2) ? '한파' : '';
+    fWarn.unshift('안전 경고' + (fRsn ? ' (' + fRsn + ')' : '') + ' — 갯바위·선상 모두 위험 수준');
+  }
 
   /* ── 대상물과 금어기 ────────────────────── */
   var hSplit = splitByBan_(hSeason.slice(0, 6), mo, d, p.r);
@@ -264,6 +337,7 @@ function analyze_(p, ds, tide, wxRec, want){
       range: Math.round(range*100)/100, src: tide.src,
       sunrise: sun.rise, sunset: sun.set, dawn: tw.rise, dusk: tw.set,
       events: ev, floor: FLOOR_KO[p.f] || '',
+      ferry: p.isl ? ferryPlan_(lowT, hWx.wave, hWx.wind, p.fr ? p.fr[2] : 1) : null,
       vis: Math.round(vis.vis*100)/100, visWord: vis.word, ssc: Math.round(vis.ssc),
       flatWidth: Math.round(width),
       curPeak: Math.round(flow.peak*100)/100,
@@ -272,7 +346,13 @@ function analyze_(p, ds, tide, wxRec, want){
       press: Math.round(dp*10)/10,
       wx: { temp: hWx.temp, wind: fWx.wind, wave: fWx.wave, sst: fWx.sst,
             cloud: fWx.cloud, rain: fWx.rain, wdir: dirName_(fWx.wdir),
-            onshore: we.wo.word, effWind: we.eff !== null && we.eff !== undefined ? Math.round(we.eff*10)/10 : null },
+            onshore: we.wo.word, effWind: we.eff !== null && we.eff !== undefined ? Math.round(we.eff*10)/10 : null,
+            sky: fSky.word, skyH: hSky.word, storm: hSky.storm || fSky.storm, fog: hSky.fog || fSky.fog,
+            rainDay: day.rainSum === null ? null : Math.round(day.rainSum*10)/10,
+            rainP: fWx.rainP === null || fWx.rainP === undefined ? null : Math.round(fWx.rainP),
+            vism: fWx.vism === null || fWx.vism === undefined ? null : Math.round(fWx.vism),
+            chillH: hChil === null ? null : Math.round(hChil*10)/10,
+            chillF: fChil === null ? null : Math.round(fChil*10)/10 },
       banned: { haeru: hSplit.banned, fish: fSplit.banned },
       banMeta: (typeof banMetaNow_==='function' ? banMetaNow_() : BAN_META)
     },

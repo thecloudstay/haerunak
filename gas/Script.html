@@ -38,38 +38,107 @@ var map = L.map('map', {
   center: [36.35, 127.3], zoom: 7, zoomControl: false,
   attributionControl: true, minZoom: 6, maxZoom: 19
 });
-/* ── 베이스맵 3종: 지도 / 위성 / 밝게 ── */
-var BASES = {
-  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    {attribution:'지도 &copy; OpenStreetMap · CARTO | 물때 바다타임 · 기상 Open-Meteo', subdomains:'abcd', maxZoom:19, className:'basetiles'}),
-  sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {attribution:'위성 Esri · Maxar | 물때 바다타임 · 기상 Open-Meteo', maxZoom:19, className:'basetiles'}),
-  lite: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    {attribution:'지도 &copy; OpenStreetMap · CARTO | 물때 바다타임 · 기상 Open-Meteo', subdomains:'abcd', maxZoom:19, className:'basetiles'})
+/* ── 베이스맵 — 키 없이 쓸 수 있는 공급원만 둔다.
+      한 곳이 죽으면 다음 후보로 자동 교체된다. ── */
+var TILE_TAIL = ' | 물때 바다타임 · 기상 Open-Meteo';
+var TILE_SRC = {
+  dark: [
+    { u:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+      a:'지도 Esri', mz:16 },
+    { u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', a:'지도 OpenStreetMap', mz:19, sd:'abc' }
+  ],
+  sat: [
+    { u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      a:'위성 Esri · Maxar', mz:19 }
+  ],
+  lite: [
+    { u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', a:'지도 OpenStreetMap', mz:19, sd:'abc' },
+    { u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      a:'지도 Esri', mz:19 }
+  ]
 };
 var SATLBL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-  {maxZoom:19, opacity:.92, className:'basetiles'});
-var curBase = 'dark';
-BASES.dark.addTo(map);
+  { maxZoom:19, maxNativeZoom:19, opacity:.92, className:'basetiles' });
+
+var LIVE = {};          // 현재 붙어 있는 레이어
+
+function makeTile_(kind, idx){
+  var c = TILE_SRC[kind] && TILE_SRC[kind][idx];
+  if (!c) return null;
+  var opt = { attribution: c.a + TILE_TAIL, maxZoom: 19, maxNativeZoom: c.mz, className: 'basetiles' };
+  if (c.sd) opt.subdomains = c.sd;
+  var tl = L.tileLayer(c.u, opt);
+  var good = 0, bad = 0;
+  tl.on('tileload',  function(){ good++; });
+  tl.on('tileerror', function(){
+    bad++;
+    // 한 장도 못 받은 채 연달아 실패하면 그 공급원은 죽은 것으로 본다
+    if (good === 0 && bad >= 5 && !tl._swapped && TILE_SRC[kind][idx + 1]){
+      tl._swapped = true;
+      var nx = makeTile_(kind, idx + 1);
+      if (nx && curBase === kind){
+        if (map.hasLayer(tl)) map.removeLayer(tl);
+        nx.addTo(map); nx.bringToBack();
+        LIVE[kind] = nx;
+      }
+    }
+  });
+  return tl;
+}
+
+function getBase_(kind){
+  if (!LIVE[kind]) LIVE[kind] = makeTile_(kind, 0);
+  return LIVE[kind];
+}
+
+/* 기본은 내장 해안선이다 — 외부 요청이 0이라 공급사가 죽든 유료화하든 영향이 없다.
+   세밀한 지도가 필요하면 사용자가 '위성'·'지도'를 눌렀을 때만 타일을 부른다.
+   해안선이 내장되지 않은 판(앱스 스크립트)에서는 밝은 지도를 기본으로 쓴다. */
+var HAS_COAST = (typeof COAST_LAYER !== 'undefined' && COAST_LAYER);
+var curBase = HAS_COAST ? 'base' : 'lite';
+if (!HAS_COAST) getBase_('lite').addTo(map);
+
+/* 타일을 켜면 내장 해안선은 숨긴다 — 위성 사진 위에 선이 덮이면 안 된다 */
+function coastVis_(show){
+  if (!HAS_COAST) return;
+  if (show){ if (!map.hasLayer(COAST_LAYER)) COAST_LAYER.addTo(map); }
+  else { if (map.hasLayer(COAST_LAYER)) map.removeLayer(COAST_LAYER); }
+}
+
 function setBase_(k){
-  if (!BASES[k] || k === curBase) return;
-  if (map.hasLayer(BASES[curBase])) map.removeLayer(BASES[curBase]);
+  if (k === curBase) return;
+  if (k !== 'base' && !TILE_SRC[k]) return;
+  var old = LIVE[curBase];
+  if (old && map.hasLayer(old)) map.removeLayer(old);
   if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
-  BASES[k].addTo(map);
-  if (k === 'sat') SATLBL.addTo(map);
+  if (k !== 'base'){                       // 'base' 는 내장 해안선만 쓴다
+    var nx = getBase_(k);
+    nx.addTo(map); nx.bringToBack();
+    if (k === 'sat') SATLBL.addTo(map);
+    coastVis_(false);
+  } else {
+    coastVis_(true);
+  }
   curBase = k;
   document.body.className = document.body.className.replace(/\s*map-sat\b/,'') + (k === 'sat' ? ' map-sat' : '');
   var bs = document.querySelectorAll('.basebtn');
   for (var i=0;i<bs.length;i++) bs[i].className = 'basebtn' + (bs[i].getAttribute('data-b') === k ? ' on' : '');
   try { localStorage.setItem('hrn_base', k); } catch(e){}
 }
+
 var baseCtl = L.control({position:'bottomleft'});
 baseCtl.onAdd = function(){
   var d = L.DomUtil.create('div','basesw');
-  d.innerHTML = '<button class="basebtn on" data-b="dark" type="button">지도</button>'
+  d.innerHTML = '<button class="basebtn on" data-b="base" type="button">기본</button>'
               + '<button class="basebtn" data-b="sat" type="button">위성</button>'
-              + '<button class="basebtn" data-b="lite" type="button">밝게</button>';
+              + '<button class="basebtn" data-b="lite" type="button">지도</button>';
   L.DomEvent.disableClickPropagation(d);
+  // 해안선이 없는 판은 '지도'가 기본이다
+  if (!HAS_COAST){
+    var bs0 = d.querySelectorAll('.basebtn');
+    for (var j=0;j<bs0.length;j++)
+      bs0[j].className = 'basebtn' + (bs0[j].getAttribute('data-b') === 'lite' ? ' on' : '');
+  }
   L.DomEvent.on(d, 'click', function(e){
     var t = e.target;
     while (t && t !== d && !(t.className && String(t.className).indexOf('basebtn') >= 0)) t = t.parentNode;
@@ -78,7 +147,7 @@ baseCtl.onAdd = function(){
   return d;
 };
 baseCtl.addTo(map);
-try { var sv = localStorage.getItem('hrn_base'); if (sv && sv !== 'dark') setBase_(sv); } catch(e){}
+try { var sv = localStorage.getItem('hrn_base'); if (sv && sv !== 'base' && sv !== 'dark') setBase_(sv); } catch(e){}
 
 function pinIcon(r, isTop, small){
   return L.divIcon({
@@ -111,6 +180,74 @@ function drawPins(){
 map.on('zoomend', function(){ if (S.rows.length) drawPins(); });
 
 /* ══════════════ 데이터 ══════════════ */
+
+/* ══════════════ 주소로 바로 들어오기 ══════════════
+ * 유튜버가 "영흥도 편" 영상에 링크를 걸면 그 지점이 바로 열려야 한다.
+ * 홈으로만 보내면 사용자가 직접 찾아야 하고, 대부분 거기서 이탈한다.
+ *   ?spot=151        지점 상세 바로 열기
+ *   ?sp=낙지         그 대상을 노릴 수 있는 자리만 추려서 보기
+ *   ?d=2026-08-30    날짜 지정
+ *   ?ref=haeru_tv    레퍼럴 코드 (기존)
+ * 해시 형태도 받는다: #/spot/151 · #/species/낙지
+ */
+function parseRoute_(){
+  var q = {};
+  (location.search || '').replace(/^\?/, '').split('&').forEach(function(kv){
+    if (!kv) return;
+    var i = kv.indexOf('=');
+    var k = i < 0 ? kv : kv.slice(0, i);
+    var v = i < 0 ? '' : kv.slice(i + 1).replace(/\+/g, ' ');
+    try { q[k] = decodeURIComponent(v); } catch(e){ q[k] = v; }
+  });
+  var h = (location.hash || '').replace(/^#\/?/, '');
+  if (h){
+    var seg = h.split('/');
+    try {
+      if (seg[0] === 'spot' && seg[1]) q.spot = decodeURIComponent(seg[1]);
+      if ((seg[0] === 'species' || seg[0] === 'sp') && seg[1]) q.sp = decodeURIComponent(seg[1]);
+    } catch(e){}
+  }
+  return q;
+}
+
+/* 주소를 지금 보고 있는 화면에 맞춘다 — 뒤로가기로 상세가 닫히게 한다 */
+function pushRoute_(kind, val){
+  if (!window.history || !history.pushState) return;
+  var ref = '';
+  try { var rj = JSON.parse(localStorage.getItem('hrn_ref') || 'null'); if (rj && rj.c) ref = rj.c; } catch(e){}
+  var qs = [];
+  if (kind === 'spot' && val) qs.push('spot=' + encodeURIComponent(val));
+  if (kind === 'sp' && val)   qs.push('sp=' + encodeURIComponent(val));
+  if (S.ds && S.ds !== todayStr_()) qs.push('d=' + S.ds);
+  if (ref) qs.push('ref=' + encodeURIComponent(ref));
+  var url = location.pathname + (qs.length ? '?' + qs.join('&') : '');
+  try { history.pushState({ k: kind, v: val }, '', url); } catch(e){}
+}
+
+/* 지금 화면의 공유 주소 */
+function shareUrl_(kind, val){
+  var ref = '';
+  try { var rj = JSON.parse(localStorage.getItem('hrn_ref') || 'null'); if (rj && rj.c) ref = rj.c; } catch(e){}
+  var qs = [];
+  if (kind === 'spot' && val) qs.push('spot=' + encodeURIComponent(val));
+  if (kind === 'sp' && val)   qs.push('sp=' + encodeURIComponent(val));
+  if (ref) qs.push('ref=' + encodeURIComponent(ref));
+  return location.origin + location.pathname + (qs.length ? '?' + qs.join('&') : '');
+}
+
+/* 첫 로딩이 끝난 뒤 주소대로 화면을 연다 */
+function applyRoute_(){
+  var q = parseRoute_();
+  if (q.sp && !S.want){
+    S.want = q.sp;
+    if (typeof renderWant === 'function') try { renderWant(); } catch(e){}
+  }
+  if (q.spot){
+    var id = parseInt(q.spot, 10);
+    if (!isNaN(id)) setTimeout(function(){ openDetail(id); }, 260);
+  }
+}
+
 function load(){
   if (S.loading) return;
   S.loading = true;
@@ -131,6 +268,7 @@ function load(){
       S.shown = res.shown; S.total = res.total;
       S.gen = res.generated;
       render();
+      if (!S._routed){ S._routed = true; applyRoute_(); }
     })
     .withFailureHandler(function(e){
       S.loading = false;
@@ -183,6 +321,8 @@ function render(){
   if (S.want) $('wantbarT').textContent = S.want + ' 기준으로 순위를 냈습니다';
   syncPick();
   $('sheetFoot').innerHTML = (S.gen || '') + ' 기준 · 물때 바다타임 · 기상 Open-Meteo · 점수는 참고용이며 안전 판단은 직접 하세요'
+    + '<br><a href="species/" style="color:var(--acc2);text-decoration:none">어종 도감</a>'
+    + ' · <a href="spot/" style="color:var(--acc2);text-decoration:none">전국 포인트 목록</a>'
     + '<br>제휴·광고 문의 <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc);text-decoration:none">thecloudstay@gmail.com</a>'
     + ' · <a href="#" id="redeemLink" style="color:var(--mut);text-decoration:underline">' + (isPremium() ? '프리미엄 이용 중' : '이용권 등록') + '</a>'
     + ' · <a href="#" id="partnerLink" style="color:var(--mut);text-decoration:underline">파트너 모집</a>';
@@ -215,6 +355,28 @@ function renderPick(){
   (top.targets||[]).slice(0,3).forEach(function(t){ c.appendChild(el('span','chip', t)); });
   (top.banned||[]).slice(0,1).forEach(function(t){ c.appendChild(el('span','chip warn', t + ' 금어기')); });
   if (top.warn && top.warn.length) c.appendChild(el('span','chip warn', top.warn[0]));
+  // 원픽 영상 자리 — 유튜버에게 주는 대가이자 나중의 광고 자리
+  var pv = $('pickVid');
+  if (!pv){
+    pv = el('a','pickvid'); pv.id = 'pickVid';
+    pv.target = '_blank';
+    $('pick').querySelector('.pick-inner').insertBefore(pv, $('pickCta'));
+  }
+  if (top.vid && top.vid.u){
+    var v = top.vid;
+    pv.hidden = false;
+    pv.href = v.u;
+    pv.rel = 'noopener' + (v.paid ? ' sponsored nofollow' : '');
+    pv.className = 'pickvid' + (v.paid ? ' paid' : '');
+    pv.innerHTML = (v.thumb ? '<img src="' + v.thumb + '" alt="" loading="lazy">' : '<span class="ph">▶</span>')
+      + '<span class="pv-t"><b>' + (v.t || (v.target + ' 잡는 법')) + '</b>'
+      + (v.ch ? '<i>' + v.ch + '</i>' : '') + '</span>'
+      + (v.paid ? '<em>광고</em>' : '');
+    pv.onclick = function(e){ e.stopPropagation(); refEvent('pickvid'); };
+  } else {
+    pv.hidden = true;
+  }
+
   $('pickCta').onclick = function(){ openDetail(top.i); };
   var bd = $('pick').querySelector('.pick-badge');
   bd.dataset.n = top.n; bd.dataset.s = top.score;
@@ -264,7 +426,13 @@ function renderList(){
 }
 
 /* ══════════════ 상세 ══════════════ */
+window.addEventListener('popstate', function(){
+  var q = parseRoute_();
+  if (!q.spot){ if (typeof closeDetail === 'function') closeDetail(); }
+});
+
 function openDetail(id){
+  pushRoute_('spot', id);
   refEvent('open');
   S.sel = id;
   var d = $('detail'); d.hidden = false;
@@ -285,6 +453,7 @@ function closeDetail(){
 $('detailScrim').onclick = closeDetail;
 
 function renderDetail(d){
+  window.__detail = d;            // shopChip 이 제휴 링크를 찾을 때 쓴다
   if (!d || d.error){ $('detailBody').innerHTML = '<p style="padding:30px 0;text-align:center;color:#8ba6b8">'+((d&&d.error)||'오류')+'</p>'; return; }
   var m = S.mode === 'fish' ? d.fish : d.haeru;
   var o = S.mode === 'fish' ? d.haeru : d.fish;
@@ -425,25 +594,69 @@ function renderDetail(d){
   cs.appendChild(el('div','gauge-l', meta.luxWord + ' · 달 남중 ' + (solT.transit != null ? hmH(solT.transit) : '-') + ' 전후가 활성기입니다'));
   b.appendChild(cs);
 
-  /* 배편 */
+  /* 배편 — 물때와 배 시간이 맞는지가 핵심이다 */
   if (d.point.isl){
     var fs3 = el('div','sec');
     fs3.appendChild(el('div','sec-t','들어가는 길'));
-    var fr = d.point.fr;
+    var fr = d.point.fr, fp = meta.ferry || {};
     var fbox = el('div','ferry');
-    fbox.innerHTML = '<div class="ferry-i">⛴</div><div class="ferry-t">'
-      + (fr ? '<b>' + fr[0] + '</b>에서 배로 <b>약 ' + fr[1] + '분</b>'
-              + (fr[2] ? ' · 차량 선적 가능' : ' · 차는 두고 가야 합니다')
-              + '<br>물때보다 배 시간이 먼저입니다. 출항 여부는 당일 기상에 달렸습니다.'
-            : '섬입니다. 배편과 출항 여부를 먼저 확인하세요.')
-      + '</div>';
+    var head = fr
+      ? '<b>' + fr[0] + '</b>에서 배로 <b>약 ' + fr[1] + '분</b>'
+        + (fr[2] ? ' · 차량 선적 가능' : ' · 차는 두고 가야 합니다')
+      : '섬입니다. 배편과 출항 여부를 먼저 확인하세요.';
+    fbox.innerHTML = '<div class="ferry-i">⛴</div><div class="ferry-t">' + head + '</div>';
     fs3.appendChild(fbox);
+
+    // 물때 대 배 시간
+    if (fp.word){
+      var pl = el('div','fplan' + (fp.mode === 'day' ? ' ok' : ' warn'));
+      pl.innerHTML = '<b>' + (fp.mode === 'day' ? '당일치기'
+                            : fp.mode === 'stay' ? '1박 필요'
+                            : fp.mode === 'tight' ? '빠듯함' : '확인 필요') + '</b> ' + fp.word;
+      fs3.appendChild(pl);
+    }
+    // 결항 위험
+    if (fp.riskWord){
+      var rk = el('div','frisk r' + fp.risk, '⚠ ' + fp.riskWord);
+      fs3.appendChild(rk);
+    }
+
+    // 예약처·운항정보 — 실제로 눌러서 확인할 수 있게
+    var FI = (window.BOOT && BOOT.ferry) || {};
+    var links = el('div','flinks');
+    (FI.status || []).forEach(function(x){
+      var a = el('a','flink hot', x.n); a.href = x.u; a.target = '_blank'; a.rel = 'noopener';
+      a.title = x.note || ''; links.appendChild(a);
+    });
+    (FI.book || []).forEach(function(x){
+      var a = el('a','flink', x.n); a.href = x.u; a.target = '_blank'; a.rel = 'noopener';
+      a.title = x.note || ''; links.appendChild(a);
+    });
+    var pinfo = (FI.portInfo || {})[fr ? fr[0] : ''];
+    if (pinfo){
+      var a2 = el('a','flink', fr[0] + ' 안내'); a2.href = pinfo; a2.target='_blank'; a2.rel='noopener';
+      links.appendChild(a2);
+    }
+    (FI.tel || []).forEach(function(t){
+      var a3 = el('a','flink tel', '☎ ' + t.n + ' ' + t.v);
+      a3.href = 'tel:' + String(t.v).replace(/[^0-9]/g,'');
+      a3.title = t.note || ''; links.appendChild(a3);
+    });
+    if (links.childNodes.length) fs3.appendChild(links);
+
+    if ((FI.tips || []).length){
+      var tl = el('ul','ftips');
+      FI.tips.forEach(function(t){ tl.appendChild(el('li','', t)); });
+      fs3.appendChild(tl);
+    }
     b.appendChild(fs3);
   }
 
   /* 바다·하늘 */
   var s3 = el('div','sec');
-  s3.appendChild(el('div','sec-t','바다와 하늘'));
+  var skyNow = (S.mode==='fish' ? w.sky : w.skyH) || '';
+  s3.appendChild(el('div','sec-t','바다와 하늘'
+    + (skyNow ? ' <em class="skytag'+(w.storm?' danger':(w.fog?' warn':''))+'">'+skyNow+'</em>' : '')));
   var g2 = el('div','grid');
   var cells = [
     [w.wave!=null ? w.wave.toFixed(1)+'m' : '-', '파고'],
@@ -451,8 +664,16 @@ function renderDetail(d){
     [w.sst !=null ? w.sst.toFixed(1)+'°' : '-', '수온'],
     [w.temp!=null ? Math.round(w.temp)+'°' : '-', '기온'],
     [hmH(meta.sunrise)+'/'+hmH(meta.sunset), '일출·일몰'],
-    [meta.moonBright+'%', '달 밝기']
+    [meta.moonBright+'%', '달 밝기'],
+    [w.rain!=null ? (w.rain>=0.05 ? w.rain.toFixed(1)+'mm' : '없음') : '-',
+     '시간당 비' + (w.rainP!=null ? ' · 확률 '+w.rainP+'%' : '')],
+    [w.cloud!=null ? Math.round(w.cloud)+'%' : '-', '구름'],
+    [(S.mode==='fish' ? w.chillF : w.chillH)!=null
+        ? Math.round(S.mode==='fish' ? w.chillF : w.chillH)+'°' : '-',
+     S.mode==='fish' ? '비바람 체감' : '젖었을 때 체감']
   ];
+  if (w.rainDay!=null && w.rainDay>=1) cells.push([w.rainDay.toFixed(0)+'mm','오늘 누적 비']);
+  if (w.vism!=null && w.vism<4000) cells.push([w.vism>=1000 ? (w.vism/1000).toFixed(1)+'km' : w.vism+'m','시정']);
   cells.forEach(function(c){ g2.appendChild(el('div','cell','<b>'+c[0]+'</b><span>'+c[1]+'</span>')); });
   s3.appendChild(g2);
   b.appendChild(s3);
@@ -516,7 +737,7 @@ function renderDetail(d){
     (rlist || []).forEach(function(r){
       var card = el('div','rig');
       card.innerHTML = '<div class="rig-h"><b>' + r.n + '</b></div>'
-        + ((r.t && r.t.length) ? '<div class="rig-t">' + r.t.map(function(x){ return '<span class="chip">' + x + '</span>'; }).join('') + '</div>' : '')
+        + ((r.t && r.t.length) ? '<div class="rig-t">' + r.t.map(shopChip).join('') + '</div>' : '')
         + (r.b ? '<p class="rig-b">🪱 ' + r.b + '</p>' : '')
         + (r.tip ? '<p class="rig-tip">' + r.tip + '</p>' : '')
         + (r.warn ? '<p class="spot-w">⚠ ' + r.warn + '</p>' : '');
@@ -527,10 +748,36 @@ function renderDetail(d){
     if (S.mode === 'haeru' && d.rigs.safe){
       var sf = el('div','rig safe');
       sf.innerHTML = '<div class="rig-h"><b>🦺 안전 장비 — 대상과 무관하게 항상</b></div>'
-        + '<div class="rig-t">' + d.rigs.safe.map(function(x){ return '<span class="chip">' + x + '</span>'; }).join('') + '</div>';
+        + '<div class="rig-t">' + d.rigs.safe.map(shopChip).join('') + '</div>';
       rs2.appendChild(sf);
     }
+    if (d.shop && d.shop.disclosure)
+      rs2.appendChild(el('div','shop-disc', d.shop.disclosure));
     b.appendChild(rs2);
+  }
+
+  /* 잡는 법 영상 — 유튜버 노출 자리 */
+  var vlist = d.videos ? (S.mode === 'fish' ? d.videos.fish : d.videos.haeru) : null;
+  if (vlist && vlist.length){
+    var vs = el('div','sec');
+    vs.appendChild(el('div','sec-t','잡는 법 영상'));
+    var vw = el('div','vids');
+    vlist.forEach(function(v){
+      var a = el('a','vid' + (v.paid ? ' paid' : '') + (v.search ? ' srch' : ''));
+      a.href = v.u; a.target = '_blank'; a.rel = 'noopener' + (v.paid ? ' sponsored nofollow' : '');
+      var thumb = v.thumb
+        ? '<img class="vid-th" src="' + v.thumb + '" alt="" loading="lazy">'
+        : '<div class="vid-th ph">▶</div>';
+      a.innerHTML = thumb
+        + '<div class="vid-b"><b>' + v.target + (v.search ? ' 잡는 법 찾아보기' : '') + '</b>'
+        + (v.t ? '<span>' + v.t + '</span>' : '')
+        + (v.ch ? '<span class="vid-ch">' + v.ch + '</span>' : '')
+        + (v.paid ? '<em class="vid-ad">광고</em>' : '') + '</div>';
+      a.addEventListener('click', function(){ refEvent('video'); });
+      vw.appendChild(a);
+    });
+    vs.appendChild(vw);
+    b.appendChild(vs);
   }
 
   /* 오늘 조건에 맞는 준비물 (제휴 링크) */
@@ -539,8 +786,13 @@ function renderDetail(d){
     gs.appendChild(el('div','sec-t','조건 맞춤 장비 <span style="font-weight:600;color:var(--mut2)">(제휴 링크)</span>'));
     var gw = el('div','chips');
     d.gear.forEach(function(g){
-      var c = el('a','chip gear', g.n + (g.why ? ' · ' + g.why : ''));
-      c.href = g.url || '#'; c.target = '_blank'; c.rel = 'noopener sponsored';
+      var label = g.n + (g.why ? ' · ' + g.why : '');
+      if (!g.url){                       // 링크가 없으면 앵커로 만들지 않는다
+        gw.appendChild(el('span','chip gear off', label));
+        return;
+      }
+      var c = el('a','chip gear', label);
+      c.href = g.url; c.target = '_blank'; c.rel = 'noopener sponsored nofollow';
       c.addEventListener('click', function(){ bizClick(g.id, 'gear'); });
       gw.appendChild(c);
     });
@@ -648,6 +900,27 @@ function renderDetail(d){
   bt.href = 'https://m.badatime.com/' + d.point.i + '.html';
   bt.target = '_blank'; bt.rel = 'noopener';
   act.appendChild(bt);
+  var info = el('a','act','이 자리 정보');
+  info.href = 'spot/' + d.point.i + '.html';
+  act.appendChild(info);
+  var sh = el('button','act','링크 복사');
+  sh.onclick = function(){
+    var u = shareUrl_('spot', d.point.i);
+    var done = function(){ toast('링크를 복사했습니다'); };
+    if (navigator.share){
+      navigator.share({ title: '해루낚 · ' + d.point.n, url: u }).catch(function(){});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(u).then(done, function(){ prompt('복사하세요', u); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = u; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch(e){}
+      document.body.removeChild(ta);
+    }
+  };
+  act.appendChild(sh);
   var cl = el('button','act','닫기'); cl.onclick = closeDetail;
   act.appendChild(cl);
   b.appendChild(act);
@@ -1143,6 +1416,31 @@ function refCode(){
   } catch(e){}
   return null;
 }
+
+/* 준비물 칩 — 제휴 링크가 걸린 도구만 누를 수 있게 만든다 */
+function shopChip(name){
+  var esc = function(v){ return String(v).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var d = window.__detail;
+  var hit = null;
+  if (d && d.shop && d.shop.items){
+    var items = d.shop.items;
+    // 1순위 — 이 도구가 실제로 묶인 상품군
+    for (var i = 0; i < items.length && !hit; i++){
+      if (items[i].u && items[i].src && items[i].src.indexOf(name) >= 0) hit = items[i];
+    }
+    // 2순위 — 이름이 같거나 서로를 포함
+    for (var j = 0; j < items.length && !hit; j++){
+      var it = items[j];
+      if (!it.u) continue;
+      if (name === it.n || String(name).indexOf(it.n) >= 0 || String(it.n).indexOf(name) >= 0) hit = it;
+    }
+  }
+  if (!hit) return '<span class="chip">' + esc(name) + '</span>';
+  return '<a class="chip buy" href="' + esc(hit.u) + '" target="_blank" rel="noopener sponsored nofollow">'
+       + esc(name) + ' <em>사기</em></a>';
+}
+
 function refEvent(ev){
   var c = refCode();
   if (c && window.google && google.script) try { google.script.run.apiRefEvent(c, ev); } catch(e){}

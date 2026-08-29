@@ -230,3 +230,86 @@ function apiRefLookup(code){
   return { ok: true, code: code, visit: visits, open: d.open || 0, nav: d.nav || 0,
            amount: d.amount || 0, rate: Math.round(rate * 100), first: d.first || '', last: d.last || '' };
 }
+
+/* ══════════ 준비물 제휴 링크 ══════════
+ * 도구 이름을 상품군으로 정규화한 뒤 data/gear.json 의 shop 에서 링크를 찾는다.
+ * 링크가 없으면 null 을 돌려주고 화면은 글자만 보여준다 — 빈 링크를 누르게 두지 않는다. */
+function shopFor_(names){
+  var j = remoteJson_('gear') || {};
+  var shop = j.shop || {};
+  var out = [], idx = {};
+  (names || []).forEach(function(n){
+    var k = (typeof gearKey_ === 'function') ? gearKey_(n) : n;
+    if (!k) return;
+    if (idx[k] === undefined){
+      var s = shop[k];
+      idx[k] = out.length;
+      // src 에 원본 도구 이름을 모아둔다 — 화면에서 '긴 장화' 같은 변형도 링크를 찾게
+      out.push({ n: k, u: (s && s.u) ? s.u : '', why: (s && s.why) ? s.why : '', src: [] });
+    }
+    if (out[idx[k]].src.indexOf(n) < 0) out[idx[k]].src.push(n);
+  });
+  return out;
+}
+
+/** 제휴 링크가 하나라도 걸려 있으면 고지 문구를 돌려준다.
+ *  대가를 받는 사실을 알리는 것은 공정거래위원회 추천·보증 심사지침상 의무다. */
+function shopDisclosure_(items){
+  var has = (items || []).some(function(x){ return x && x.u; });
+  if (!has) return '';
+  var j = remoteJson_('gear') || {};
+  return j.disclosure || '이 링크로 구매하시면 해루낚이 수수료를 받습니다. 가격은 같습니다.';
+}
+
+/* ══════════ 대상물별 '잡는 법' 영상 ══════════
+ * 유튜버에게 노출 자리를 주는 것이 곧 대가다. 현금 없이 제휴가 성립한다.
+ * 등록된 영상이 없으면 유튜브 검색 링크를 만든다 — 이건 언제나 유효하다. */
+/** 오늘의 원픽에 걸 영상 하나.
+ *  이 자리가 유튜버에게 주는 대가다 — 앱에서 가장 눈에 띄는 곳이다.
+ *  지점 전용 영상이 1순위, 없으면 그날 대상물 영상, 그것도 없으면 걸지 않는다.
+ *  (원픽에는 검색 링크를 걸지 않는다 — 빈손인 자리를 광고 자리처럼 보이게 하지 않는다) */
+function pickVideo_(pointId, pointName, names, mode){
+  var j = remoteJson_('videos') || {};
+  var all = j.items || [];
+  var mk = function(v){
+    return { id:v.id||'', ch:v.ch||'', t:v.t||'', paid:!!v.paid, target:v.target||pointName,
+             u: v.id ? ('https://www.youtube.com/watch?v=' + v.id) : (v.u || ''),
+             thumb: v.id ? ('https://img.youtube.com/vi/' + v.id + '/mqdefault.jpg') : '' };
+  };
+  // 1순위 — 이 지점 전용
+  var spot = all.filter(function(v){
+    return v && (String(v.spot) === String(pointId) || v.spot === pointName);
+  });
+  spot.sort(function(a,b){ return (b.paid?1:0) - (a.paid?1:0); });
+  if (spot.length) return mk(spot[0]);
+
+  // 2순위 — 그날 대상물
+  for (var i = 0; i < (names || []).length; i++){
+    var hit = all.filter(function(v){ return v && v.target === names[i]; });
+    hit.sort(function(a,b){ return (b.paid?1:0) - (a.paid?1:0); });
+    if (hit.length) return mk(hit[0]);
+  }
+  return null;
+}
+
+function videosFor_(names, mode){
+  var j = remoteJson_('videos') || {};
+  var all = j.items || [];
+  var out = [];
+  (names || []).slice(0, 4).forEach(function(n){
+    var hit = all.filter(function(v){ return v && v.target === n; });
+    // 대가를 받은 노출을 위로 올린다
+    hit.sort(function(a, b){ return (b.paid ? 1 : 0) - (a.paid ? 1 : 0); });
+    if (hit.length){
+      var v = hit[0];
+      out.push({ target:n, id:v.id || '', ch:v.ch || '', t:v.t || '', paid:!!v.paid,
+                 u: v.id ? ('https://www.youtube.com/watch?v=' + v.id) : (v.u || ''),
+                 thumb: v.id ? ('https://img.youtube.com/vi/' + v.id + '/mqdefault.jpg') : '' });
+    } else {
+      var q = n + ' ' + (mode === 'fish' ? '낚시' : '잡는법');
+      out.push({ target:n, id:'', ch:'', t:'', paid:false, search:true,
+                 u: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q), thumb:'' });
+    }
+  });
+  return out;
+}

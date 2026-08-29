@@ -358,3 +358,157 @@ function sunAtAlt_(y, m, d, lat, lon, altDeg){
   var f = function(J){ return ((J - Math.floor(jd)) * 24 + 9 + 12) % 24; };
   return { rise: f(Jt - w/360), set: f(Jt + w/360) };
 }
+
+/* ══════════ 12. 하늘 상태 — 세계기상기구 기상코드 해석 ══════════ */
+/**
+ * 코드가 험할수록 순위가 높다. 하루 요약에서 "가장 험한 하늘"을 뽑는 데 쓴다.
+ * 0 맑음 / 1~3 구름 / 45,48 안개 / 51~57 이슬비 / 61~65 비 / 66,67 얼어붙는 비
+ * 71~77 눈 / 80~82 소나기 / 85,86 눈소나기 / 95,96,99 뇌우
+ */
+var SKY_RANK = {
+  0:0, 1:1, 2:2, 3:3,
+  45:6, 48:7,
+  51:2, 53:3, 55:4, 56:6, 57:7,
+  61:3, 63:5, 65:8, 66:8, 67:9,
+  71:4, 73:6, 75:8, 77:5,
+  80:4, 81:6, 82:9,
+  85:6, 86:8,
+  95:14, 96:15, 99:16
+};
+
+/**
+ * 기상코드·시정·강수로 활동 위험을 판정한다.
+ * @param code 세계기상기구 코드
+ * @param vism 수평 시정(m)
+ * @param rainH 그 시각 강수량(mm/h)
+ * @param snowH 그 시각 적설(cm)
+ * @return {storm, fog, freeze, snow, shower, word, level}
+ */
+function skyRisk_(code, vism, rainH, snowH){
+  var c = (code === null || code === undefined) ? -1 : code;
+  var r = {
+    storm:  (c >= 95),
+    freeze: (c === 66 || c === 67 || c === 56 || c === 57),
+    snow:   (c >= 71 && c <= 77) || c === 85 || c === 86 || (snowH || 0) >= 0.3,
+    shower: (c >= 80 && c <= 82),
+    fog:    (c === 45 || c === 48) || (vism !== null && vism !== undefined && vism < 1000),
+    word: '', level: 0
+  };
+  r.level = SKY_RANK[c] !== undefined ? SKY_RANK[c] : 0;
+  if (r.fog && r.level < 6) r.level = 6;
+
+  var rh = rainH || 0;
+  if (r.storm)       r.word = '뇌우';
+  else if (r.freeze) r.word = '얼어붙는 비';
+  else if (r.snow)   r.word = '눈';
+  else if (r.fog)    r.word = (vism !== null && vism < 500) ? '짙은 안개' : '안개';
+  else if (rh >= 7)  r.word = '강한 비';
+  else if (rh >= 2.5)r.word = '비';
+  else if (rh >= 0.3)r.word = '약한 비';
+  else if (c >= 51 && c <= 57) r.word = '이슬비';
+  else r.word = '';
+  return r;
+}
+
+/* ══════════ 13. 젖은 체감온도 ══════════ */
+/**
+ * 비를 맞으면 옷이 젖고 증발 냉각이 더해져 체감이 실제보다 훨씬 떨어진다.
+ * 갯벌은 바람을 막아줄 것이 없어 이 효과가 그대로 온다.
+ *   젖음도 w = 강수 강도로 포화되는 0~1 값
+ *   추가 냉각 = w × (2.0 + 1.15×풍속)   [℃]
+ * 물속에 들어가는 해루질은 하체가 이미 젖어 있어 기본 젖음도를 깔아준다.
+ * @param feel 체감온도(℃)
+ * @param wind 풍속(m/s)
+ * @param rainH 강수량(mm/h)
+ * @param wading 물속 작업 여부
+ */
+function wetChill_(feel, wind, rainH, wading){
+  if (feel === null || feel === undefined) return null;
+  var w = 1 - Math.exp(-(rainH || 0) / 1.6);          // 1.6mm/h면 약 절반 젖음
+  if (wading) w = Math.max(w, 0.45);                   // 갯벌·물속은 기본 젖음
+  var v = (wind === null || wind === undefined) ? 2 : wind;
+  var drop = w * (2.0 + 1.15 * Math.min(v, 14));
+  return feel - drop;
+}
+
+/**
+ * 낚시에서 비의 두 얼굴.
+ * 약한 비는 수면 파문으로 경계심을 낮추고 육상 먹이를 흘려보내 활성을 올린다.
+ * 강한 비는 염분을 흐트러뜨리고 흙탕을 만들어 오히려 입질을 끊는다.
+ * @return -1~+1 (활성 보정)
+ */
+function rainBite_(rainH, cloudPct){
+  var r = rainH || 0;
+  var b;
+  if (r <= 3.0)       b = 0.55 * Math.sin(Math.PI * (r / 3.0));   // 1.5mm/h 부근에서 최고, r=0이면 0
+  else if (r <= 8.0)  b = -0.7 * ((r - 3.0) / 5.0);   /* 3mm/h에서 0으로 연속 */
+  else                b = -0.7;
+  // 흐린 날은 광량이 낮아 경계심이 준다 (농어·감성돔·우럭)
+  var cl = (cloudPct === null || cloudPct === undefined) ? 50 : cloudPct;
+  b += 0.22 * Math.max(0, (cl - 55) / 45);
+  return Math.max(-1, Math.min(1, b));
+}
+
+/* ══════════ 14. 섬 들어가는 길 ══════════ */
+/**
+ * 해루질의 핵심 시간은 간조 전후다. 그런데 섬은 배가 끊긴다.
+ * 이 둘이 어긋나는지를 미리 알려주는 것이 이 함수의 목적이다.
+ *
+ * 연안여객선 운항대는 항로마다 다르므로 보수적인 공통값만 쓴다.
+ * 실제 시간표는 예약처에서 확인하라고 안내한다 — 추정한 시각을 단정해서 보여주면
+ * 그 시각에 맞춰 나갔다가 배를 놓친다.
+ *
+ * @param lowT  간조 시각 (시, 소수)
+ * @param wave  파고(m)
+ * @param wind  풍속(m/s)
+ * @param carOk 차량 선적 가능 여부
+ * @return {mode, word, risk, riskWord, needStay}
+ */
+var FERRY_FIRST = 7.5;      // 첫 배 통상 하한
+var FERRY_LAST  = 17.5;     // 막배 통상 상한 (겨울은 더 이르다)
+
+function ferryPlan_(lowT, wave, wind, carOk){
+  var r = { mode:'', word:'', risk:0, riskWord:'', needStay:false };
+
+  /* 1) 물때와 배 시간이 맞는가 */
+  if (lowT === null || lowT === undefined){
+    r.mode = 'unknown';
+    r.word = '간조 시각을 먼저 확인하세요.';
+  } else {
+    var lt   = ((lowT % 24) + 24) % 24;
+    var from = lt - 1.5, to = lt + 1.5;          // 작업 창
+    var inOk  = from >= FERRY_FIRST + 1.0;        // 들어가서 자리 잡을 여유
+    var outOk = to   <= FERRY_LAST  - 1.0;        // 나올 배를 탈 여유
+    if (inOk && outOk){
+      r.mode = 'day';
+      r.word = '당일치기가 됩니다. 간조 ' + fmtH_(lt) + ' 전후로 작업하고 오후 배로 나오면 됩니다.';
+    } else if (lt >= 19 || lt <= 5){
+      r.mode = 'stay';
+      r.needStay = true;
+      r.word = '간조가 ' + fmtH_(lt) + '입니다. 해루질엔 좋은 시각이지만 그 시간엔 배가 없습니다 — 1박을 잡거나 다른 날을 고르세요.';
+    } else {
+      r.mode = 'tight';
+      r.needStay = true;
+      r.word = '간조 ' + fmtH_(lt) + '이라 당일 배로는 빠듯합니다. 첫 배·막배 시각을 확인하고 안 되면 1박 하세요.';
+    }
+  }
+
+  /* 2) 뜰 수 있는 날인가 — 결항은 파고가 좌우한다 */
+  if (wave !== null && wave !== undefined){
+    if (wave >= 2.5)      { r.risk = 3; r.riskWord = '결항 가능성이 큽니다'; }
+    else if (wave >= 1.5) { r.risk = 2; r.riskWord = '결항될 수 있습니다'; }
+    else if (wave >= 1.0) { r.risk = 1; r.riskWord = '운항 여부를 꼭 확인하세요'; }
+  }
+  if (wind !== null && wind !== undefined && wind >= 14 && r.risk < 3){
+    r.risk = 3; r.riskWord = '강풍 — 결항 가능성이 큽니다';
+  }
+
+  /* 3) 나가는 배가 끊기면 갇힌다 */
+  if (r.risk >= 2 && !r.needStay){
+    r.word += ' 들어갔다가 못 나올 수 있으니 돌아오는 배편까지 확인하세요.';
+  }
+  if (carOk === 0 || carOk === false){
+    r.word += ' 차는 두고 들어가야 합니다.';
+  }
+  return r;
+}

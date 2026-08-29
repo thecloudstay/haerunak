@@ -44,7 +44,7 @@ function fetchWeather_(points, ds){
     try {
       var r1 = UrlFetchApp.fetch('https://api.open-meteo.com/v1/forecast'
         + '?latitude=' + lats + '&longitude=' + lons
-        + '&hourly=temperature_2m,apparent_temperature,precipitation,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,surface_pressure'
+        + '&hourly=temperature_2m,apparent_temperature,precipitation,precipitation_probability,weather_code,visibility,snowfall,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,surface_pressure'
         + '&timezone=Asia%2FSeoul&start_date=' + ds + '&end_date=' + ds
         + '&wind_speed_unit=ms', { muteHttpExceptions: true });
       if (r1.getResponseCode() === 200) land = JSON.parse(r1.getContentText());
@@ -67,6 +67,10 @@ function fetchWeather_(points, ds){
         temp:  L && L.hourly ? L.hourly.temperature_2m      : null,
         feel:  L && L.hourly ? L.hourly.apparent_temperature : null,
         rain:  L && L.hourly ? L.hourly.precipitation        : null,
+        rainP: L && L.hourly ? L.hourly.precipitation_probability : null,
+        code:  L && L.hourly ? L.hourly.weather_code         : null,
+        vism:  L && L.hourly ? L.hourly.visibility           : null,
+        snow:  L && L.hourly ? L.hourly.snowfall             : null,
         cloud: L && L.hourly ? L.hourly.cloud_cover          : null,
         wind:  L && L.hourly ? L.hourly.wind_speed_10m       : null,
         gust:  L && L.hourly ? L.hourly.wind_gusts_10m       : null,
@@ -97,12 +101,19 @@ function wxAt_(rec, hour){
     }
     return v;
   };
+  /* 기상코드는 평균 내면 안 되는 범주값 — 해당 시각 값을 그대로 쓴다 */
+  var pick = function(arr){
+    if (!arr || !arr.length) return null;
+    var v = arr[h];
+    return (v === null || v === undefined) ? null : v;
+  };
   var wind = g(rec.wind);
   var wave = g(rec.wave);
   // 파고 데이터가 없는 연안 격자는 풍속으로 추정
   if (wave === null && wind !== null) wave = Math.max(0.1, Math.pow(wind, 1.6) / 26);
   return {
     temp: g(rec.temp), feel: g(rec.feel), rain: g(rec.rain), cloud: g(rec.cloud),
+    rainP: g(rec.rainP), code: pick(rec.code), vism: g(rec.vism), snow: g(rec.snow),
     wind: wind, gust: g(rec.gust), wdir: g(rec.wdir), pres: g(rec.pres),
     wave: wave, wper: g(rec.wper), sst: g(rec.sst)
   };
@@ -113,7 +124,15 @@ function wxDay_(rec){
   if (!rec) return {};
   var mx = function(a){ if(!a||!a.length) return null; var m=-1e9; a.forEach(function(v){ if(v!=null&&v>m)m=v; }); return m===-1e9?null:m; };
   var sm = function(a){ if(!a||!a.length) return null; var s=0; a.forEach(function(v){ if(v!=null)s+=v; }); return s; };
-  return { rainSum: sm(rec.rain), windMax: mx(rec.wind), gustMax: mx(rec.gust), waveMax: mx(rec.wave) };
+  var worst = function(a){                        /* 가장 험한 기상코드 */
+    if (!a || !a.length) return null;
+    var m = -1;
+    a.forEach(function(v){ if (v != null && SKY_RANK[v] !== undefined && SKY_RANK[v] > m) m = SKY_RANK[v]; });
+    return m < 0 ? null : m;
+  };
+  var mn = function(a){ if(!a||!a.length) return null; var m=1e12; a.forEach(function(v){ if(v!=null&&v<m)m=v; }); return m===1e12?null:m; };
+  return { rainSum: sm(rec.rain), windMax: mx(rec.wind), gustMax: mx(rec.gust), waveMax: mx(rec.wave),
+           snowSum: sm(rec.snow), skyWorst: worst(rec.code), visMin: mn(rec.vism) };
 }
 
 var WDIR = ['북','북북동','북동','동북동','동','동남동','남동','남남동','남','남남서','남서','서남서','서','서북서','북서','북북서'];
