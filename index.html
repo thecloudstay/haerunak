@@ -6085,6 +6085,25 @@ function load(){
 }
 
 /* ══════════════ 렌더 ══════════════ */
+/* 시야를 그 바다 기준으로 읽어 준다.
+   서해에서 1.2m 는 아주 맑은 날이고, 제주에서 1.2m 는 흙탕물이다.
+   미터만 보여주면 서해 사람은 늘 「나쁨」만 보게 된다. */
+var VIS_BAND_UI = { W:[0.10, 2.0], S:[0.20, 5.0], E:[0.60, 12], J:[0.60, 12] };
+var SEA_KO = { W:'서해', S:'남해', E:'동해', J:'제주' };
+function visLabel_(v, sea){
+  var m = (v >= 1) ? (v.toFixed(1) + 'm') : (Math.round(v*100) + 'cm');
+  var b = VIS_BAND_UI[sea];
+  if (!b) return '시야 ' + m;
+  var q = (Math.log(v) - Math.log(b[0])) / (Math.log(b[1]) - Math.log(b[0]));
+  var w = q >= 0.80 ? '최상' : q >= 0.60 ? '맑음' : q >= 0.38 ? '보통' : q >= 0.18 ? '탁함' : '거의 안 보임';
+  return '시야 ' + m + ' · ' + (SEA_KO[sea] || '') + ' 기준 ' + w;
+}
+function visQ_(v, sea){
+  if (v == null) return -1;
+  var b = VIS_BAND_UI[sea] || VIS_BAND_UI.S;
+  return Math.max(0, Math.min(1, (Math.log(v) - Math.log(b[0])) / (Math.log(b[1]) - Math.log(b[0]))));
+}
+
 function sorted(){
   var a = S.rows.slice();
   if (S.sort === 'near' && S.me){
@@ -6096,10 +6115,10 @@ function sorted(){
       return xa - ya;
     });
   } else if (S.sort === 'vis'){
-    // 시야가 같으면 추천 점수로 가른다. 시야를 못 낸 자리는 뒤로 보낸다
+    /* 미터로 줄을 세우면 늘 동해·제주가 위에 온다. 서해 사람에게는 쓸모가 없다.
+       「그 바다치고 오늘이 맑은 날인가」로 세운다. 시야를 못 낸 자리는 뒤로. */
     a.sort(function(x,y){
-      var xv = (x.vis == null ? -1 : x.vis), yv = (y.vis == null ? -1 : y.vis);
-      return (yv - xv) || (y.raw - x.raw);
+      return (visQ_(y.vis, y.s) - visQ_(x.vis, x.s)) || (y.raw - x.raw);
     });
   } else {
     a.sort(function(x,y){ return y.raw - x.raw; });
@@ -6339,6 +6358,7 @@ function syncSortBtns(){
   }
 }
 
+
 function renderList(){
   syncSortBtns();
   var l = $('list'); l.innerHTML = '';
@@ -6364,8 +6384,7 @@ function renderList(){
     var ch = el('div','row-chips');
     var visChip = null;
     if (S.mode === 'haeru' && r.vis != null)
-      visChip = el('span', 'chip' + (S.sort==='vis' ? ' vis-on' : ''),
-                   '시야 ' + (r.vis >= 1 ? r.vis.toFixed(1)+'m' : Math.round(r.vis*100)+'cm'));
+      visChip = el('span', 'chip' + (S.sort==='vis' ? ' vis-on' : ''), visLabel_(r.vis, r.s));
     if (visChip && S.sort === 'vis') ch.appendChild(visChip);   // 시야순일 땐 맨 앞에
     if (r.win) ch.appendChild(el('span','chip hot', hm(r.win[0])+'~'+hm(r.win[1])));
     ch.appendChild(el('span','chip', r.mul));
@@ -6722,12 +6741,19 @@ function renderDetail(d){
   if (S.mode === 'haeru'){
     var vs = el('div','sec');
     vs.appendChild(el('div','sec-t','수중 시야 추정'));
-    var vv = meta.vis, vpct = Math.max(4, Math.min(100, Math.round(Math.log(1+vv)/Math.log(1+8)*100)));
-    var vcol = vv >= 2.5 ? '#2ee6a8' : vv >= 1.2 ? '#a3e635' : vv >= 0.5 ? '#fbbf24' : '#f87171';
+    /* 막대는 절대 미터가 아니라 그 바다에서 기대할 수 있는 폭 안의 자리로 그린다.
+       서해 물은 원래 탁하다. 절대값으로 그리면 서해는 늘 빨간 막대만 보게 된다. */
+    var vv = meta.vis, sea = (d.point && d.point.s) || 'S';
+    var vb = VIS_BAND_UI[sea] || VIS_BAND_UI.S;
+    var vq = Math.max(0, Math.min(1, (Math.log(vv) - Math.log(vb[0])) / (Math.log(vb[1]) - Math.log(vb[0]))));
+    var vpct = Math.max(4, Math.round(vq*100));
+    var vcol = vq >= 0.60 ? '#2ee6a8' : vq >= 0.38 ? '#a3e635' : vq >= 0.18 ? '#fbbf24' : '#f87171';
+    var vword = vq >= 0.80 ? '최상' : vq >= 0.60 ? '맑음' : vq >= 0.38 ? '보통' : vq >= 0.18 ? '탁함' : '거의 안 보임';
     var g = el('div','gauge');
     g.innerHTML = '<div class="gauge-v" style="color:'+vcol+'">' + (vv >= 1 ? vv.toFixed(1)+'m' : Math.round(vv*100)+'cm') + '</div>'
       + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+vpct+'" style="background:'+vcol+'"></i></div>'
-      + '<div class="gauge-l">' + meta.visWord + ' · 부유물 ' + meta.ssc + 'mg/L 추정<br>'
+      + '<div class="gauge-l"><b>' + (SEA_KO[sea]||'') + ' 기준 ' + vword + '</b> · 부유물 ' + meta.ssc + 'mg/L 추정<br>'
+      + (SEA_KO[sea]||'') + '에서 기대할 수 있는 범위는 ' + vb[0] + '~' + vb[1] + 'm 입니다. '
       + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
     vs.appendChild(g);
     b.appendChild(vs);
