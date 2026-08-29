@@ -4336,6 +4336,8 @@ function analyze_(p, ds, tide, wxRec, want){
   // 낮 물때에 야행성 대상을 노리고 나가면 헛걸음이다 — 분명히 적는다
   if (daylightAt_(lowT, sun) >= 1)
     hWarn.push('간조가 대낮 — 낙지·문어·주꾸미·꽃게는 이 시각엔 숨어 있습니다');
+  if (visQ < 0.18 && hSeason.some(function(t){ return SIGHT_HUNT[t.n]; }))
+    hWarn.push('물이 흐려 랜턴 사냥(꽃게·문어류)은 어렵습니다 — 호미로 파는 대상 위주로 가세요');
   if (Math.abs(toKnot_(hCur)) >= 1.6) hWarn.push('조류 ' + Math.abs(toKnot_(hCur)).toFixed(1) + '노트 — 발 밑 조심');
   if (hWx.wind !== null && hWe.eff >= 9) hWarn.push((hWe.wo.word||'바람') + ' ' + Math.round(hWx.wind) + 'm/s — 체온 손실·물결 주의');
   if (p.f === 'none') hWarn.push('조차가 작아 갯벌 노출이 거의 없음');
@@ -4475,7 +4477,7 @@ function analyze_(p, ds, tide, wxRec, want){
      낙지·문어·주꾸미·꽃게는 낮에 펄과 돌 밑에 숨어 있어, 물이 아무리 잘 빠져도
      대낮에 걸어다녀서는 나오지 않는다. 점수에만 반영하고 목록은 그대로 두면
      "낮 10시에 꽃게" 같은 헛걸음 추천이 나간다. */
-  var hSplit = splitByBan_(demoteNocturnal_(hSeason, lowT, sun).slice(0, 6), mo, d, p.r);
+  var hSplit = splitByBan_(demoteMurky_(demoteNocturnal_(hSeason, lowT, sun), visQ).slice(0, 6), mo, d, p.r);
   var fSplit = splitByBan_(fSeason.slice(0, 6), mo, d, p.r);
   var hTargets = hSplit.ok.slice(0, 4), fTargets = fSplit.ok.slice(0, 4);
   if (!hTargets.length && hSplit.banned.length) hTargets = [];
@@ -4534,6 +4536,8 @@ function analyze_(p, ds, tide, wxRec, want){
       why: hWhy, warn: hWarn, targets: hTargets, bannedTargets: hSplit.banned,
       parts: { 시야: Math.round(sVis), 노출: Math.round(sExpo), 타이밍: Math.round(sTime),
                안전: Math.round(sSafe), 활성: Math.round(sLive) },
+      partsMax: { 시야: Math.round(32*vw), 노출: Math.round(26 + 32*(1 - vw)),
+                  타이밍: 18, 안전: 16, 활성: 8 },
       verdict: verdictHaeru_(p, hScore, hWindow, hTargets, vis, hSplit.banned)
     },
     fish: {
@@ -4581,7 +4585,9 @@ function grade_(s){
 function verdictHaeru_(p, s, win, tg, vis, banned){
   if (banned && banned.length && !tg.length)
     return banned[0].n + ' 금어기라 오늘 이 자리는 의미가 없습니다.';
-  var names = tg.slice(0,2).map(function(t){ return t.n; }).join('·');
+  // 흐린 물·낮 물때로 강등된 대상은 결론 문장에서 뺀다 — 앞세워 놓고 헛걸음시키지 않는다
+  var solid = tg.filter(function(t){ return !t.murk && !t.night; });
+  var names = (solid.length ? solid : tg).slice(0,2).map(function(t){ return t.n; }).join('·');
   if (!win) return p.n + ' — 오늘은 물이 안 빠져서 들어갈 자리가 없습니다.';
   var t = fmtRange_(win[0], win[1]);
   var v = vis.vis >= 1.5 ? ' 물도 봐줄 만합니다.' : (vis.vis < 0.5 ? ' 다만 물이 많이 탁합니다.' : '');
@@ -4620,6 +4626,19 @@ function daylightAt_(t, sun){
   if (t >= rise + 1.0 && t <= set - 1.0) return 1;          // 확실한 낮
   return 0.5;                                              // 여명·땅거미
 }
+/* 눈으로 찾아 잡는 대상 — 물이 흐리면 랜턴을 비춰도 안 보인다.
+ * 꽃게 뜰채질·문어 웅덩이 사냥이 여기 해당한다. 호미로 파는 조개는 무관하다. */
+var SIGHT_HUNT = { '꽃게':1, '문어':1, '주꾸미':1, '박하지':1, '갯가재':1, '톱날꽃게':1 };
+function demoteMurky_(list, visQ){
+  if (visQ >= 0.18) return list;
+  var out = list.map(function(t){
+    if (!SIGHT_HUNT[t.n]) return t;
+    return { n: t.n, v: Math.max(0.3, t.v * 0.5), murk: 1 };
+  });
+  out.sort(function(a, b){ return b.v - a.v; });
+  return out;
+}
+
 function demoteNocturnal_(list, lowT, sun){
   var dl = daylightAt_(lowT, sun);
   if (dl <= 0) return list;                                 // 밤 물때면 손대지 않는다
@@ -6777,6 +6796,8 @@ function renderDetail(d){
     var vcol = vq >= 0.60 ? '#2ee6a8' : vq >= 0.38 ? '#a3e635' : vq >= 0.18 ? '#fbbf24' : '#f87171';
     var vword = meta.visWord || '보통';
     function vm_(x){ return x >= 1 ? x.toFixed(1)+'m' : Math.round(x*100)+'cm'; }
+    var digNote = (d.point && (d.point.f === 'mud' || d.point.f === 'sand'))
+      ? '이 자리는 파서 잡는 갯벌이라 시야는 점수에 조금만 들어갑니다. ' : '';
     var bandTxt = (meta.visLo != null && meta.visHi != null)
       ? '이 자리는 최악 ' + vm_(meta.visLo) + ' ~ 최선 ' + vm_(meta.visHi) + ' 사이를 오갑니다. 오늘은 그중 ' + Math.round(vq*100) + '% 자리입니다. '
       : '';
@@ -6784,7 +6805,7 @@ function renderDetail(d){
     g.innerHTML = '<div class="gauge-v" style="color:'+vcol+'">' + vm_(vv) + '</div>'
       + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+vpct+'" style="background:'+vcol+'"></i></div>'
       + '<div class="gauge-l"><b>' + (SEA_KO[sea]||'') + ' 기준 ' + vword + '</b> · 부유물 ' + meta.ssc + 'mg/L 추정<br>'
-      + bandTxt + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
+      + digNote + bandTxt + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
     vs.appendChild(g);
     b.appendChild(vs);
 
@@ -6903,9 +6924,9 @@ function renderDetail(d){
   var s4 = el('div','sec');
   s4.appendChild(el('div','sec-t','점수를 이렇게 냈습니다'));
   var bars = el('div','bars');
-  var MAXP = S.mode === 'fish'
+  var MAXP = m.partsMax || (S.mode === 'fish'
     ? { 피딩:28, 조류:18, 해상:20, 수온:16, 기압:8, 물색:10 }
-    : { 시야:32, 노출:26, 타이밍:18, 안전:16, 활성:8 };
+    : { 시야:32, 노출:26, 타이밍:18, 안전:16, 활성:8 });
   Object.keys(m.parts).forEach(function(k){
     var v = m.parts[k], mx = MAXP[k] || 25;
     var r = el('div','bar-row');
