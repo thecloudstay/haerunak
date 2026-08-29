@@ -17,7 +17,7 @@ function doGet(e){
   var t = HtmlService.createTemplateFromFile('Index');
   t.BOOT = JSON.stringify({
     today: todayStr_(),
-    count: POINTS.length,
+    count: (typeof pool_==='function' ? pool_().length : POINTS.length),
     indexCount: allIndex_().length,
     species: { haeru: allSpecies_('haeru'), fish: allSpecies_('fish') },
     ban: (typeof banMetaNow_==='function' ? banMetaNow_() : BAN_META),
@@ -98,7 +98,7 @@ function apiBoard(ds, mode, opts){
   rows.sort(function(a,b){ return b.raw - a.raw; });
 
   var out = { ds: ds, mode: mode, want: opts.want || null, rows: rows,
-              total: POINTS.length, shown: rows.length,
+              total: (typeof pool_==='function' ? pool_().length : POINTS.length), shown: rows.length,
               generated: Utilities.formatDate(new Date(), CFG.TZ, 'HH:mm') };
   try { cache.put(ck, JSON.stringify(out), CFG.BOARD_CACHE_SEC); } catch(e){}
   return out;
@@ -115,7 +115,7 @@ function packRow_(p, an, mode){
     banned: (m.bannedTargets || []).map(function(t){ return t.n; }),
     verdict: m.verdict, why: (m.why||[]).slice(0,2), warn: (m.warn||[]).slice(0,2),
     mul: an.meta.mul, range: an.meta.range, src: an.meta.src,
-    vis: an.meta.vis, cur: an.meta.curPeak,
+    vis: an.meta.vis, visQ: an.meta.visQ, visWord: an.meta.visWord, cur: an.meta.curPeak,
     other: (mode === 'fish' ? an.haeru.score : an.fish.score),
     wantReason: an.want ? an.want.reason : null,
     // 원픽 자리에 걸 영상 — 유튜버에게 주는 대가이자 나중의 광고 자리
@@ -200,15 +200,26 @@ function apiSpecies(ds, mode){
   ds = ds || todayStr_();
   var a = ds.split('-'), mo = +a[1], d = +a[2];
   var table = mode === 'fish' ? SEASON_FX : SEASON_SP;
+  var PL_ = (typeof pool_==='function' ? pool_() : POINTS);
   return allSpecies_(mode === 'fish' ? 'fish' : 'haeru').map(function(n){
     var st = banStatus_(n, mo, d, '전국');
     var spots = 0;
-    POINTS.forEach(function(p){ if (speciesOf_(p, mode === 'fish' ? 'fish' : 'haeru').indexOf(n) >= 0) spots++; });
+    PL_.forEach(function(p){ if (speciesOf_(p, mode === 'fish' ? 'fish' : 'haeru').indexOf(n) >= 0) spots++; });
     return { n: n, season: table[n] ? table[n][mo-1] : 1, spots: spots,
              banned: !!(st && st.banned),
+             pop: (typeof popRank_ === 'function') ? popRank_(n, mode) : 999,
+             a: (typeof nicksOf_ === 'function') ? nicksOf_(n) : [],
              ban: st ? { from: st.from, to: st.to, size: st.size, unit: st.unit, scope: st.scope } : null };
   }).filter(function(x){ return x.spots > 0; })
-    .sort(function(x,y){ return (y.season - x.season) || (y.spots - x.spots); });
+    // 사람들이 실제로 노리는 순서로 세운다.
+    // 다만 금어기와 철 아닌 것은 아래로 내린다 — 눌러도 소용이 없기 때문이다.
+    .sort(function(x, y){
+      var xb = x.banned ? 1 : 0, yb = y.banned ? 1 : 0;
+      if (xb !== yb) return xb - yb;
+      var xo = x.season > 0 ? 0 : 1, yo = y.season > 0 ? 0 : 1;
+      if (xo !== yo) return xo - yo;
+      return (x.pop - y.pop) || (y.season - x.season) || (y.spots - x.spots);
+    });
 }
 
 /* ── 레퍼럴 집계 ─────────────────────────────────────
@@ -251,6 +262,6 @@ function refStats(){
 
 function clearCache(){
   var c = CacheService.getScriptCache();
-  c.removeAll(POINTS.map(function(p){ return 'bt_' + p.i; }));
+  c.removeAll((typeof pool_==='function' ? pool_() : POINTS).map(function(p){ return 'bt_' + p.i; }));
   Logger.log('캐시 삭제 완료');
 }

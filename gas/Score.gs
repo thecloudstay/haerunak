@@ -101,22 +101,40 @@ function analyze_(p, ds, tide, wxRec, want){
   var width = flatWidth_(msl, lowLv, p.f);
   var wIdx  = clamp01_(Math.log(1 + width/120) / Math.log(1 + 2500/120));
   var expo  = clamp01_((relRange - 0.42) / 0.58);
-  var sExpo = 28 * (0.42*wIdx + 0.34*expo + 0.24*clamp01_(range/3.2)) * floorK;
+  var sExpoBase = (0.42*wIdx + 0.34*expo + 0.24*clamp01_(range/3.2)) * floorK;
 
   // 수중 시야 — 파랑이 바닥을 흔들고, 조류·강우가 흙을 실어 나른다
   var vis = underwaterVis_({
-    wave: hWx.wave, period: hWx.wper, floor: p.f,
+    wave: hWx.wave, period: hWx.wper, floor: p.f, sea: p.s,
     current: Math.abs(hCur), rain24: day.rainSum, month: mo
   });
-  var sVis = 22 * clamp01_((Math.log(vis.vis) - Math.log(0.25)) / (Math.log(4.0) - Math.log(0.25)));
+  /* 시야가 해루질의 성패를 가른다 — 배점에서 가장 큰 자리를 준다.
+     다만 절대 미터로 재면 서해는 영원히 꼴찌가 된다. 서해 물은 원래 탁하고,
+     서해 사람에게 「제주가 맑다」는 말은 쓸모가 없다. 그래서 그 해역에서
+     기대할 수 있는 폭 안에서 오늘이 어느 자리인지로 잰다. */
+  /* 띠는 해역만이 아니라 바닥질·달까지 본다 — 같은 서해라도 펄과 갯바위는 다른 물이다.
+     띠 계산과 오늘값 계산이 같은 식을 쓰므로, q 는 순수하게 「오늘 날씨가 물색을
+     얼마나 흐렸나」만 남는다. 서해치고 맑은 날이 실제로 위로 올라온다. */
+  var vb2 = visBandFor_(p.f, p.s, mo);
+  var visQ = clamp01_((Math.log(vis.vis) - Math.log(vb2.lo)) / (Math.log(vb2.hi) - Math.log(vb2.lo)));
+  vis.q = visQ;   // 결론 문장이 그 바다 기준으로 말하게
+  var visWord = visQ >= 0.80 ? '최상' : visQ >= 0.60 ? '맑음' : visQ >= 0.38 ? '보통'
+              : visQ >= 0.18 ? '탁함' : '거의 안 보임';
+  /* 시야가 중요한 정도는 바닥질에 따라 다르다.
+     갯바위에서 문어·소라를 눈으로 찾는 일은 시야가 전부지만,
+     갯벌에서 조개를 파는 일은 물이 빠진 뒤라 시야가 거의 상관없다.
+     시야에 안 쓴 배점은 「얼마나 드러나느냐」로 넘긴다 — 그쪽이 성패를 가르기 때문이다. */
+  var VIS_W = { rock:1.0, mix:0.75, sand:0.45, mud:0.30, none:0.6 };
+  var vw = VIS_W[p.f] !== undefined ? VIS_W[p.f] : 0.7;
+  var sVis = 32 * vw * visQ;
 
-  var sTime = 20 * (nl ? nl.timing : 0.3);
+  var sTime = 18 * (nl ? nl.timing : 0.3);
 
   var hWe = windEffect_(p, hWx.wind, hWx.wdir);
   // 작업 시간대의 실제 하늘 — 하루 총량이 아니라 그 시각 값을 본다
   var hSky  = skyRisk_(hWx.code, hWx.vism, hWx.rain, hWx.snow);
   var hChil = wetChill_(hWx.feel, hWx.wind, hWx.rain, true);   // 갯벌은 젖은 채로 선다
-  var sSafe = 18 * (0.30*lerpDown_(hWe.eff, 4, 13)
+  var sSafe = 16 * (0.30*lerpDown_(hWe.eff, 4, 13)
                   + 0.25*lerpDown_(hWx.wave, 0.25, 1.1)
                   + 0.22*band_(hChil === null ? hWx.feel : hChil, 8, 30, 12)
                   + 0.13*lerpDown_(Math.abs(toKnot_(hCur)), 0.6, 2.4)
@@ -131,8 +149,10 @@ function analyze_(p, ds, tide, wxRec, want){
   // 구름이 달을 가리면 실제 노출 조도는 크게 떨어진다 (야행성 대상에 유리)
   if (hWx.cloud !== null && hWx.cloud !== undefined) lux *= (1 - 0.78 * Math.min(1, hWx.cloud/100));
   var nocturn = clamp01_(1 - Math.min(1, lux/0.22)*0.45) ;   // 어두울수록 문어·낙지 유리
-  var sLive = 12 * (0.5*hTherm + 0.28*clamp01_((hSeason.length ? hSeason[0].v : 1)/3) + 0.22*nocturn);
+  var sLive = 8 * (0.5*hTherm + 0.28*clamp01_((hSeason.length ? hSeason[0].v : 1)/3) + 0.22*nocturn);
 
+  // 시야에서 남은 배점을 노출로 옮긴다 — 총점은 100 그대로다
+  var sExpo = (26 + 32*(1 - vw)) * sExpoBase;
   var hRaw = sExpo + sVis + sTime + sSafe + sLive;
 
   // 안전 게이트
@@ -157,7 +177,12 @@ function analyze_(p, ds, tide, wxRec, want){
   if (hSky.snow) hCap = Math.min(hCap, 38);
   if (hChil !== null && hChil <= 0) hCap = Math.min(hCap, 26);           // 젖은 채 저체온
   if (hWx.feel !== null && hWx.feel <= 2) hCap = Math.min(hCap, 42);
-  if (vis.vis < 0.25) hCap = Math.min(hCap, 45);
+  /* 시야 게이트는 「물속에 들어가 눈으로 찾는」 방식에만 건다.
+     물 빠진 갯벌에서 조개를 파는 데는 시야가 상관없고,
+     서해 물은 원래 탁해서 여기에 절대 기준을 걸면 서해가 통째로 막힌다.
+     그래서 그 해역에서 기대할 수 있는 폭의 아래쪽에 걸렸을 때만 잠근다. */
+  if ((p.f === 'rock' || p.f === 'mix') && vis.vis < 0.30 && visQ < 0.35)
+    hCap = Math.min(hCap, 45);
   if (p.f === 'none') hCap = Math.min(hCap, 28);
   var hScore = Math.round(Math.min(hRaw, hCap));
 
@@ -167,11 +192,17 @@ function analyze_(p, ds, tide, wxRec, want){
   else if (expo < 0.3) hWarn.push('조금 물때 — 얕게만 빠짐');
   if (nl && nl.timing > 0.8) hWhy.push('간조가 밤 시간대에 딱 걸림');
   else if (nl && nl.timing < 0.45) hWarn.push('간조가 낮이라 야간 작업 창이 짧음');
-  if (vis.vis >= 2) hWhy.push('수중 시야 ' + vis.vis.toFixed(1) + 'm — ' + vis.word);
-  else if (vis.vis < 0.6) hWarn.push('수중 시야 ' + Math.round(vis.vis*100) + 'cm — ' + vis.word);
+  var visTxt = (vis.vis >= 1 ? vis.vis.toFixed(1)+'m' : Math.round(vis.vis*100)+'cm');
+  if (visQ >= 0.60) hWhy.push('수중 시야 ' + visTxt + ' — 이 바다 기준 ' + visWord);
+  else if (visQ < 0.18) hWarn.push('수중 시야 ' + visTxt + ' — 이 바다 기준으로도 ' + visWord);
   if (vis.R > 1.4) hWarn.push('파랑이 바닥을 흔들어 흙탕물');
   if (lux < 0.02) hWhy.push('달 없는 밤 — 문어·낙지 활동 좋음');
   else if (lux > 0.18) hWarn.push('달이 밝아 야행성 대상이 숨음');
+  // 낮 물때에 야행성 대상을 노리고 나가면 헛걸음이다 — 분명히 적는다
+  if (daylightAt_(lowT, sun) >= 1)
+    hWarn.push('간조가 대낮 — 낙지·문어·주꾸미·꽃게는 이 시각엔 숨어 있습니다');
+  if (visQ < 0.18 && hSeason.some(function(t){ return SIGHT_HUNT[t.n]; }))
+    hWarn.push('물이 흐려 랜턴 사냥(꽃게·문어류)은 어렵습니다 — 호미로 파는 대상 위주로 가세요');
   if (Math.abs(toKnot_(hCur)) >= 1.6) hWarn.push('조류 ' + Math.abs(toKnot_(hCur)).toFixed(1) + '노트 — 발 밑 조심');
   if (hWx.wind !== null && hWe.eff >= 9) hWarn.push((hWe.wo.word||'바람') + ' ' + Math.round(hWx.wind) + 'm/s — 체온 손실·물결 주의');
   if (p.f === 'none') hWarn.push('조차가 작아 갯벌 노출이 거의 없음');
@@ -200,7 +231,7 @@ function analyze_(p, ds, tide, wxRec, want){
              : (hChil !== null && hChil <= 0) ? '저체온'
              : (day.rainSum !== null && day.rainSum >= 20) ? '비 ' + Math.round(day.rainSum) + 'mm'
              : hSky.snow ? '눈'
-             : (vis.vis < 0.25) ? '시야 없음' : '';
+             : ((p.f === 'rock' || p.f === 'mix') && vis.vis < 0.30 && visQ < 0.35) ? '시야 없음' : '';
     hWarn.unshift('안전 경고' + (hRsn ? ' (' + hRsn + ')' : '') + ' — 오늘 이 지점 입수는 권하지 않습니다');
   }
 
@@ -211,7 +242,7 @@ function analyze_(p, ds, tide, wxRec, want){
   var sol  = solunar_(y, mo, d, p.la, p.lo, age);
   var solV = solunarAt_(sol, ((fMid % 24) + 24) % 24);
   var flow = flowFit_(p, tide, fo.from, fo.to);
-  var visF = underwaterVis_({ wave: fWx.wave, period: fWx.wper, floor: p.f,
+  var visF = underwaterVis_({ wave: fWx.wave, period: fWx.wper, floor: p.f, sea: p.s,
                               current: flow.peak/1.94, rain24: day.rainSum, month: mo, depth: 3 });
 
   var fSky  = skyRisk_(fWx.code, fWx.vism, fWx.rain, fWx.snow);
@@ -238,7 +269,12 @@ function analyze_(p, ds, tide, wxRec, want){
   var dp = pressTrend_(wxRec ? wxRec.pres : null, fMid);
   var sPres = 8 * pressScore_(dp);
   // 물색 — 맑을수록 좋다 (0.3m에서 0점, 6m 이상이면 만점)
-  var sTurb = 10 * clamp01_((Math.log(Math.max(0.05, visF.vis)) - Math.log(0.3)) / (Math.log(6) - Math.log(0.3)));
+  /* 물색도 그 바다 기준으로 잰다. 절대값으로 재면 서해 낚시는 어디서든 0점이고
+     동해는 어디서든 만점이라 지점을 가르는 힘이 없다. 그리고 낚시는 「맑을수록 좋다」가
+     아니다 — 유리처럼 맑으면 경계심이 올라간다. 약간 흐린 쪽에 정점을 둔다. */
+  var fvb = visBandFor_(p.f, p.s, mo);
+  var fq  = clamp01_((Math.log(Math.max(0.03, visF.vis)) - Math.log(fvb.lo)) / (Math.log(fvb.hi) - Math.log(fvb.lo)));
+  var sTurb = 10 * (fq < 0.55 ? clamp01_(fq / 0.55) : (1 - 0.2 * clamp01_((fq - 0.85) / 0.15)));
 
   var fRaw = sFeed + sFlow + sSea + sSst + sPres + sTurb;
   var fCap = 100;
@@ -307,7 +343,11 @@ function analyze_(p, ds, tide, wxRec, want){
   }
 
   /* ── 대상물과 금어기 ────────────────────── */
-  var hSplit = splitByBan_(hSeason.slice(0, 6), mo, d, p.r);
+  /* 야행성 대상은 낮 물때에 앞세우면 안 된다.
+     낙지·문어·주꾸미·꽃게는 낮에 펄과 돌 밑에 숨어 있어, 물이 아무리 잘 빠져도
+     대낮에 걸어다녀서는 나오지 않는다. 점수에만 반영하고 목록은 그대로 두면
+     "낮 10시에 꽃게" 같은 헛걸음 추천이 나간다. */
+  var hSplit = splitByBan_(demoteMurky_(demoteNocturnal_(hSeason, lowT, sun), visQ).slice(0, 6), mo, d, p.r);
   var fSplit = splitByBan_(fSeason.slice(0, 6), mo, d, p.r);
   var hTargets = hSplit.ok.slice(0, 4), fTargets = fSplit.ok.slice(0, 4);
   if (!hTargets.length && hSplit.banned.length) hTargets = [];
@@ -338,8 +378,12 @@ function analyze_(p, ds, tide, wxRec, want){
       sunrise: sun.rise, sunset: sun.set, dawn: tw.rise, dusk: tw.set,
       events: ev, floor: FLOOR_KO[p.f] || '',
       ferry: p.isl ? ferryPlan_(lowT, hWx.wave, hWx.wind, p.fr ? p.fr[2] : 1) : null,
-      vis: Math.round(vis.vis*100)/100, visWord: vis.word, ssc: Math.round(vis.ssc),
+      vis: Math.round(vis.vis*100)/100, visQ: Math.round(visQ*100)/100, visWord: visWord,
+      visLo: Math.round(vb2.lo*100)/100, visHi: Math.round(vb2.hi*100)/100, ssc: Math.round(vis.ssc),
       flatWidth: Math.round(width),
+      wade: (typeof wadePlan_ === 'function') ? wadePlan_(lowT, range, p.f, width) : null,
+      risk: (typeof riskOf_ === 'function') ? riskOf_(range, p.f) : null,
+      runup: (typeof runupOf_ === 'function') ? runupOf_(fWx.wave, fWx.wper) : null,
       curPeak: Math.round(flow.peak*100)/100,
       solunar: { major: sol.major, minor: sol.minor, strength: Math.round(sol.strength*100),
                  moonrise: sol.ev.rise, moonset: sol.ev.set, transit: sol.ev.transit },
@@ -360,8 +404,10 @@ function analyze_(p, ds, tide, wxRec, want){
       score: Math.max(0, Math.min(100, hScore)), raw: Math.round(Math.min(hRaw,hCap)*100)/100,
       grade: grade_(hScore), window: hWindow, lowTime: lowT, lowLevel: nl ? nl.ev.lv : null,
       why: hWhy, warn: hWarn, targets: hTargets, bannedTargets: hSplit.banned,
-      parts: { 노출: Math.round(sExpo), 시야: Math.round(sVis), 타이밍: Math.round(sTime),
+      parts: { 시야: Math.round(sVis), 노출: Math.round(sExpo), 타이밍: Math.round(sTime),
                안전: Math.round(sSafe), 활성: Math.round(sLive) },
+      partsMax: { 시야: Math.round(32*vw), 노출: Math.round(26 + 32*(1 - vw)),
+                  타이밍: 18, 안전: 16, 활성: 8 },
       verdict: verdictHaeru_(p, hScore, hWindow, hTargets, vis, hSplit.banned)
     },
     fish: {
@@ -409,10 +455,14 @@ function grade_(s){
 function verdictHaeru_(p, s, win, tg, vis, banned){
   if (banned && banned.length && !tg.length)
     return banned[0].n + ' 금어기라 오늘 이 자리는 의미가 없습니다.';
-  var names = tg.slice(0,2).map(function(t){ return t.n; }).join('·');
+  // 흐린 물·낮 물때로 강등된 대상은 결론 문장에서 뺀다 — 앞세워 놓고 헛걸음시키지 않는다
+  var solid = tg.filter(function(t){ return !t.murk && !t.night; });
+  var names = (solid.length ? solid : tg).slice(0,2).map(function(t){ return t.n; }).join('·');
   if (!win) return p.n + ' — 오늘은 물이 안 빠져서 들어갈 자리가 없습니다.';
   var t = fmtRange_(win[0], win[1]);
-  var v = vis.vis >= 1.5 ? ' 물도 봐줄 만합니다.' : (vis.vis < 0.5 ? ' 다만 물이 많이 탁합니다.' : '');
+  var v = (vis.q != null)
+    ? (vis.q >= 0.6 ? ' 물도 이 바다치고 맑은 편입니다.' : (vis.q < 0.18 ? ' 다만 물이 많이 탁합니다.' : ''))
+    : '';
   if (s >= 88) return t + '에 들어가서 ' + names + ' 담으면 됩니다.' + v;
   if (s >= 76) return t + ' 사이에 ' + names + ' 노리세요.' + v;
   if (s >= 62) return t + '에 ' + names + ' 정도는 봅니다. 무난한 수준.';
@@ -430,12 +480,58 @@ function verdictFish_(p, s, win, tg, fo, flow){
   return '오늘 출조는 비추천입니다.';
 }
 
+
+/* ══════════ 야행성 보정 ══════════
+ * 작업 시간대(간조 앞뒤)가 훤한 낮이면 야행성 대상을 뒤로 미룬다.
+ * 아예 지우지는 않는다 — 물때가 밤으로 넘어가는 날을 고르라는 뜻이지
+ * 그 자리에 아예 없다는 뜻은 아니기 때문이다. */
+var NOCTURNAL = { '낙지':1, '문어':1, '주꾸미':1, '꽃게':1, '박하지':1,
+                  '왕밤송이게':1, '톱날꽃게':1, '갯가재':1, '대수리':1 };
+function isNocturnal_(n){ return !!NOCTURNAL[n]; }
+
+/* 간조 시각이 낮 한복판이면 1, 완전한 밤이면 0 */
+function daylightAt_(t, sun){
+  if (t === null || t === undefined || !sun) return 0;
+  var rise = sun.rise, set = sun.set;
+  if (rise === null || set === null) return 0;
+  if (t <= rise - 0.7 || t >= set + 0.7) return 0;          // 확실한 밤
+  if (t >= rise + 1.0 && t <= set - 1.0) return 1;          // 확실한 낮
+  return 0.5;                                              // 여명·땅거미
+}
+/* 눈으로 찾아 잡는 대상 — 물이 흐리면 랜턴을 비춰도 안 보인다.
+ * 꽃게 뜰채질·문어 웅덩이 사냥이 여기 해당한다. 호미로 파는 조개는 무관하다. */
+var SIGHT_HUNT = { '꽃게':1, '문어':1, '주꾸미':1, '박하지':1, '갯가재':1, '톱날꽃게':1 };
+function demoteMurky_(list, visQ){
+  if (visQ >= 0.18) return list;
+  var out = list.map(function(t){
+    if (!SIGHT_HUNT[t.n]) return t;
+    return { n: t.n, v: Math.max(0.3, t.v * 0.5), murk: 1 };
+  });
+  out.sort(function(a, b){ return b.v - a.v; });
+  return out;
+}
+
+function demoteNocturnal_(list, lowT, sun){
+  var dl = daylightAt_(lowT, sun);
+  if (dl <= 0) return list;                                 // 밤 물때면 손대지 않는다
+  var out = list.map(function(t){
+    if (!isNocturnal_(t.n)) return t;
+    return { n: t.n, v: Math.max(0.4, t.v * (dl >= 1 ? 0.34 : 0.7)), night: 1 };
+  });
+  out.sort(function(a, b){ return b.v - a.v; });
+  return out;
+}
+
 /** 앱에서 고를 수 있는 대상 목록 (검색 화면용) */
 function allSpecies_(kind){
   var seen = {}, out = [];
-  var table = kind === 'fish' ? FX_DEFAULT : SP_DEFAULT;
-  for (var k in table) table[k].forEach(function(n){ if (!seen[n]){ seen[n] = 1; out.push(n); } });
-  POINTS.forEach(function(p){
+  var tables = kind === 'fish'
+    ? [FX_DEFAULT, (typeof FX_BY === 'object' ? FX_BY : {})]
+    : [SP_DEFAULT];
+  tables.forEach(function(table){
+    for (var k in table) table[k].forEach(function(n){ if (!seen[n]){ seen[n] = 1; out.push(n); } });
+  });
+  (typeof pool_==='function' ? pool_() : POINTS).forEach(function(p){
     var arr = kind === 'fish' ? p.fx : p.sp;
     if (arr) arr.forEach(function(n){ if (!seen[n]){ seen[n] = 1; out.push(n); } });
   });

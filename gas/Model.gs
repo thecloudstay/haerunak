@@ -47,8 +47,21 @@ function bedOrbitalVel_(H, T, h){
 /* ══════════ 2. 재부유 임계 ══════════ */
 /** 바닥질별 재부유 임계 유속(m/s) — 조간대 생물막을 감안해 실험값보다 높게 잡았다 */
 var U_CRIT   = { mud:0.20, mix:0.25, sand:0.26, rock:0.50, none:0.24 };
-/** 잔잔할 때의 기본 부유물 농도(mg/L) */
+/** 잔잔할 때의 기본 부유물 농도(mg/L) — 남해 기준 표다 */
 var SSC_BASE = { mud:30,   mix:14,   sand:8,    rock:2.5,  none:11  };
+/** 해역 보정 — 같은 갯바위라도 서해와 제주는 물이 다르다.
+ *  해양환경정보포털 수질평가지수의 해역별 투명도 기준값
+ *  (동해 8.5m · 대한해협 2.5m · 서해중부 1.0m · 제주 8.0m)을
+ *  소광식으로 역산해 부유물질 농도로 환산한 비율이다.
+ *  환산된 서해 24.2mg/L 는 서해안 갯벌 해역 실측 평균 24.3mg/L 와 거의 같다. */
+var SEA_TURB = { W:2.8, S:1.0, E:0.15, J:0.18 };
+/** 해역별 시야 상한(m) — 계수가 어긋나도 헛소리가 나가지 않게 마지막에 거는 빗장 */
+var VIS_CAP  = { W:5, S:12, E:20, J:25 };
+/** 세키 깊이 → 수평 시야 환산. 탁할수록 수평이 더 나빠진다 */
+function horizRatio_(secchi){
+  var t = Math.max(0, Math.min(1, (secchi - 1) / 9));
+  return 0.46 + 0.30 * t;                 // 탁수 0.46 ~ 청수 0.76
+}
 /** 조간대 작업 수심(m) — 해루질은 무릎~허리 */
 var WORK_DEPTH = { mud:1.0, mix:1.2, sand:1.2, rock:1.8, none:1.5 };
 
@@ -64,6 +77,25 @@ function resuspendIdx_(ub, floor){
  * @param o {wave, period, floor, current, rain24, month, depth}
  * @return {vis, ssc, ub, R, kd, grade, word}
  */
+/* 부유물 농도 하나로 시야를 내는 공통 경로 — 오늘값과 띠 계산이 같은 식을 쓴다 */
+function visFromSSC_(ssc, sea){
+  var kd = 0.12 + 0.065*ssc;
+  var secchi = 1.7/kd;
+  return Math.max(0.03, Math.min(VIS_CAP[sea] || 12, secchi * horizRatio_(secchi)));
+}
+/* 그 자리(해역×바닥질×달)에서 기대할 수 있는 시야 폭.
+ *   최선: 정조·무풍·무강우          최악: 파랑이 바닥을 뒤집고 조류·비가 겹친 날(교란 8배)
+ * 「서해치고 맑은 날인가」는 이 띠 안에서 오늘이 어디 있는지로 잰다.
+ * 절대 미터로 재면 서해 펄은 일 년 내내 꼴찌라 아무것도 가려내지 못한다. */
+function visBandFor_(floor, sea, month){
+  var bloom = (month >= 6 && month <= 9) ? 1.30 : (month >= 4 && month <= 5) ? 1.15 : 1.0;
+  var base = (SSC_BASE[floor] || 11) * (SEA_TURB[sea] || 1) * bloom;
+  var hi = visFromSSC_(base, sea);
+  var lo = visFromSSC_(base * 8, sea);
+  if (lo >= hi) lo = hi * 0.5;
+  return { lo: lo, hi: hi };
+}
+
 function underwaterVis_(o){
   var floor = o.floor || 'mix';
   var h  = o.depth || WORK_DEPTH[floor] || 1.2;
@@ -72,15 +104,21 @@ function underwaterVis_(o){
   var ub = bedOrbitalVel_(H, T, h);
   var R  = resuspendIdx_(ub, floor);
 
-  var stir  = 1 + 3.5*Math.pow(Math.max(0, R - 1), 1.3);      // 바닥이 뜨는 정도
+  // 바닥이 뜨는 정도 — 상한 6배. 폭풍이라고 무한정 뜨는 게 아니라 어느 선에서 포화된다
+  var stir  = Math.min(6, 1 + 3.5*Math.pow(Math.max(0, R - 1), 1.3));
   var cur   = 1 + 0.55*Math.min(2.5, (o.current || 0)/0.35);  // 조류가 흙을 실어 나른다
   var rain  = 1 + Math.min(2.5, (o.rain24 || 0)/12);          // 육상 유출
   var m = o.month || 6;
   var bloom = (m >= 6 && m <= 9) ? 1.30 : (m >= 4 && m <= 5) ? 1.15 : 1.0;  // 부유생물·적조기
 
-  var ssc = (SSC_BASE[floor] || 11) * stir * cur * rain * bloom;
-  var kd  = 0.04 + 0.045*ssc;
-  var vis = Math.max(0.12, Math.min(25, 1.77/kd));
+  var sea = o.sea || 'S';
+  // 상한 600mg/L — 폭풍 재부유 실측이 수백 mg/L 대이고, 그 위는 유동니(죽 같은 뻘물)라 시야 논의가 무의미하다
+  var ssc = Math.min(600, (SSC_BASE[floor] || 11) * (SEA_TURB[sea] || 1) * stir * cur * rain * bloom);
+  // 영국 연안 실측 회귀식 kd = 0.1155 + 0.0654·부유물질 (Devlin 외 2009)
+  var kd  = 0.12 + 0.065*ssc;
+  // 1.7/kd 는 수평 시야가 아니라 세키(투명도) 깊이다. 수평은 그보다 짧다
+  var secchi = 1.7/kd;
+  var vis = Math.max(0.03, Math.min(VIS_CAP[sea] || 12, secchi * horizRatio_(secchi)));
 
   var grade, word;
   if (vis >= 6)        { grade = 'S'; word = '훤히 보임'; }
@@ -89,7 +127,7 @@ function underwaterVis_(o){
   else if (vis >= 0.5) { grade = 'C'; word = '탁함'; }
   else                 { grade = 'D'; word = '거의 안 보임'; }
 
-  return { vis: vis, ssc: ssc, ub: ub, R: R, kd: kd, grade: grade, word: word };
+  return { vis: vis, secchi: secchi, ssc: ssc, ub: ub, R: R, kd: kd, grade: grade, word: word };
 }
 
 /* ══════════ 4. 조류 유속 ══════════ */
@@ -254,7 +292,9 @@ var THERMAL = {
   '개불':[3,8,20,26], '칠게':[8,15,28,33], '짱뚱어':[13,19,30,34], '꼬막':[4,10,24,30],
   '굴':[2,7,22,28], '홍합':[2,7,20,26], '따개비':[4,10,24,30], '거북손':[8,14,25,30],
   '군소':[9,14,24,28], '개조개':[5,11,24,29], '키조개':[6,12,24,29], '새조개':[3,8,18,24],
-  '대하':[11,16,26,30], '밴댕이':[12,17,26,30], '미역':[1,4,15,20]
+  '대하':[11,16,26,30], '밴댕이':[12,17,26,30], '미역':[1,4,15,20],
+  /* 2026-08 추가 — 문헌 확인분만 */
+  '붉바리':[5,12,26,34], '피뿔고둥':[4,18,26,35]
 };
 /** 0~1 사다리꼴 적합도 */
 function thermalFit_(name, sst){
@@ -288,13 +328,262 @@ function pressScore_(dp){
 
 /* ══════════ 9. 갯벌 노출 폭 ══════════ */
 /** 바닥질별 평균 경사 (수직/수평) */
-var FLAT_SLOPE = { mud:0.0009, mix:0.0022, sand:0.0040, rock:0.020, none:0.05 };
+/* 문헌 실측에서 도출한 값으로 고쳤다 (2026-08).
+ *   펄   0.0013  곰소만 6m/6km=0.0010 과 강화 남단 9.3m/6km=0.0016 의 사이
+ *   혼합 0.0027  천수만 황도 4.41m/1.65km, 보령 학성리 1.7m/600m
+ *   모래 0.0060  모래갯벌 폭 약 1km, 서해 중부 대조 조차 약 6m
+ *   암반 0.020   직접 실측 근거를 못 찾음. 종전값 유지
+ * 근거: MDPI Water 17(23) 3361 · JMSE 11(9) 1697 · 한국해양학회지 학성리
+ *       · 서울대 해양저서생태학연구실 · 해양환경정보포털 */
+var FLAT_SLOPE = { mud:0.0013, mix:0.0027, sand:0.0060, rock:0.020, none:0.05 };
+/* 안전 계산 전용 — 물가가 밀려오는 속도는 경사가 완만할수록 빠르다.
+ * 퇴로 시각과 위험도는 「가장 불리한 쪽」으로 잡아야 하므로 종전의 완만한 값을 그대로 쓴다.
+ * 드러나는 폭은 위의 실측값으로, 빠져나올 시간은 이 값으로 — 둘을 일부러 갈라 놓았다. */
+var SAFE_SLOPE = { mud:0.0009, mix:0.0022, sand:0.0040, rock:0.020, none:0.05 };
+function safeSlope_(floor){ return SAFE_SLOPE[floor] || FLAT_SLOPE[floor] || 0.003; }
 /** 평균해면에서 저조위까지 떨어질 때 드러나는 수평 거리(m) */
 function flatWidth_(mslCm, lowCm, floor){
   var drop = Math.max(0, (mslCm - lowCm))/100;
   return drop / (FLAT_SLOPE[floor] || 0.003);
 }
 
+/* ══════════ 9-2. 진입·퇴로 시각 ══════════
+ *  갯벌은 "몇 시가 좋다"만으로는 안전하지 않다.
+ *  물가까지 걸어 나가는 데 시간이 걸리고, 돌아올 때는 물이 쫓아온다.
+ *  그래서 조위 곡선과 걷는 속도를 함께 풀어 진입 시각과 퇴로 시각을 낸다.
+ *
+ *  조위(저조 기준 상승고)  h(Δt) = (R/2)(1 − cos(π·Δt / 6.21))
+ *  드러난 거리            E(t)  = max(0, (H − h) / 경사)
+ *  사람 위치              pos(t) = 걷기속도 × 경과시간
+ *  안전 조건              언제나  pos(t) + 여유 ≤ E(t)
+ */
+
+/** 바닥질별 도보 속도 (m/h) — 펄은 발이 빠져 느리다 */
+var WADE_SPEED = { mud:2000, mix:2600, sand:3200, rock:1600, none:2600 };
+/** 물가와 유지할 여유 거리(m) */
+var WADE_CLEAR = 25;
+
+/** 저조로부터 Δt 시간 떨어진 시점의 조위 상승고(m) */
+function tideRise_(dtH, rangeM){
+  var T = 6.21;                                  // 저조→만조 반주기(시간)
+  var x = Math.min(1, Math.abs(dtH) / T);
+  return (rangeM / 2) * (1 - Math.cos(Math.PI * x));
+}
+
+/**
+ * 진입·퇴로 계산
+ * @param lowT   저조 시각(소수 시간, 0~24)
+ * @param rangeM 그날 조차(m)
+ * @param floor  바닥질 키 (mud/mix/sand/rock)
+ * @param widthM 저조 때 드러나는 폭(m)
+ * @return {inT, outT, dist, speed, walkMin, workMin, tight, why}
+ */
+/** 목표 작업 시간(분) — 이만큼도 못 있을 거면 그 거리는 의미가 없다 */
+var WADE_TARGET = 90;
+var WADE_DMIN   = 80;
+
+function wadePlan_(lowT, rangeM, floor, widthM){
+  if (lowT === null || lowT === undefined) return null;
+  var v     = WADE_SPEED[floor] || 2600;
+  var slope = safeSlope_(floor);            // 퇴로는 불리한 쪽으로 잡는다
+  var H     = Math.max(0, widthM) * slope;
+  if (!(H > 0)) return null;
+
+  function E(t){
+    var h = tideRise_(t - lowT, rangeM);
+    return Math.max(0, (H - h) / slope);
+  }
+  var STEP = 1/12;
+
+  /* 거리 D 를 정하면 진입·퇴로 시각이 정해진다 */
+  function windowFor(D){
+    function backOk(td){
+      for (var t = td; t <= td + 6; t += STEP){
+        var pos = D - v * (t - td);
+        if (pos <= 0) return true;
+        if (pos + WADE_CLEAR > E(t)) return false;
+      }
+      return true;
+    }
+    var outT = null;
+    for (var td = lowT + 6; td >= lowT - 0.5; td -= STEP){ if (backOk(td)){ outT = td; break; } }
+
+    function outOk(ti){
+      for (var t = ti; t <= ti + 6; t += STEP){
+        var pos = v * (t - ti);
+        if (pos >= D) return true;
+        if (pos + WADE_CLEAR > E(t)) return false;
+      }
+      return true;
+    }
+    var inT = null;
+    for (var ti = lowT - 6; ti <= lowT + 0.5; ti += STEP){ if (outOk(ti)){ inT = ti; break; } }
+    if (inT === null || outT === null) return null;
+
+    var walkMin = Math.round(D / v * 60);
+    var margin  = Math.min(0.5, 0.25 + walkMin / 600);
+    outT = outT - margin;
+    if (outT <= inT) return null;
+    return {
+      D: D, inT: inT, outT: outT, walkMin: walkMin, margin: margin,
+      workMin: Math.round((outT - inT) * 60) - walkMin * 2
+    };
+  }
+
+  /* ── 순서가 중요하다 ──
+     예전에는 "걸어서 갈 수 있는 최대 거리"를 먼저 정하고 시간을 계산했다.
+     그러면 갯벌 폭이 좁은 곳에서 맨 끝까지 나가라고 해 놓고
+     "실제로 잡을 수 있는 시간 13분" 같은 말이 나온다. 쓸모가 없다.
+
+     지금은 거꾸로 한다. 목표 작업 시간(90분)이 나오는
+     '가장 먼' 거리를 고른다. 멀리 갈수록 좋지만 시간이 먼저다.        */
+  var cap = Math.max(WADE_DMIN, Math.min(widthM, v * 0.42));
+  var best = null, chosen = null;
+  for (var D = cap; D >= WADE_DMIN; D -= 20){
+    var w = windowFor(D);
+    if (!w) continue;
+    if (!best || w.workMin > best.workMin) best = w;
+    if (w.workMin >= WADE_TARGET){ chosen = w; break; }
+  }
+  var r = chosen || best;
+  if (!r) return null;
+
+  var km = function(x){ return x >= 1000 ? (x/1000).toFixed(1) + 'km' : Math.round(x) + 'm'; };
+  var why = '편도 ' + km(r.D) + ' 기준 · 걷는 데 한쪽 ' + r.walkMin + '분 · 안전 여유 '
+          + Math.round(r.margin * 60) + '분을 뺐습니다';
+  if (r.D < cap - 10)
+    why += ' (저조 때는 ' + km(widthM) + '까지 드러나지만, 그만큼 나가면 머물 시간이 없어 '
+         + km(r.D) + ' 로 잡았습니다)';
+  else if (widthM > r.D * 1.25)
+    why += ' (저조 때는 ' + km(widthM) + '까지 드러나지만 그렇게 멀리 나가면 물때에 걸립니다)';
+
+  return {
+    inT: (r.inT + 24) % 24,
+    outT: (r.outT + 24) % 24,
+    dist: Math.round(r.D),
+    maxWidth: Math.round(widthM),
+    speed: v,
+    walkMin: r.walkMin,
+    workMin: Math.max(0, r.workMin),
+    tight: r.workMin < 40,
+    why: why
+  };
+}
+
+/* ══════════ 9-3. 지점 위험도 ══════════
+ *  갯벌 고립사고가 왜 뻘에서만 나는지는 물리로 설명된다.
+ *
+ *  물이 드는 속도(수직)는 어디나 비슷하지만, 물가가 육지 쪽으로
+ *  밀려오는 속도(수평)는 바닥 경사에 반비례한다.
+ *  뻘은 경사가 1/1000 수준이라, 수직으로 1m 차는 동안
+ *  물가는 수평으로 1km를 온다. 모래밭의 네 배가 넘는다.
+ *
+ *      h(t)  = (R/2)(1 - cos(pi·t/T))        조석 상승
+ *      dh/dt = (R·pi / 2T)·sin(pi·t/T)       중간 물때에 최대
+ *      물가 전진 속도 = (dh/dt) / 경사
+ *
+ *  이 값을 사람 걸음 속도로 나눈 것이 rho 다.
+ *  rho 가 1을 넘으면 물이 들기 시작한 뒤에 걸어 나와서는 늦는다.
+ *  서해 뻘은 조차 7m를 넘으면 rho 가 1을 넘는다. 인천·강화 대조가 여기다.
+ *
+ *  이 수치는 화면 경고에도 쓰고, 지점별 위험등급 자료로도 내보낸다.
+ */
+function riskOf_(rangeM, floor){
+  var slope = safeSlope_(floor);            // 위험도도 불리한 쪽으로
+  var walk  = WADE_SPEED[floor];
+  if (!slope || !walk || !(rangeM > 0)) return null;
+
+  var T = 6.21;
+  var vWater = rangeM * Math.PI / (2 * T * slope);   // 물가 최대 전진 속도 (m/h)
+  var rho    = vWater / walk;
+
+  var grade, label, say;
+  if (rho >= 1.0){
+    grade = 4; label = '매우 높음';
+    say = '중간 물때에는 물가가 걸음보다 빠릅니다. 물이 들기 시작하면 이미 늦습니다.';
+  } else if (rho >= 0.6){
+    grade = 3; label = '높음';
+    say = '물가가 걸음 속도의 ' + Math.round(rho * 100) + '%로 따라옵니다. 여유를 넉넉히 두세요.';
+  } else if (rho >= 0.3){
+    grade = 2; label = '보통';
+    say = '걸어서 빠져나올 수 있는 속도지만 갯골은 먼저 잠깁니다.';
+  } else {
+    grade = 1; label = '낮음';
+    say = '경사가 있어 물가가 천천히 옵니다.';
+  }
+
+  return {
+    rho: Math.round(rho * 100) / 100,
+    water: Math.round(vWater),      // m/h
+    walk: walk,                     // m/h
+    slope: slope,
+    grade: grade,                   // 1~4
+    label: label,
+    say: say
+  };
+}
+
+/* ══════════ 9-4. 갯바위 처오름 ══════════
+ *  갯바위 사고는 갯벌보다 많다. 최근 5년 638건, 사망 71명.
+ *  그런데 원인이 다르다. 갯벌은 물때고, 갯바위는 너울이다.
+ *
+ *  사람들이 "갑자기 큰 파도가 왔다"고 하는 것은 착각이 아니다.
+ *  파고는 유의파고(상위 1/3의 평균)라 개별 파는 그보다 크다.
+ *  레일리 분포에서 1000파 중 최대파는 유의파고의 약 1.86배다.
+ *
+ *      Hmax ≈ 1.86 · Hs
+ *      L0   = g·T² / 2π                      심해 파장
+ *      ξ    = tanβ / √(Hmax/L0)              이리바렌 수
+ *      R    = Hmax · ξ                        헌트(1959) 급경사 밀려오름
+ *
+ *  핵심은 주기다. 같은 파고 1m라도 주기 6초면 처오름 2.0m,
+ *  14초면 4.8m가 된다. 파고만 보는 앱이 놓치는 자리가 여기다.
+ *
+ *  Hunt, I.A. (1959) Design of seawalls and breakwaters
+ *  Longuet-Higgins, M.S. (1952) 파고의 통계 분포
+ */
+var ROCK_BETA = 0.20;        // 갯바위 앞면 경사 (약 11도)
+var WAVE_MAX_RATIO = 1.86;   // 1000파 중 최대파 / 유의파고
+
+function runupOf_(waveM, periodS){
+  if (waveM === null || waveM === undefined) return null;
+  if (periodS === null || periodS === undefined || !(periodS > 0)) return null;
+  if (!(waveM > 0)) waveM = 0.1;
+
+  var Hmax = WAVE_MAX_RATIO * waveM;
+  var L0   = 9.81 * periodS * periodS / (2 * Math.PI);
+  var xi   = ROCK_BETA / Math.sqrt(Hmax / L0);
+  var R    = Hmax * Math.min(xi, 3.0);
+
+  var grade, label, say;
+  if (R >= 4.0){
+    grade = 4; label = '매우 높음';
+    say = '큰 파 하나가 ' + R.toFixed(1) + 'm까지 올라옵니다. 갯바위에 서 있을 높이가 아닙니다.';
+  } else if (R >= 2.5){
+    grade = 3; label = '높음';
+    say = '드물게 오는 큰 파가 ' + R.toFixed(1) + 'm까지 칩니다. 발밑까지 옵니다.';
+  } else if (R >= 1.5){
+    grade = 2; label = '보통';
+    say = '큰 파는 ' + R.toFixed(1) + 'm까지 올라옵니다. 낮은 자리는 피하세요.';
+  } else {
+    grade = 1; label = '낮음';
+    say = '처오름 ' + R.toFixed(1) + 'm. 갯바위 높이면 대체로 넘지 않습니다.';
+  }
+
+  return {
+    runup: Math.round(R * 10) / 10,        // 처오름 높이 (m)
+    hs: Math.round(waveM * 100) / 100,     // 유의파고
+    hmax: Math.round(Hmax * 10) / 10,      // 최대파
+    period: Math.round(periodS * 10) / 10,
+    wavelen: Math.round(L0),
+    xi: Math.round(xi * 100) / 100,
+    grade: grade,
+    label: label,
+    say: say,
+    swell: periodS >= 9,                   // 장주기 너울
+    ratio: Math.round(R / Math.max(0.1, waveM) * 10) / 10
+  };
+}
 /* ══════════ 10. 해안 방위와 바람 방향 ══════════ */
 /**
  * 그 자리가 바라보는 바다 방향(방위각, 도).
