@@ -156,10 +156,19 @@
       <div class="mod-h"><h3>부유물 → 빛 감쇠 → 보이는 거리</h3><span class="badge mid">연구 기반</span></div>
       <p>떠오른 입자가 많을수록 빛이 빨리 사라집니다. 그 감쇠 정도에서 볼 수 있는 거리를 추정합니다.
          투명도판(하얀 원판을 내려 안 보이는 깊이를 재는 방법)과 흑판 수평 시계 측정법이 근거입니다.</p>
+      <p>해역마다 물이 다릅니다. 해양환경정보포털의 해역별 투명도 기준값(동해 8.5m · 대한해협 2.5m ·
+         서해중부 1.0m · 제주 8.0m)을 역산해 해역 계수를 두고, 감쇠 회귀식은 연안 실측값
+         (Devlin 외 2009)을 씁니다. 투명도(위에서 내려다본 깊이)를 그대로 쓰지 않고
+         수평으로 보이는 거리로 환산합니다 — 물속에서 옆으로 보이는 거리는 그보다 짧기 때문입니다.</p>
+      <p><strong>등급은 절대 미터가 아니라 그 자리 기준입니다.</strong> 서해 갯벌의 물은 원래 탁해서
+         절대값으로 매기면 일 년 내내 「탁함」만 나옵니다. 저희는 그 자리(해역×바닥질×계절)에서
+         나올 수 있는 최악~최선 범위를 같은 식으로 계산해 두고, 오늘이 그 사이 어디인지로
+         「맑음 / 보통 / 탁함」을 매깁니다. 서해치고 맑은 날이 실제로 「맑음」으로 표시됩니다.</p>
       <ul class="refs">
         <li><b>Poole, H.H. &amp; Atkins, W.R.G. (1929)</b> — <i>J. Mar. Biol. Assoc. UK</i> 16(1), 297–324</li>
         <li><b>Preisendorfer, R.W. (1986)</b> — Secchi disk science: Visual optics of natural waters, <i>Limnology and Oceanography</i> 31(5), 909–926</li>
         <li><b>Davies-Colley, R.J. (1988)</b> — Measuring water clarity with a black disk, <i>Limnology and Oceanography</i> 33(4), 616–623</li>
+        <li><b>Devlin, M.J. 외 (2009)</b> — Estimating the diffuse attenuation coefficient from optically active constituents in UK marine waters, <i>Estuarine, Coastal and Shelf Science</i> 82(1), 73–83</li>
         <li><b>Davies-Colley, R.J. &amp; Smith, D.G. (2001)</b> — Turbidity, Suspended Sediment, and Water Clarity: A Review, <i>JAWRA</i> 37(5), 1085–1101</li>
         <li><b>Zaneveld, J.R.V. &amp; Pegau, W.S. (2003)</b> — Robust underwater visibility parameter, <i>Optics Express</i> 11(23), 2997–3009</li>
       </ul>

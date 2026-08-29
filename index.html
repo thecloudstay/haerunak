@@ -2935,6 +2935,25 @@ function resuspendIdx_(ub, floor){
  * @param o {wave, period, floor, current, rain24, month, depth}
  * @return {vis, ssc, ub, R, kd, grade, word}
  */
+/* 부유물 농도 하나로 시야를 내는 공통 경로 — 오늘값과 띠 계산이 같은 식을 쓴다 */
+function visFromSSC_(ssc, sea){
+  var kd = 0.12 + 0.065*ssc;
+  var secchi = 1.7/kd;
+  return Math.max(0.03, Math.min(VIS_CAP[sea] || 12, secchi * horizRatio_(secchi)));
+}
+/* 그 자리(해역×바닥질×달)에서 기대할 수 있는 시야 폭.
+ *   최선: 정조·무풍·무강우          최악: 파랑이 바닥을 뒤집고 조류·비가 겹친 날(교란 8배)
+ * 「서해치고 맑은 날인가」는 이 띠 안에서 오늘이 어디 있는지로 잰다.
+ * 절대 미터로 재면 서해 펄은 일 년 내내 꼴찌라 아무것도 가려내지 못한다. */
+function visBandFor_(floor, sea, month){
+  var bloom = (month >= 6 && month <= 9) ? 1.30 : (month >= 4 && month <= 5) ? 1.15 : 1.0;
+  var base = (SSC_BASE[floor] || 11) * (SEA_TURB[sea] || 1) * bloom;
+  var hi = visFromSSC_(base, sea);
+  var lo = visFromSSC_(base * 8, sea);
+  if (lo >= hi) lo = hi * 0.5;
+  return { lo: lo, hi: hi };
+}
+
 function underwaterVis_(o){
   var floor = o.floor || 'mix';
   var h  = o.depth || WORK_DEPTH[floor] || 1.2;
@@ -2955,7 +2974,7 @@ function underwaterVis_(o){
   var kd  = 0.12 + 0.065*ssc;
   // 1.7/kd 는 수평 시야가 아니라 세키(투명도) 깊이다. 수평은 그보다 짧다
   var secchi = 1.7/kd;
-  var vis = Math.max(0.10, Math.min(VIS_CAP[sea] || 12, secchi * horizRatio_(secchi)));
+  var vis = Math.max(0.03, Math.min(VIS_CAP[sea] || 12, secchi * horizRatio_(secchi)));
 
   var grade, word;
   if (vis >= 6)        { grade = 'S'; word = '훤히 보임'; }
@@ -4229,9 +4248,13 @@ function analyze_(p, ds, tide, wxRec, want){
      다만 절대 미터로 재면 서해는 영원히 꼴찌가 된다. 서해 물은 원래 탁하고,
      서해 사람에게 「제주가 맑다」는 말은 쓸모가 없다. 그래서 그 해역에서
      기대할 수 있는 폭 안에서 오늘이 어느 자리인지로 잰다. */
-  var VIS_BAND = { W:[0.10, 2.0], S:[0.20, 5.0], E:[0.60, 12], J:[0.60, 12] };
-  var vb = VIS_BAND[p.s] || VIS_BAND.S;
-  var visQ = clamp01_((Math.log(vis.vis) - Math.log(vb[0])) / (Math.log(vb[1]) - Math.log(vb[0])));
+  /* 띠는 해역만이 아니라 바닥질·달까지 본다 — 같은 서해라도 펄과 갯바위는 다른 물이다.
+     띠 계산과 오늘값 계산이 같은 식을 쓰므로, q 는 순수하게 「오늘 날씨가 물색을
+     얼마나 흐렸나」만 남는다. 서해치고 맑은 날이 실제로 위로 올라온다. */
+  var vb2 = visBandFor_(p.f, p.s, mo);
+  var visQ = clamp01_((Math.log(vis.vis) - Math.log(vb2.lo)) / (Math.log(vb2.hi) - Math.log(vb2.lo)));
+  var visWord = visQ >= 0.80 ? '최상' : visQ >= 0.60 ? '맑음' : visQ >= 0.38 ? '보통'
+              : visQ >= 0.18 ? '탁함' : '거의 안 보임';
   /* 시야가 중요한 정도는 바닥질에 따라 다르다.
      갯바위에서 문어·소라를 눈으로 찾는 일은 시야가 전부지만,
      갯벌에서 조개를 파는 일은 물이 빠진 뒤라 시야가 거의 상관없다.
@@ -4293,7 +4316,7 @@ function analyze_(p, ds, tide, wxRec, want){
      물 빠진 갯벌에서 조개를 파는 데는 시야가 상관없고,
      서해 물은 원래 탁해서 여기에 절대 기준을 걸면 서해가 통째로 막힌다.
      그래서 그 해역에서 기대할 수 있는 폭의 아래쪽에 걸렸을 때만 잠근다. */
-  if ((p.f === 'rock' || p.f === 'mix') && vis.vis < vb[0] * 1.6)
+  if ((p.f === 'rock' || p.f === 'mix') && vis.vis < 0.30 && visQ < 0.35)
     hCap = Math.min(hCap, 45);
   if (p.f === 'none') hCap = Math.min(hCap, 28);
   var hScore = Math.round(Math.min(hRaw, hCap));
@@ -4304,8 +4327,9 @@ function analyze_(p, ds, tide, wxRec, want){
   else if (expo < 0.3) hWarn.push('조금 물때 — 얕게만 빠짐');
   if (nl && nl.timing > 0.8) hWhy.push('간조가 밤 시간대에 딱 걸림');
   else if (nl && nl.timing < 0.45) hWarn.push('간조가 낮이라 야간 작업 창이 짧음');
-  if (vis.vis >= 2) hWhy.push('수중 시야 ' + vis.vis.toFixed(1) + 'm — ' + vis.word);
-  else if (vis.vis < 0.6) hWarn.push('수중 시야 ' + Math.round(vis.vis*100) + 'cm — ' + vis.word);
+  var visTxt = (vis.vis >= 1 ? vis.vis.toFixed(1)+'m' : Math.round(vis.vis*100)+'cm');
+  if (visQ >= 0.60) hWhy.push('수중 시야 ' + visTxt + ' — 이 바다 기준 ' + visWord);
+  else if (visQ < 0.18) hWarn.push('수중 시야 ' + visTxt + ' — 이 바다 기준으로도 ' + visWord);
   if (vis.R > 1.4) hWarn.push('파랑이 바닥을 흔들어 흙탕물');
   if (lux < 0.02) hWhy.push('달 없는 밤 — 문어·낙지 활동 좋음');
   else if (lux > 0.18) hWarn.push('달이 밝아 야행성 대상이 숨음');
@@ -4340,7 +4364,7 @@ function analyze_(p, ds, tide, wxRec, want){
              : (hChil !== null && hChil <= 0) ? '저체온'
              : (day.rainSum !== null && day.rainSum >= 20) ? '비 ' + Math.round(day.rainSum) + 'mm'
              : hSky.snow ? '눈'
-             : ((p.f === 'rock' || p.f === 'mix') && vis.vis < vb[0] * 1.6) ? '시야 없음' : '';
+             : ((p.f === 'rock' || p.f === 'mix') && vis.vis < 0.30 && visQ < 0.35) ? '시야 없음' : '';
     hWarn.unshift('안전 경고' + (hRsn ? ' (' + hRsn + ')' : '') + ' — 오늘 이 지점 입수는 권하지 않습니다');
   }
 
@@ -4482,7 +4506,8 @@ function analyze_(p, ds, tide, wxRec, want){
       sunrise: sun.rise, sunset: sun.set, dawn: tw.rise, dusk: tw.set,
       events: ev, floor: FLOOR_KO[p.f] || '',
       ferry: p.isl ? ferryPlan_(lowT, hWx.wave, hWx.wind, p.fr ? p.fr[2] : 1) : null,
-      vis: Math.round(vis.vis*100)/100, visWord: vis.word, ssc: Math.round(vis.ssc),
+      vis: Math.round(vis.vis*100)/100, visQ: Math.round(visQ*100)/100, visWord: visWord,
+      visLo: Math.round(vb2.lo*100)/100, visHi: Math.round(vb2.hi*100)/100, ssc: Math.round(vis.ssc),
       flatWidth: Math.round(width),
       wade: (typeof wadePlan_ === 'function') ? wadePlan_(lowT, range, p.f, width) : null,
       risk: (typeof riskOf_ === 'function') ? riskOf_(range, p.f) : null,
@@ -5444,7 +5469,7 @@ function packRow_(p, an, mode){
     banned: (m.bannedTargets || []).map(function(t){ return t.n; }),
     verdict: m.verdict, why: (m.why||[]).slice(0,2), warn: (m.warn||[]).slice(0,2),
     mul: an.meta.mul, range: an.meta.range, src: an.meta.src,
-    vis: an.meta.vis, cur: an.meta.curPeak,
+    vis: an.meta.vis, visQ: an.meta.visQ, visWord: an.meta.visWord, cur: an.meta.curPeak,
     other: (mode === 'fish' ? an.haeru.score : an.fish.score),
     wantReason: an.want ? an.want.reason : null,
     // 원픽 자리에 걸 영상 — 유튜버에게 주는 대가이자 나중의 광고 자리
@@ -6090,12 +6115,13 @@ function load(){
    미터만 보여주면 서해 사람은 늘 「나쁨」만 보게 된다. */
 var VIS_BAND_UI = { W:[0.10, 2.0], S:[0.20, 5.0], E:[0.60, 12], J:[0.60, 12] };
 var SEA_KO = { W:'서해', S:'남해', E:'동해', J:'제주' };
-function visLabel_(v, sea){
+function visLabel_(v, sea, q, word){
   var m = (v >= 1) ? (v.toFixed(1) + 'm') : (Math.round(v*100) + 'cm');
+  if (word) return '시야 ' + m + ' · ' + (SEA_KO[sea] || '') + ' 기준 ' + word;
   var b = VIS_BAND_UI[sea];
   if (!b) return '시야 ' + m;
-  var q = (Math.log(v) - Math.log(b[0])) / (Math.log(b[1]) - Math.log(b[0]));
-  var w = q >= 0.80 ? '최상' : q >= 0.60 ? '맑음' : q >= 0.38 ? '보통' : q >= 0.18 ? '탁함' : '거의 안 보임';
+  var q2 = (Math.log(v) - Math.log(b[0])) / (Math.log(b[1]) - Math.log(b[0]));
+  var w = q2 >= 0.80 ? '최상' : q2 >= 0.60 ? '맑음' : q2 >= 0.38 ? '보통' : q2 >= 0.18 ? '탁함' : '거의 안 보임';
   return '시야 ' + m + ' · ' + (SEA_KO[sea] || '') + ' 기준 ' + w;
 }
 function visQ_(v, sea){
@@ -6118,7 +6144,9 @@ function sorted(){
     /* 미터로 줄을 세우면 늘 동해·제주가 위에 온다. 서해 사람에게는 쓸모가 없다.
        「그 바다치고 오늘이 맑은 날인가」로 세운다. 시야를 못 낸 자리는 뒤로. */
     a.sort(function(x,y){
-      return (visQ_(y.vis, y.s) - visQ_(x.vis, x.s)) || (y.raw - x.raw);
+      var xq = (x.visQ != null) ? x.visQ : visQ_(x.vis, x.s);
+      var yq = (y.visQ != null) ? y.visQ : visQ_(y.vis, y.s);
+      return (yq - xq) || (y.raw - x.raw);
     });
   } else {
     a.sort(function(x,y){ return y.raw - x.raw; });
@@ -6384,7 +6412,7 @@ function renderList(){
     var ch = el('div','row-chips');
     var visChip = null;
     if (S.mode === 'haeru' && r.vis != null)
-      visChip = el('span', 'chip' + (S.sort==='vis' ? ' vis-on' : ''), visLabel_(r.vis, r.s));
+      visChip = el('span', 'chip' + (S.sort==='vis' ? ' vis-on' : ''), visLabel_(r.vis, r.s, r.visQ, r.visWord));
     if (visChip && S.sort === 'vis') ch.appendChild(visChip);   // 시야순일 땐 맨 앞에
     if (r.win) ch.appendChild(el('span','chip hot', hm(r.win[0])+'~'+hm(r.win[1])));
     ch.appendChild(el('span','chip', r.mul));
@@ -6744,17 +6772,19 @@ function renderDetail(d){
     /* 막대는 절대 미터가 아니라 그 바다에서 기대할 수 있는 폭 안의 자리로 그린다.
        서해 물은 원래 탁하다. 절대값으로 그리면 서해는 늘 빨간 막대만 보게 된다. */
     var vv = meta.vis, sea = (d.point && d.point.s) || 'S';
-    var vb = VIS_BAND_UI[sea] || VIS_BAND_UI.S;
-    var vq = Math.max(0, Math.min(1, (Math.log(vv) - Math.log(vb[0])) / (Math.log(vb[1]) - Math.log(vb[0]))));
+    var vq = (meta.visQ != null) ? meta.visQ : 0.5;
     var vpct = Math.max(4, Math.round(vq*100));
     var vcol = vq >= 0.60 ? '#2ee6a8' : vq >= 0.38 ? '#a3e635' : vq >= 0.18 ? '#fbbf24' : '#f87171';
-    var vword = vq >= 0.80 ? '최상' : vq >= 0.60 ? '맑음' : vq >= 0.38 ? '보통' : vq >= 0.18 ? '탁함' : '거의 안 보임';
+    var vword = meta.visWord || '보통';
+    function vm_(x){ return x >= 1 ? x.toFixed(1)+'m' : Math.round(x*100)+'cm'; }
+    var bandTxt = (meta.visLo != null && meta.visHi != null)
+      ? '이 자리는 최악 ' + vm_(meta.visLo) + ' ~ 최선 ' + vm_(meta.visHi) + ' 사이를 오갑니다. 오늘은 그중 ' + Math.round(vq*100) + '% 자리입니다. '
+      : '';
     var g = el('div','gauge');
-    g.innerHTML = '<div class="gauge-v" style="color:'+vcol+'">' + (vv >= 1 ? vv.toFixed(1)+'m' : Math.round(vv*100)+'cm') + '</div>'
+    g.innerHTML = '<div class="gauge-v" style="color:'+vcol+'">' + vm_(vv) + '</div>'
       + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+vpct+'" style="background:'+vcol+'"></i></div>'
       + '<div class="gauge-l"><b>' + (SEA_KO[sea]||'') + ' 기준 ' + vword + '</b> · 부유물 ' + meta.ssc + 'mg/L 추정<br>'
-      + (SEA_KO[sea]||'') + '에서 기대할 수 있는 범위는 ' + vb[0] + '~' + vb[1] + 'm 입니다. '
-      + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
+      + bandTxt + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
     vs.appendChild(g);
     b.appendChild(vs);
 
