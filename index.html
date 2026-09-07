@@ -5934,6 +5934,8 @@ var COAST_LAYER = L.geoJSON(COAST, {
 var TILE_TAIL = ' | 물때 자체 조석계산 · 기상 Open-Meteo';
 var TILE_SRC = {
   dark: [
+    { u:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      a:'지도 OpenStreetMap · CARTO', mz:20, sd:'abcd' },
     { u:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       a:'지도 Esri', mz:16 },
     { u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', a:'지도 OpenStreetMap', mz:19, sd:'abc' }
@@ -5960,7 +5962,8 @@ function makeTile_(kind, idx){
   if (c.sd) opt.subdomains = c.sd;
   var tl = L.tileLayer(c.u, opt);
   var good = 0, bad = 0;
-  tl.on('tileload',  function(){ good++; });
+  /* 타일이 한 장이라도 오면 내장 약도(해안선)는 걷는다 — 진짜 지도가 기본이다 */
+  tl.on('tileload',  function(){ good++; coastVis_(false); });
   tl.on('tileerror', function(){
     bad++;
     // 한 장도 못 받은 채 연달아 실패하면 그 공급원은 죽은 것으로 본다
@@ -5982,34 +5985,31 @@ function getBase_(kind){
   return LIVE[kind];
 }
 
-/* 기본은 내장 해안선이다 — 외부 요청이 0이라 공급사가 죽든 유료화하든 영향이 없다.
-   세밀한 지도가 필요하면 사용자가 '위성'·'지도'를 눌렀을 때만 타일을 부른다.
-   해안선이 내장되지 않은 판(앱스 스크립트)에서는 밝은 지도를 기본으로 쓴다. */
+/* 기본은 진짜 지도다 — 바다로드처럼 실제 지형·도로·지명이 그대로 보여야
+   포인트가 어디인지 맞는지 한눈에 확인된다. 내장 해안선(약도)은
+   타일이 오기 전 첫 화면과, 타일 공급이 전부 막힌 환경의 폴백으로만 쓴다. */
 var HAS_COAST = (typeof COAST_LAYER !== 'undefined' && COAST_LAYER);
-var curBase = HAS_COAST ? 'base' : 'lite';
-if (!HAS_COAST) getBase_('lite').addTo(map);
 
-/* 타일을 켜면 내장 해안선은 숨긴다 — 위성 사진 위에 선이 덮이면 안 된다 */
+/* 내장 약도 보이기/걷기 — 타일이 로드되면 걷는다 */
 function coastVis_(show){
   if (!HAS_COAST) return;
   if (show){ if (!map.hasLayer(COAST_LAYER)) COAST_LAYER.addTo(map); }
   else { if (map.hasLayer(COAST_LAYER)) map.removeLayer(COAST_LAYER); }
 }
 
+var curBase = 'dark';
+getBase_('dark').addTo(map);
+
 function setBase_(k){
   if (k === curBase) return;
-  if (k !== 'base' && !TILE_SRC[k]) return;
+  if (!TILE_SRC[k]) return;
   var old = LIVE[curBase];
   if (old && map.hasLayer(old)) map.removeLayer(old);
   if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
-  if (k !== 'base'){                       // 'base' 는 내장 해안선만 쓴다
-    var nx = getBase_(k);
-    nx.addTo(map); nx.bringToBack();
-    if (k === 'sat') SATLBL.addTo(map);
-    coastVis_(false);
-  } else {
-    coastVis_(true);
-  }
+  var nx = getBase_(k);
+  nx.addTo(map); nx.bringToBack();
+  if (k === 'sat') SATLBL.addTo(map);
+  coastVis_(false);
   curBase = k;
   document.body.className = document.body.className.replace(/\s*map-sat\b/,'') + (k === 'sat' ? ' map-sat' : '');
   var bs = document.querySelectorAll('.basebtn');
@@ -6020,16 +6020,10 @@ function setBase_(k){
 var baseCtl = L.control({position:'bottomleft'});
 baseCtl.onAdd = function(){
   var d = L.DomUtil.create('div','basesw');
-  d.innerHTML = '<button class="basebtn on" data-b="base" type="button">기본</button>'
+  d.innerHTML = '<button class="basebtn on" data-b="dark" type="button">지도</button>'
               + '<button class="basebtn" data-b="sat" type="button">위성</button>'
-              + '<button class="basebtn" data-b="lite" type="button">지도</button>';
+              + '<button class="basebtn" data-b="lite" type="button">밝게</button>';
   L.DomEvent.disableClickPropagation(d);
-  // 해안선이 없는 판은 '지도'가 기본이다
-  if (!HAS_COAST){
-    var bs0 = d.querySelectorAll('.basebtn');
-    for (var j=0;j<bs0.length;j++)
-      bs0[j].className = 'basebtn' + (bs0[j].getAttribute('data-b') === 'lite' ? ' on' : '');
-  }
   L.DomEvent.on(d, 'click', function(e){
     var t = e.target;
     while (t && t !== d && !(t.className && String(t.className).indexOf('basebtn') >= 0)) t = t.parentNode;
@@ -6038,7 +6032,7 @@ baseCtl.onAdd = function(){
   return d;
 };
 baseCtl.addTo(map);
-try { var sv = localStorage.getItem('hrn_base'); if (sv && sv !== 'base' && sv !== 'dark') setBase_(sv); } catch(e){}
+try { var sv = localStorage.getItem('hrn_base'); if (sv === 'sat' || sv === 'lite') setBase_(sv); } catch(e){}
 
 /* 핀 — 원은 좌표 위에 뜨고, 꼬리 끝과 흰 점이 실제 좌표를 가리킨다.
    iconAnchor 의 세로값 = 원 높이 + 꼬리 + 점까지의 거리 */
