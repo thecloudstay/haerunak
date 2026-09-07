@@ -726,6 +726,10 @@ h1,h2,h3,h4,p{margin:0}
   background:linear-gradient(100deg,#ffb020,#ff8a3d);color:#241302;
   box-shadow:0 2px 9px rgba(255,176,32,.4);
 }
+.eosw .basebtn.gg.on{
+  background:linear-gradient(100deg,#37c4f2,#2a8fd8);color:#04202e;
+  box-shadow:0 2px 9px rgba(55,196,242,.4);
+}
 .basesw{
   display:flex;gap:3px;padding:4px;
   background:#0a1e2b;border:1px solid rgba(140,200,235,.3);
@@ -6044,21 +6048,31 @@ baseCtl.onAdd = function(){
 baseCtl.addTo(map);
 try { var sv = localStorage.getItem('hrn_base'); if (sv === 'sat' || sv === 'lite') setBase_(sv); } catch(e){}
 
-/* 어장 켜고 끄기 — 기본은 켬. 확대(10레벨)해야 그려진다 */
+/* 어장·갯골 켜고 끄기 — 기본은 켬. 어장은 10레벨, 갯골은 12레벨부터 그려진다 */
 var eoCtl = L.control({position:'bottomleft'});
 eoCtl.onAdd = function(){
   var d = L.DomUtil.create('div','basesw eosw');
-  d.innerHTML = '<button class="basebtn on" id="eoBtn" type="button">어장 표시</button>';
+  d.innerHTML = '<button class="basebtn on" id="eoBtn" type="button">어장</button>'
+              + '<button class="basebtn on gg" id="ggBtn" type="button">갯골</button>';
   L.DomEvent.disableClickPropagation(d);
-  L.DomEvent.on(d, 'click', function(){
-    EO_ON = !EO_ON;
-    var b = d.querySelector('#eoBtn');
-    b.className = 'basebtn' + (EO_ON ? ' on' : '');
-    if (EO_ON && map.getZoom() < EO_MINZ) toast('지도를 확대하면 어장 구역이 보입니다');
-    eoVis_();
-    try { localStorage.setItem('hrn_eo', EO_ON ? '1' : '0'); } catch(e){}
+  L.DomEvent.on(d, 'click', function(e){
+    var t = e.target;
+    if (t && t.id === 'eoBtn'){
+      EO_ON = !EO_ON;
+      t.className = 'basebtn' + (EO_ON ? ' on' : '');
+      if (EO_ON && map.getZoom() < EO_MINZ) toast('지도를 확대하면 어장 구역이 보입니다');
+      eoVis_();
+      try { localStorage.setItem('hrn_eo', EO_ON ? '1' : '0'); } catch(err){}
+    } else if (t && t.id === 'ggBtn'){
+      GG_ON = !GG_ON;
+      t.className = 'basebtn gg' + (GG_ON ? ' on' : '');
+      if (GG_ON && map.getZoom() < GG_MINZ) toast('지도를 확대하면 갯골(물길)이 보입니다');
+      ggVis_();
+      try { localStorage.setItem('hrn_gg', GG_ON ? '1' : '0'); } catch(err){}
+    }
   });
   try { if (localStorage.getItem('hrn_eo') === '0'){ EO_ON = false; d.querySelector('#eoBtn').className = 'basebtn'; } } catch(e){}
+  try { if (localStorage.getItem('hrn_gg') === '0'){ GG_ON = false; d.querySelector('#ggBtn').className = 'basebtn gg'; } } catch(e){}
   return d;
 };
 eoCtl.addTo(map);
@@ -6212,6 +6226,85 @@ function eoVis_(){
 }
 map.on('moveend zoomend', eoVis_);
 
+/* ══════════════ 갯골 오버레이 — 개방해 갯골(상세) 4만6천여 개 ══════════════
+ * 갯벌 고립사고의 주범. 밀물 때 갯골부터 물이 차서 퇴로가 끊긴다.
+ * 12레벨 이상 확대했을 때 보이는 0.25도 조각만 받는다. */
+var GG_LAYER = L.layerGroup();
+var GG_ON = true, GG_MINZ = 12;
+var GG_IDX = null, GG_CELL = {};
+var GG_POP = '<div style="max-width:210px;line-height:1.5"><b style="color:#4dd7ff">〰 갯골(물길)</b>'
+  + '<br>밀물 때 이곳부터 물이 찹니다 — <b style="color:#ff9c9c">갯골 건너편에 있으면 퇴로가 끊깁니다</b>.'
+  + '<br><span style="color:#888">들어가기 전에 돌아올 길에 갯골이 없는지 확인하세요 · 출처 국립해양조사원</span></div>';
+function ggDrawCell_(key){
+  var feats = GG_CELL[key];
+  if (!feats || feats === 'loading' || feats._drawn) return;
+  feats._drawn = true;
+  feats.forEach(function(rings){
+    rings.forEach(function(ring){
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color:'#37c4f2', weight:1,
+                                 opacity:.65, fillColor:'#37c4f2', fillOpacity:.22 });
+      pg.bindPopup(GG_POP);
+      pg.addTo(GG_LAYER);
+    });
+  });
+}
+function ggRefresh_(){
+  if (!GG_ON || map.getZoom() < GG_MINZ) return;
+  var load = function(){
+    if (!GG_IDX || !GG_IDX.cells) return;
+    var b = map.getBounds(), G = GG_IDX.grid || .25;
+    GG_IDX.cells.forEach(function(c){
+      if (c.y > b.getNorth() || c.y + G < b.getSouth()) return;
+      if (c.x > b.getEast()  || c.x + G < b.getWest())  return;
+      var key = c.y + '|' + c.x;
+      if (GG_CELL[key]){ ggDrawCell_(key); return; }
+      GG_CELL[key] = 'loading';
+      fetch('data/gg/' + c.f).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j){ GG_CELL[key] = j; ggDrawCell_(key); } else delete GG_CELL[key]; })
+        .catch(function(){ delete GG_CELL[key]; });
+    });
+  };
+  if (GG_IDX && GG_IDX !== 'loading'){ load(); return; }
+  if (GG_IDX === 'loading') return;
+  GG_IDX = 'loading';
+  fetch('data/gg/index.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ GG_IDX = j || {cells:[]}; load(); })
+    .catch(function(){ GG_IDX = {cells:[]}; });
+}
+function ggVis_(){
+  var show = GG_ON && map.getZoom() >= GG_MINZ;
+  if (show){ if (!map.hasLayer(GG_LAYER)) GG_LAYER.addTo(map); ggRefresh_(); }
+  else { if (map.hasLayer(GG_LAYER)) map.removeLayer(GG_LAYER); }
+}
+map.on('moveend zoomend', ggVis_);
+
+/* ══════════════ 낚시금지·제한구역 — 낚시 관리 및 육성법 ══════════════ */
+var NF_LAYER = L.layerGroup().addTo(map);
+function nfPopup_(z){
+  return '<div style="max-width:220px;line-height:1.5">'
+    + '<b style="color:#ff6b9d">🚫 낚시' + z.t + '구역</b><br><b>' + (z.n || '') + '</b>'
+    + (z.a ? '<br><span style="color:#666">' + z.a + '</span>' : '')
+    + '<br>낚시 관리 및 육성법에 따른 ' + z.t + ' 구역입니다'
+    + (z.t === '금지' ? ' — <b style="color:#ff9c9c">여기서 낚시하면 과태료</b>' : '')
+    + '<br><span style="color:#667">출처 국립해양조사원</span></div>';
+}
+function loadNofish_(){
+  if (loadNofish_._done) return; loadNofish_._done = true;
+  fetch('data/nofish.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if (!j || !j.list) return;
+      j.list.forEach(function(z){
+        (z.p || []).forEach(function(ring){
+          var pg = L.polygon(ring, { renderer: EO_RENDER, color:'#ff5c8a', weight:1.4,
+                                     opacity:.8, fillColor:'#ff5c8a', fillOpacity:.18 });
+          pg.bindTooltip('🚫 낚시' + z.t + (z.n ? ' · ' + z.n : ''), { direction:'top', opacity:.9 });
+          pg.bindPopup(nfPopup_(z));
+          pg.addTo(NF_LAYER);
+        });
+      });
+    }).catch(function(){});
+}
+
 /* ══════════════ 데이터 ══════════════ */
 
 /* ══════════════ 주소로 바로 들어오기 ══════════════
@@ -6302,6 +6395,7 @@ function load(){
       S.gen = res.generated;
       render();
       loadZones_();
+      loadNofish_();
       if (FEED === null) loadFeed_(); else buildTicker_();
       if (!S._routed){ S._routed = true; applyRoute_(); }
     })
