@@ -718,6 +718,14 @@ h1,h2,h3,h4,p{margin:0}
 .leaflet-bottom.leaflet-left .leaflet-control.basesw{
   margin:0 0 calc(162px + var(--safeB)) 12px;
 }
+/* 어장 토글은 베이스맵 전환 위에 얹는다 */
+.leaflet-bottom.leaflet-left .leaflet-control.eosw{
+  margin:0 0 8px 12px;
+}
+.eosw .basebtn.on{
+  background:linear-gradient(100deg,#ffb020,#ff8a3d);color:#241302;
+  box-shadow:0 2px 9px rgba(255,176,32,.4);
+}
 .basesw{
   display:flex;gap:3px;padding:4px;
   background:#0a1e2b;border:1px solid rgba(140,200,235,.3);
@@ -6036,6 +6044,25 @@ baseCtl.onAdd = function(){
 baseCtl.addTo(map);
 try { var sv = localStorage.getItem('hrn_base'); if (sv === 'sat' || sv === 'lite') setBase_(sv); } catch(e){}
 
+/* 어장 켜고 끄기 — 기본은 켬. 확대(10레벨)해야 그려진다 */
+var eoCtl = L.control({position:'bottomleft'});
+eoCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw eosw');
+  d.innerHTML = '<button class="basebtn on" id="eoBtn" type="button">어장 표시</button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(){
+    EO_ON = !EO_ON;
+    var b = d.querySelector('#eoBtn');
+    b.className = 'basebtn' + (EO_ON ? ' on' : '');
+    if (EO_ON && map.getZoom() < EO_MINZ) toast('지도를 확대하면 어장 구역이 보입니다');
+    eoVis_();
+    try { localStorage.setItem('hrn_eo', EO_ON ? '1' : '0'); } catch(e){}
+  });
+  try { if (localStorage.getItem('hrn_eo') === '0'){ EO_ON = false; d.querySelector('#eoBtn').className = 'basebtn'; } } catch(e){}
+  return d;
+};
+eoCtl.addTo(map);
+
 /* 핀 — 원은 좌표 위에 뜨고, 꼬리 끝과 흰 점이 실제 좌표를 가리킨다.
    iconAnchor 의 세로값 = 원 높이 + 꼬리 + 점까지의 거리 */
 var PIN_TAIL = 13, PIN_TAIL_SM = 10;
@@ -6107,6 +6134,82 @@ function loadZones_(){
     }).apiZones();
   } catch(e){}
 }
+
+/* ══════════════ 어장 오버레이 — 국립해양조사원 어장정보도 2025 ══════════════
+ * 면허어장 지적 1만4천여 개. 해루질꾼에게 제일 중요한 건 마을어업 구역이다 —
+ * 어촌계가 관리하는 수역이라 조개·해조류를 캐면 수산업법 위반(어업권 침해)이 된다.
+ * 전국 4MB 를 0.5도 격자 54조각으로 쪼개 두고, 확대했을 때 보이는 조각만 받는다. */
+var EO_RENDER = L.canvas({ padding: .3 });          // 폴리곤이 많아 캔버스로 그린다
+var EO_LAYER  = L.layerGroup().addTo(map);
+var EO_ON = true, EO_MINZ = 10;
+var EO_IDX = null, EO_CELL = {};                     // 셀 캐시: 'y|x' → 도형 배열|'loading'
+var EO_STYLE = {
+  M: { c:'#ffb020', fo:.20 },   // 마을어업 — 경고색
+  P: { c:'#8f9ff5', fo:.12 },   // 패류양식
+  H: { c:'#3ec98f', fo:.12 },   // 해조류양식
+  Y: { c:'#b39af0', fo:.12 },   // 기타 양식
+  J: { c:'#41b9d5', fo:.12 }    // 정치망
+};
+var EO_NAME = { M:'마을어업 (어촌계 관리수역)', P:'패류 양식장', H:'해조류 양식장', Y:'양식장', J:'정치망 어장' };
+function eoPopup_(f){
+  var s = '<div style="max-width:230px;line-height:1.5">'
+    + '<b style="color:' + EO_STYLE[f.k].c + '">■ ' + EO_NAME[f.k] + '</b>';
+  if (f.f) s += '<br>품목: ' + f.f;
+  if (f.a) s += '<br>' + f.a;
+  if (f.ha) s += '<br>면적 ' + f.ha + 'ha';
+  if (f.k === 'M')
+    s += '<br><b style="color:#e88">여기서 조개·해조류를 캐면 안 됩니다</b>'
+       + '<br><span style="color:#888">어촌계 면허 수역 — 수산업법 위반(어업권 침해) 소지</span>';
+  else if (f.k === 'J')
+    s += '<br><span style="color:#888">그물이 설치된 수역입니다 — 가까이 가지 마세요</span>';
+  else
+    s += '<br><span style="color:#888">면허 양식장입니다 — 시설물·양식물에 손대면 안 됩니다</span>';
+  s += '<br><span style="color:#667">출처 국립해양조사원 어장정보도</span></div>';
+  return s;
+}
+function eoDrawCell_(key){
+  var feats = EO_CELL[key];
+  if (!feats || feats === 'loading' || feats._drawn) return;
+  feats._drawn = true;
+  feats.forEach(function(f){
+    (f.p || []).forEach(function(ring){
+      var st = EO_STYLE[f.k] || EO_STYLE.Y;
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color: st.c, weight: 1,
+                                 opacity: .55, fillColor: st.c, fillOpacity: st.fo });
+      pg.bindPopup(eoPopup_(f));
+      pg.addTo(EO_LAYER);
+    });
+  });
+}
+function eoRefresh_(){
+  if (!EO_ON || map.getZoom() < EO_MINZ){ return; }
+  var load = function(){
+    if (!EO_IDX || !EO_IDX.cells) return;
+    var b = map.getBounds();
+    EO_IDX.cells.forEach(function(c){
+      if (c.y > b.getNorth() || c.y + .5 < b.getSouth()) return;
+      if (c.x > b.getEast()  || c.x + .5 < b.getWest())  return;
+      var key = c.y + '|' + c.x;
+      if (EO_CELL[key]){ eoDrawCell_(key); return; }
+      EO_CELL[key] = 'loading';
+      fetch('data/eo/' + c.f).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j){ EO_CELL[key] = j; eoDrawCell_(key); } else delete EO_CELL[key]; })
+        .catch(function(){ delete EO_CELL[key]; });
+    });
+  };
+  if (EO_IDX){ load(); return; }
+  if (EO_IDX === 'loading') return;
+  EO_IDX = 'loading';
+  fetch('data/eo/index.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ EO_IDX = j || {cells:[]}; load(); })
+    .catch(function(){ EO_IDX = {cells:[]}; });
+}
+function eoVis_(){
+  var show = EO_ON && map.getZoom() >= EO_MINZ;
+  if (show){ if (!map.hasLayer(EO_LAYER)) EO_LAYER.addTo(map); eoRefresh_(); }
+  else { if (map.hasLayer(EO_LAYER)) map.removeLayer(EO_LAYER); }
+}
+map.on('moveend zoomend', eoVis_);
 
 /* ══════════════ 데이터 ══════════════ */
 
