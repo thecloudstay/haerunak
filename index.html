@@ -744,6 +744,8 @@ body.map-sat .vignette{
 }
 body.map-sat .pin{box-shadow:0 0 0 2px rgba(0,0,0,.45),0 3px 12px rgba(0,0,0,.6)}
 body.map-sat .leaflet-container{background:#0b1a22}
+/* OSM 타일 다크 모드 — 색을 뒤집고 색상환을 되돌려 어두운 지도로 만든다 */
+.osm-dark{filter:invert(1) hue-rotate(180deg) brightness(.94) contrast(.88) saturate(.68)}
 
 .vignette{
   position:fixed;inset:0;z-index:1;pointer-events:none;
@@ -5934,11 +5936,10 @@ var COAST_LAYER = L.geoJSON(COAST, {
 var TILE_TAIL = ' | 물때 자체 조석계산 · 기상 Open-Meteo';
 var TILE_SRC = {
   dark: [
-    { u:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      a:'지도 OpenStreetMap · CARTO', mz:20, sd:'abcd' },
+    /* OSM 을 어둡게 뒤집어 쓴다 — 키가 필요 없고, 한글 지명·도로가 끝까지 나온다 */
+    { u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', a:'지도 OpenStreetMap', mz:19, sd:'abc', cl:'osm-dark' },
     { u:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-      a:'지도 Esri', mz:16 },
-    { u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', a:'지도 OpenStreetMap', mz:19, sd:'abc' }
+      a:'지도 Esri', mz:16 }
   ],
   sat: [
     { u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -5958,7 +5959,8 @@ var LIVE = {};          // 현재 붙어 있는 레이어
 function makeTile_(kind, idx){
   var c = TILE_SRC[kind] && TILE_SRC[kind][idx];
   if (!c) return null;
-  var opt = { attribution: c.a + TILE_TAIL, maxZoom: 19, maxNativeZoom: c.mz, className: 'basetiles' };
+  var opt = { attribution: c.a + TILE_TAIL, maxZoom: 19, maxNativeZoom: c.mz,
+              className: 'basetiles' + (c.cl ? ' ' + c.cl : '') };
   if (c.sd) opt.subdomains = c.sd;
   var tl = L.tileLayer(c.u, opt);
   var good = 0, bad = 0;
