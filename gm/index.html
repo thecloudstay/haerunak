@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리자</title>
+<style>
+body{margin:0;background:#05141f;color:#d7e8f2;font-family:'Pretendard Variable',Pretendard,'Noto Sans KR',sans-serif;min-height:100vh}
+.gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px}
+.gate input{padding:13px 16px;border-radius:12px;border:1px solid rgba(140,200,235,.35);background:#0a1e2b;color:#fff;font-size:16px;width:230px;text-align:center}
+.gate button{padding:13px 26px;border-radius:12px;border:0;background:linear-gradient(100deg,#2ee6a8,#35d0ff);color:#04121c;font-weight:800;font-size:15px;cursor:pointer}
+.gate p{color:#8ba6b8;font-size:13px}
+#app{display:none;max-width:760px;margin:0 auto;padding:18px}
+h1{font-size:19px}
+.warn{background:rgba(255,176,32,.12);border:1px solid rgba(255,176,32,.35);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.6;color:#fcd34d;margin-bottom:14px}
+.card{background:#0a1e2b;border:1px solid rgba(140,200,235,.22);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.card b{font-size:15px}
+.card .exp{color:#ff9c9c;font-weight:700}
+.card .sub{color:#8ba6b8;font-size:13px;line-height:1.6;margin-top:4px}
+.tagf{display:inline-block;padding:2px 9px;border-radius:8px;font-size:12px;font-weight:800;margin-right:6px}
+.f가무락{background:rgba(46,230,168,.18);color:#2ee6a8}
+.f백합{background:rgba(53,208,255,.18);color:#35d0ff}
+.f굴{background:rgba(255,176,32,.18);color:#ffb020}
+.f바지락{background:rgba(200,160,255,.2);color:#c8a0ff}
+a.map{color:#35d0ff;text-decoration:none;font-size:13px}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div style="font-size:34px">&#128274;</div>
+  <input id="pw" type="password" placeholder="비밀번호" autocomplete="off">
+  <button onclick="go()">열기</button>
+  <p id="msg">관리자 전용 자료입니다</p>
+</div>
+<div id="app">
+  <h1>강화도 조개 어장 — 면허 만료 목록</h1>
+  <div class="warn">&#9888; 관리자 전용 참고자료입니다. 면허가 만료됐어도 갱신 절차가 진행 중이거나 어촌계가 계속 관리하는 곳일 수 있습니다. 현장 안내판과 어촌계 확인이 우선입니다. 이 목록은 국립해양조사원 어장정보도(2025)의 면허 종료일 기준입니다.</div>
+  <div id="list"></div>
+</div>
+<script>
+var BLOB={"s": "ice1QgVrCTTvsJf2cHQ1qQ==", "i": "XZjjDG+4xxeHf9pp", "c": "ZhN0xV5X+1hjaBYpioqjG531DzkZBL/IwVmLmZyJ5ow0lqvWtbO/iTwnJeRkbQIGGjxJKbse+2TIaA2byzKIka36fbM1ov2OF1vvhla02t47KE6h6CHzXDQaUP1rLTbUnvCK5ogHVHltyvqt4dPAJ2hiGSZxld16+VGoUBE0ZdHNkb0rPTjALWvFTA0qlrjs4VRRsXpuw7V37xwW4f3587yHZA1ryWRu6foPhZB0Qia8t9UZ9AgKt2XsGdIdm1iQlBsrzLX2uF8MdYOnGhmSJ/zSQ/Z6u/X/M3kta8R8SSvXD4phN+dxzKRnka8Q7vWHAQJ15iayoHo8mmVEH0LyGW6ROaZcULRJhAZeSCUlkSdUbZKxpO1NSYwXXAQnbK53BCcIRagFdeQhhz2+phXjGLuGIdiBPHufZGSzXGhpw1ZmK6P9/WBBPNODSb08OUD6PxvjPALFbI5t9mPEy8nrbseTIqPdcxkns8zMkKt2K2ilmEVBnoOGwde8DyYjAoMRIhrI2n+Yhj8em0z36ItqP66icH1V5GGgxCGWglsepT5S2LGXWUlGeoYixAllsY6QgxxGOFcVM3vq+AwKDjLFRHHDhKHDGgxxG4P9rUGUV8VsOb8i0Tp3Bvw4ohGhrcmswaQLdfC7CrVjgexySUicA5yS10v9xKDV61Rppvc6JYNJjcUj3ZKI0ljhRLm81OIrtajDl/lE7L96mI105e7KZZ6PfqQ/XX5iYcXgum6Ot0gI5c3jX5IC/ah3k6183oMEjLceAcCeOhm9R7wwZQEZH3itRPV3ll5gBDyIuPfXciy3S7DLj1b2Sg92WJ4SWZUre2inIYyopD3u1KFwpIBcWXskn1aR6hiK93dcH9agA4JOqDsqCALEHY6Khui4By76KS4P1/FY51Mu8SEi/eAKwg71oZDu5yzHO1A0mivC7BDYgYyWa0HiA1e8PuaqsSrIi248hDPVWGLs0NMXYtOylSCusNjwsw/80BSm3Td5vc4QQ8s/ohNkRNm3+l9B88bIFjAeoZ8rfaD3X1d1RBtg4X8iRxYMZsNnPeFl6N2v01LvrTSEUlH5luejoFggX607PZN0UvON4NI95bNzEpu4oQKWRKyw3DXo/s+Mqt77mF4KYtyul6PXSPtfsF1dhPsVkXfaF/uS/WpfEciLUfIjsSwih5xzrX4z8aG3DIhpNjdg/SE3qi3Gq4rV8z63i6DB+xC5SkpAmYqz9H87oEFXJckH+mrKFVUPgtjYdquJyy3ctmPk89LJeLSbyzg1TgsmviW1AU/Fmm53D4mCP8Hee+pJ/5IKVbESemvT+F+G4zpFOmXPI9cGCbvGJUfYLrtGIaCaUW2c3HteemgcEkhh3a3hB7EfqxU93mAl58NI+dJEmzMOoG4P1Tuj0dMKo6zB7RH2ufnZYQPsDG1lsNLkgA/0hCr64E9hMqY9jnyUs4WRTufSRUCOUmiKL+pnczPr9tG5fHESIpSWoPW4+WvwSkKkw0wYIPJKcBV7Emkxx5n3xbBM/3f00RRUXH5YgA2nPxZnbA6TizJy6pjTnlVtfLvQPHpyawAg97GtMgYpNHVO0JWrbcAdF7+Ovyz+ocHdvPzHuY2tISTrXF+gvGxpFyiDqRuRr1i6IwwTGHO/JMX/aFfN/mJppeVRUsP+rnoXE9wrNcbb+Vd4LkduuhPSoRMTwI/wR/lkBc8q8ZWwYjPVzHVzh8ptOiqOSnM88XJ9qG53hRtpF69rTvgy4wQHY6RguJfiIUuljKmXloejGuDpnp6dh8nWZKaNmYZXkVWkVZJdYcnGbobPD9E+seKLhojNiCp0JupE9stRfwB5eDsAOPI887fgSL9x4unoKFPOzz0nKHpenIe8SECOcTmgLIxTo56phS7z2O38uxL2TW1+kan/MMznKMDI/8c56o8L55tJzczq2Bo9Frqtt/4yXZbEAnVgP856mNvER7sLYUiUSvsBHHmTP21rDPudpvXHN6SnNwrZb9uYShV108Z7mVTUtQzXV33BUOKEVFcqVqqORcFpsMBRPXLn3qa6U7UTIxYQsitDqXhalIU7T4wMwrzu2uFd3oiSLQOJULtjp/W902wJbGLw8nGcfAW338FjEMWf55CsCVkIzaMJAhvQhd8er7BZvG3JJ5sZ7DU6JNymbSck+2YwrtPK12x5+6Up2WUb8BIifWW84ikC8dMhtzX9AdLNvhFQNueQNE2ziwcV5NvlFNeUgO9fYEvSLqCuICSYRUUuaV6VYJhnanDqZflzcvie68qN4Xpf26Uzh1fwzw+QXj6vNNABjmMo5RQV98+WYhvubxuXz/84Sql7Zj1jcXZMl9c7rXidNc4YFGMV2+c45QPfMi+QA8UvcdzT81I2DxLZOp/j7sICtq7gpoKNkgWB+r8a8VFU3h7GPhDUH6+/FNcMJdJhngQ5XfMkZGUjQCT8bqa1ZJ9ZqJ90OUphKVtntJdLeU1g5qbFWEHWOYuon0zNjiLT4dY+Os0VPBosG/InMjWyr34jFsiLfPAwNelM1rTNomwS6sorqYdQHfV6YfMq5mb4rC5hJqVyIZPmxt2n9fVG9gsBUQ8yV9b7deVlEOeiqGiHQpfYJBhAiUnP2zkOBBnK+ijJGqZam9sXyDCpsb4wueCnIR2sHsE2e0DLU0VyPaGGWmOFEDQUT4bInzq2KwNa5Kx/J0Pom6hezpF2Ibjok09Zmq7VEXUFe9Lumgc06VqHBRn1TNQ5sOWtY3cv/RWAj+0wNkwSM3KUYesFrhLOVkKCx+ygnnHVLo7Dhx92BdPvZxpOxAdVA3EUrDBgX3cc6MROXv63vmFW9O3EyyzbrVXyyVCzTMkgL0HIJqpLxfXoPmDdg4aj2atS8M80B8tg0gDJq+yHO4LLtuylq+zZsx19k1qTja4d/M7uw/BoW887CZjjMDS1DMleX6Pqv7zMpQODMJ/vDAKum1/RF2tMeHcWFxQUIHxMQfs9l/lNKyBlcCzFI5SD6XW0b3kPGh4pDvqhmbWnZEgp0J/UKgXrYzfkiYG4ZXgFTAD1xPDTkMQKRPN9qr/NUrjr3qmDX7gvjjNct1CPeC7qpzMEaEs3E1TYJML8v3N8+TAaNp7LvWF1hoY3+6lMcQs2g2271irRIphpErMSs8/pmKiCchMeQRn82LARmtcWsscHsX3r/gjWkQaUfoeaLpQJMYZE/40h65/NJwjMKVHy7UXFuQLXnq8L6dDTolpa4Zeef8f27FiD4OBBkMfIjegBJ3g1AOKUqnPYqsOAlBZVmPq67QdMky/BwBeHHD8VtBX4JTfv0QcQB5js9WTrard7RikVk1fs6/xV4a9qscHGrdvOpe8XjIPYi4AMkMz5b+CkdkjbkQVAwmbQHHtABZCBv3D29yr3jnoG4XexGlv593WBg35TO52kGLnuaZVlQeLCqt1AYw7+zk0A2fbXv6abc4dePWrdmyLT1wBw+6yAUc8Z2pxspUrl+i7BwIZN8+IL7XqQ4bn6NtYbxGUGD42woLKjaJ0PzotlWbMq+T4NJdBVJeA95Qj4YyhcOpw+zZS33lz5AdwUbmRlaEj60yhwgsiGGgBQVgl+WwYtVAkD04RmfCvramGAaJKYdW97LkQN23K1zt0Zq1yMoNB/HweYhFZ34uIi5BK6akGnLlPNGwGxENl8z7WXoLPqo9dEUcZtt8bj08ROi36zg2PCdT0TiZsIsjz1EYhEeHhgT0bpfBOIZkmAoAhN+CfhhR0ruWcFzh8gdBI6ByzXOPdMJKHLS6PuChv9UJXJsQQvE778R9lrWXzimdLnTFvSInkoQ/et7WzB2h9InWhmU1U6sTZkz7ZhEE5A2GkC9rn3Cv8W6EZ0RhwL6j3AvTCs/1BSlWQWJ+BiDbT7nIGGRFNLVpb6Y4eOTrjXmCKaAfqbBz7ACnxnH37BEmHZ3oZ5NdDn0tpzSm+5xc9FbJkO7cjp2ySFtU1i4FJl/oaaidkI4XdTiFcQits6YrCd9mMo23+6ggPWGuZlzdHI5zTvUKlf/n41DmTpi3UkbJ0V5wxyGf3EkNGe/ies3kdsRQRp4R3OkcAO74UjIRMSQy/lmoiM1krPwmcnUENCpHNU3fDUdbKuYXmoIKdxSA+A/m+h8+fSbg7+W+8f7EmVpKw3LhJkkfH4bid5R1PbdebJ6Lakumxt3zAAZ96kUCuDE5wABiUwOuLlqakp7kbRbGW3XQFukjBNx664UuUOX9CbaZTgFIt8GTl8pzluBE8nQe1HTKD19O4PH8FK7OwUm/74rNeiQPIYXMjbl2vf7bjeTR8i7/5BGBhMGDoqy0owx/D/IeK1Ec2W26PAakgnND5S6L+taHFvx7NiRQsiyx0A5up0OcHdM2Cp50jDJMUIBa4D45CRoRw39if/NsyLeClEPesUhlXAHR9x2B3LeCoYKTLRDsuiP1HX+YC7El0/4RNNxEN+Pwj3zkEL004QuRzSDi81c1u7maMPC62e+7+ZRfzB4Pgeg/wrbkxA6eUl8w92/xaFj9WUGyoOEvMpz8/E+0s90RpK0fDmb9yBUxgjJdWXDu9uVvKTv/neuqBVtUoh5qqg1tcPWdDoQ7jtS/moC+UBc1zKgRzQ/bU1XyUfLFuV1Hq23vbbCVj0bbo/uRZjVXF1DlqROb06/v4fO1YbpB7pyj6DUh6mabVsMQ/mPM2mmUWacumn+b0Edi3GZTvAXpTudCbQlrGbSYgn+Ebix+JANQUcaCNoiX7NvQ+mZMTHQLGkVoI+7xoRwqzzKdb4sdn3qEKHT20BaSnd2KjMzsJo+l2cVZzOlrtQlRrmMZ1L+EKdhxPMVFht7NbiIXhbVrGgXXyUyN7i+Sr9ek1Acnak73Vy0E1EX2BZCHSINo+cSoxVE9117eeXXZNvJw42fZh733UqERjaJ+42m46aoxV8E62vCF8ByXsZOC5njzC4f1yr2KKUr9qiWbEF+Jr6sARSxVOvy6ERrGkdrVuZZ6gv3uLCIRAuO4vJcU50JLe7jEKvQipwAsE61wf732XtFhNBK4A5DPtaG44JydWBa+SBSdkcJO+vwu+bvCiPMySOQURpASKTCM0mFbLoeIwMn6niD/xRfT3Ky27NX0vwJmUwUEEJHNP7Z/sf1FYd29YMzZQjM2eicH/maYkn1hTwejwOf5KdVPKlbiI8NRPNyN72i4J/QQBak7pXLXCwYfBTtvCPoP+mGuYurls4keZdzXBN3j5HBXlev8Ecmk9Jr1hS+PROLNc/r/5BhQ0ruRf/zRt3cBg8kk+XxBKgSixYRM8MAQvjHkLvMaOZ3bmMrbWJT4I50WsbIBUxgx+q0sReS0fBOgiGqljtpYZHhPBprLWYBbUR/AOiqPYdnNl8h0Kjo9raq578uWgC3FFT82OPU/bsOqvwAlIoB7z2CvKiHcOQ6VGmK4uHExAGj/RtDA14Kmnyip0gdDVXKxhZMgzH/e8fhAkUhhd1XebUOMCIuNjKPqZZh/nMKjFQYScQubgiR1qrWSbcsgbLVmgLBkLhjQl31pajL+w/9JbEacuKRoAYZ7zmEaLB3ASGaqXG0FyD3zCB9wN4NN1Z+ZApVFNCCmrcRrOcXtHd9AktJD2myGGIStaN/FpmFYK+GHcfJlQKjdVNKg/0XGTho2V2K2pq9oXg0bSwnpKVBYRxuyAFYB/4SOudJCzHyb7Y1u/yjlaWQ08pDXIm6SNDxFMTc8bd/L+319Tt7TdI3HThIRU7ouNehEh9mMuHRaPVnD9wvYa3LUJYnE+DgcCWfxzdzUThJdNNhELrQ56laFr8MzclHqbZKHUedWh1VwNIHIUVr1mSOKBbgjcY2OtKiLO7M47hV3NB7Et4fn64iyump+44Aef+VdPeRvCZ7DuLXWe2SSo+9YCK2ZBo9jfyQVuxHAu4bunfAs3iOz9GyvXwvRnwWRkd/TR3JqzKH6iLpXy+K/GoKBgk8veVaHvmH8o/vvnjd2Xa+qO3cQxd06sKDJTjvv9wc7NhJtMS3twuVj6SFhjp6C811gPaNVcypIRK/lScsDyzNKtVOY5hGhdftyPrn/IpLxABS+UU5DYMRdeTfqk9Yso7V7ZoVZQf8IfuDb79RD+e0Wdg0TH/MBgVmAcIaFazW7y6X3I/995iYEcxjfBnP6Pbtx7fQX9Pq5djLWtwvyQYs/pYPBxHNUUUBchKJxsuPLxexljATc5c/WCaPaUTboIGtL1opDgPaZfLt5FJSLwJtKI11KUoqsJmM0auMSsik8Xxvom8h9aD5nVFeqQF+qheX75ougdoImvTIiksnlW5axkA"};
+function b64(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
+async function go(){
+  var pw=document.getElementById('pw').value;
+  try{
+    var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+    var key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(BLOB.s),iterations:200000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
+    var pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(BLOB.i)},key,b64(BLOB.c));
+    render(JSON.parse(new TextDecoder().decode(pt)));
+  }catch(e){ document.getElementById('msg').textContent='비밀번호가 맞지 않습니다'; }
+}
+document.getElementById('pw').addEventListener('keydown',function(e){if(e.key==='Enter')go();});
+function render(rows){
+  document.getElementById('gate').style.display='none';
+  document.getElementById('app').style.display='block';
+  var el=document.getElementById('list');
+  rows.forEach(function(r){
+    var d=document.createElement('div'); d.className='card';
+    var end=r.end.slice(0,4)+'.'+(+r.end.slice(4,6))+'.'+(+r.end.slice(6,8));
+    d.innerHTML='<span class="tagf f'+r.farm+'">'+r.farm+'</span><b>'+r.addr+'</b>'
+      +' <span class="exp">면허 만료 '+end+'</span>'
+      +'<div class="sub">'+r.knd+' &middot; '+r.ha+'ha &middot; 면허번호 '+r.no
+      +' &middot; <a class="map" target="_blank" rel="noopener" href="https://map.kakao.com/link/map/'+encodeURIComponent(r.addr)+','+r.la+','+r.lo+'">지도에서 보기</a></div>';
+    el.appendChild(d);
+  });
+}
+</script>
+</body>
+</html>
