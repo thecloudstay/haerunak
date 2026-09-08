@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>통영 물때표 · 오늘 만조·간조 시각 | 해루낚</title>
+<meta name="description" content="통영(사량도·욕지도·미륵도) 오늘의 물때와 만조·간조 시각, 조위(cm), 해루질 추천일(6~9물)을 한눈에. 남해 25개 포인트의 채집물·어종까지. 무료.">
+<link rel="canonical" href="https://haerunak.com/tide/tongyeong/">
+<meta property="og:title" content="통영 물때표 · 오늘 만조·간조 시각 | 해루낚">
+<meta property="og:description" content="통영(사량도·욕지도·미륵도) 오늘의 물때와 만조·간조 시각, 조위(cm), 해루질 추천일(6~9물)을 한눈에. 남해 25개 포인트의 채집물·어종까지. 무료.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://haerunak.com/tide/tongyeong/">
+<style>
+:root{--bg:#fff;--ink:#1b2a32;--mut:#6a7a84;--line:#e2e8ec;--line2:#eef2f5;--hi:#1565c0;--lo:#c25e00;--rec:#e39a00;--recbg:#fff6df;--recln:#f2cf7a;--brand:#0b7a5a;--brand2:#0aa07a;--sun:#d3453b;--sat:#1769c9}
+*{box-sizing:border-box}
+html,body{background:#eef1f3}
+body{margin:0;color:var(--ink);font-family:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.6}
+a{color:var(--brand)}
+.wrap{max-width:920px;margin:0 auto;padding:0 15px 60px}
+header{background:linear-gradient(100deg,var(--brand),var(--brand2));color:#fff;padding:11px 0}
+header .in{max-width:920px;margin:0 auto;padding:0 15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+header a{color:#fff;text-decoration:none;font-weight:800;font-size:16px}
+header .nav{margin-left:auto;display:flex;gap:14px;font-size:13px}
+header .nav a{font-weight:600;opacity:.92}
+.bc{font-size:12.5px;color:var(--mut);margin:14px 2px 4px}
+.bc a{color:var(--mut);text-decoration:none}
+h1{font-size:26px;letter-spacing:-.02em;margin:6px 0 6px}
+.lead{color:#40515a;font-size:14.5px;margin:0 0 4px;max-width:720px}
+.lead b{color:var(--ink)}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 6px 20px rgba(30,50,64,.06);padding:16px 18px;margin:16px 0}
+.card h2{font-size:17px;margin:0 0 4px}
+.card .sub{color:var(--mut);font-size:12.5px;margin:0 0 12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 6px;text-align:center;font-size:13px;border-bottom:1px solid var(--line2);font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-weight:800;font-size:12px;border-bottom:1px solid var(--line)}
+td.d{font-weight:800;text-align:left}
+td.d .wd{font-weight:600;color:var(--mut);font-size:11px}
+.mul{font-weight:800;color:#3b8f6f}
+tr.rec td{background:var(--recbg)}
+tr.rec .mul{color:#b07400}
+.star{color:var(--rec);font-weight:900}
+.hcol b{color:var(--hi)}.lcol b{color:var(--lo)}
+.today td{box-shadow:inset 0 2px 0 var(--brand)}
+.recnote{background:var(--recbg);border:1px solid var(--recln);border-radius:12px;padding:11px 14px;font-size:13.5px;color:#7a5200;margin:14px 0}
+.recnote b{color:var(--rec)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:6px}
+.pt{border:1px solid var(--line);border-radius:14px;padding:13px 14px;background:#fff}
+.pt-h{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+.pt-h b{font-size:15px}
+.pt-r{color:var(--mut);font-size:11.5px}
+.pt-tag{color:#51616a;font-size:12.5px;margin:5px 0 9px}
+.pt-sp,.pt-fx{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:4px 0}
+.lab{font-size:10.5px;font-weight:800;color:var(--mut);width:28px;flex:0 0 28px}
+.chip{background:#eef4f1;color:#2c6b53;border-radius:7px;padding:2px 7px;font-size:11.5px;font-weight:700}
+.pt-fx .chip{background:#eaf0f7;color:#2a5680}
+.pt-go{display:inline-block;margin-top:9px;font-size:12.5px;font-weight:800;text-decoration:none}
+.cta{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+.cta a{flex:1;min-width:150px;text-align:center;text-decoration:none;font-weight:800;font-size:14px;padding:13px;border-radius:13px}
+.cta .a1{background:linear-gradient(100deg,var(--brand),var(--brand2));color:#fff}
+.cta .a2{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.faq{margin-top:18px}
+.faq h2{font-size:18px;margin:0 0 8px}
+.faq dt{font-weight:800;margin:12px 0 3px}
+.faq dd{margin:0;color:#40515a;font-size:13.5px}
+footer{color:var(--mut);font-size:12px;line-height:1.7;margin-top:26px;border-top:1px solid var(--line);padding-top:14px}
+footer a{color:var(--brand)}
+@media(max-width:560px){h1{font-size:22px}th,td{padding:7px 3px;font-size:11.5px}.lab{display:none}}
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[
+{"@type":"ListItem","position":1,"name":"해루낚","item":"https://haerunak.com/"},
+{"@type":"ListItem","position":2,"name":"지역별 물때","item":"https://haerunak.com/tide/"},
+{"@type":"ListItem","position":3,"name":"통영 물때표","item":"https://haerunak.com/tide/tongyeong/"}]}
+</script>
+</head>
+<body>
+<header><div class="in"><a href="/">🌊 해루낚</a><div class="nav"><a href="/">지도</a><a href="/tide/">지역물때</a><a href="/calendar/">물때달력</a><a href="/species/">어종도감</a></div></div></header>
+<div class="wrap">
+  <p class="bc"><a href="/">홈</a> › <a href="/tide/">지역별 물때</a> › 통영</p>
+  <h1>통영 물때표</h1>
+  <p class="lead"><b>통영</b>(사량도·욕지도·미륵도)의 오늘 물때와 만조·간조 시각, 조위(cm), <b class="star">해루질 추천일(★)</b>을 한눈에. 남해 25개 포인트의 채집물·어종별 추천까지 무료로 확인하세요. 물이 가장 많이 빠지는 <b>사리(6~9물)</b>가 갯벌 해루질 황금기입니다.</p>
+
+  <div class="card">
+    <h2 id="repName">오늘의 물때</h2>
+    <p class="sub" id="repSub"></p>
+    <table><thead><tr><th>날짜</th><th>물때</th><th>해루질</th><th>만조 시각·조위</th><th>간조 시각·조위</th></tr></thead>
+    <tbody id="tbody"><tr><td colspan="5" style="color:#9db">물때 계산 중…</td></tr></tbody></table>
+  </div>
+  <p class="recnote"><b>★ 해루질 추천일</b> — 이번 주 <b id="recDays">-</b>. 조차가 커 갯벌이 넓게 드러나는 사리(6~9물)권으로, 간조 전후 1~2시간이 낙지·바지락 채집 황금 타이밍입니다.</p>
+
+  <div class="card">
+    <h2>통영 해루질·낚시 포인트 (25곳)</h2>
+    <p class="sub">각 자리에서 실제로 나오는 채집물과 어종입니다. 「지도에서 보기」로 그날 물때·추천 점수를 확인하세요.</p>
+    <div class="grid">
+<div class="pt"><div class="pt-h"><b>통영</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">섬 낚시 관문</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">볼락</span><span class="chip">감성돔</span><span class="chip">무늬오징어</span></div><a class="pt-go" href="https://haerunak.com/?spot=25">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>소매물도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">등대섬 갯바위</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=234">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>사량도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">볼락 명당</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=28">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>욕지도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">원도 대물</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">참돔</span><span class="chip">부시리</span><span class="chip">무늬오징어</span></div><a class="pt-go" href="https://haerunak.com/?spot=29">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>한산도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">제승당, 차 싣고 진입</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">볼락</span><span class="chip">감성돔</span><span class="chip">무늬오징어</span></div><a class="pt-go" href="https://haerunak.com/?spot=1077">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>용초도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">한산도 옆 조용한 섬</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=24">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>비진도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">산호빛 해변, 물 맑음</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">거북손</span><span class="chip">문어</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=1026">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>매물도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">대매물도, 갯바위</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=252">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>연화도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">용머리 절벽</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=256">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>통영 우도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">매물도 옆</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=998">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>두미도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">욕지 옆 원도</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=990">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>추도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">물메기 산지</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=398">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>곤리도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">배 10분, 볼락 명당</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=1017">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>학림도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">한산면 작은 섬</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=1023">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>통영 홍도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">무인 원도, 대물 전용</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">부시리</span><span class="chip">참돔</span><span class="chip">돌돔</span></div><a class="pt-go" href="https://haerunak.com/?spot=249">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>갈도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">남해 최고 갯바위 중 하나</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=399">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>국도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">무인도 대물터</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">군소</span><span class="chip">거북손</span><span class="chip">문어</span><span class="chip">뿔소라</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">우럭</span></div><a class="pt-go" href="https://haerunak.com/?spot=1417">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>견내량</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">물살에 자란 돌미역, 발밑이 급류다</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">미역</span><span class="chip">굴</span><span class="chip">고둥</span><span class="chip">거북손</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">볼락</span><span class="chip">감성돔</span><span class="chip">농어</span></div><a class="pt-go" href="https://haerunak.com/?spot=14">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>수우도</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">기암 아래 돌밭, 거북손이 층으로 붙음</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">보말</span><span class="chip">거북손</span><span class="chip">돌멍게</span><span class="chip">군소</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">볼락</span><span class="chip">감성돔</span><span class="chip">벵에돔</span></div><a class="pt-go" href="https://haerunak.com/?spot=539">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>풍화리</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">산양읍 서쪽, 개조개 나오는 자갈펄</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">바지락</span><span class="chip">개조개</span><span class="chip">굴</span><span class="chip">고둥</span><span class="chip">돌멍게</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">볼락</span><span class="chip">감성돔</span><span class="chip">쥐노래미</span></div><a class="pt-go" href="https://haerunak.com/?spot=258">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>사량도 대항 갯바위</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">지리산 조망 갯바위 명당</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">거북손</span><span class="chip">홍합</span><span class="chip">고둥</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">벵에돔</span><span class="chip">볼락</span></div><a class="pt-go" href="https://haerunak.com/?spot=2200">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>욕지도 삼여 갯바위</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">욕지도 대표 참돔 포인트</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">홍합</span><span class="chip">전복</span><span class="chip">군소</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">참돔</span><span class="chip">감성돔</span><span class="chip">돌돔</span></div><a class="pt-go" href="https://haerunak.com/?spot=2201">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>연화도 용머리</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">용머리 해안 갯바위 명당</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">홍합</span><span class="chip">거북손</span><span class="chip">고둥</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">벵에돔</span><span class="chip">감성돔</span><span class="chip">돌돔</span></div><a class="pt-go" href="https://haerunak.com/?spot=2202">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>미륵도 달아공원</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">한려수도 조망 갯바위</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">고둥</span><span class="chip">홍합</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">학공치</span></div><a class="pt-go" href="https://haerunak.com/?spot=2203">지도에서 물때·추천 보기 →</a></div>
+<div class="pt"><div class="pt-h"><b>통영 영운리 방파제</b><span class="pt-r">경남 통영</span></div><p class="pt-tag">산양관광도로 갯바위</p><div class="pt-sp"><span class="lab">채집</span><span class="chip">홍합</span><span class="chip">거북손</span><span class="chip">고둥</span></div><div class="pt-fx"><span class="lab">어종</span><span class="chip">감성돔</span><span class="chip">볼락</span><span class="chip">학공치</span></div><a class="pt-go" href="https://haerunak.com/?spot=2615">지도에서 물때·추천 보기 →</a></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <a class="a1" href="https://haerunak.com/">🗺 통영 지도로 물때·추천 보기</a>
+    <a class="a2" href="/calendar/">📅 한 달 물때달력 무료 인쇄</a>
+  </div>
+
+  <div class="faq card">
+    <h2>통영 물때 자주 묻는 질문</h2>
+    <dl>
+      <dt>통영 해루질은 언제 가야 하나요?</dt>
+      <dd>물이 가장 많이 빠지는 <b>사리(6~9물)</b>의 간조 전후 1~2시간이 가장 좋습니다. 위 물때표에서 ★ 표시된 날을 참고하세요. 야간에는 달빛이 적은 날이 낙지·꽃게 채집에 유리합니다.</dd>
+      <dt>만조·간조 시각은 매일 어떻게 바뀌나요?</dt>
+      <dd>물때는 하루 약 50분씩 늦어집니다. 통영은 남해 물때 기준이며, 자세한 날짜별 시각은 위 표와 지도에서 확인할 수 있습니다.</dd>
+      <dt>조위(cm) 숫자는 무슨 뜻인가요?</dt>
+      <dd>그 시각의 바닷물 높이입니다. 간조 조위가 낮을수록 갯벌이 더 넓게 드러나 해루질에 좋습니다.</dd>
+    </dl>
+  </div>
+
+  <footer>
+    물때는 해루낚 자체 조석계산 기준입니다(공식 예보 연동 준비 중). 실제 출조 전 현장 물때를 한 번 더 확인하세요. · 대상 포인트: 통영, 소매물도, 사량도, 욕지도, 한산도, 용초도, 비진도, 매물도, 연화도, 통영 우도, 두미도, 추도, 곤리도, 학림도, 통영 홍도, 갈도, 국도, 견내량, 수우도, 풍화리, 사량도 대항 갯바위, 욕지도 삼여 갯바위, 연화도 용머리, 미륵도 달아공원, 통영 영운리 방파제 · <a href="/tide/">다른 지역 물때 보기</a> · <a href="/">해루낚 지도</a> · 무단 재판매 금지.
+  </footer>
+</div>
+<script>
+var SYN = 29.530588853;      // 삭망월(일)
+var LUNI_DAY = 24.8412;      // 태음일(시간)
+var SEMI = 12.4206;          // 반일주조 주기(시간)
+var MULTTAE = ['7물','8물','9물','10물','11물','12물','13물','조금','무시','1물','2물','3물','4물','5물','6물'];
+var REC_SET = {'6물':1,'7물':1,'8물':1,'9물':1};   // 해루질 추천 물때(조차 큰 사리권)
+function toJD_(d){ return d.getTime()/86400000 + 2440587.5; }
+function moonAge_(y,m,d){
+  var dt = new Date(Date.UTC(y, m-1, d, 3, 0, 0)); // KST 12시 = UTC 03시
+  var age = ((toJD_(dt) - 2451550.26) % SYN + SYN) % SYN;
+  return age;
+}
+function multtae_(age, sea){
+  var lunarDay = Math.round(age) + 1;
+  if (lunarDay > 30) lunarDay = 30;
+  var idx = (lunarDay - 1) % 15;
+  if (sea && sea !== 'W') idx = (idx + 1) % 15;
+  return { name: MULTTAE[idx], idx: idx, lunarDay: lunarDay };
+}
+function moonTransit_(age, lon){
+  var solarNoon = 12 + (135 - lon)/15;
+  return ((solarNoon + age * (LUNI_DAY - 24)) % LUNI_DAY + LUNI_DAY) % LUNI_DAY;
+}
+function calcTide_(p, y, mo, d){
+  var age = moonAge_(y, mo, d);
+  var eff = age - 1.0;
+  var phase = 2*Math.PI*eff/SYN;
+  var sf = 1 + 0.447*Math.cos(2*phase);
+  var anom = 1 + 0.05*Math.cos(2*Math.PI*(eff+3)/27.5545);
+  var range = p.mr * sf * anom * 0.94;
+  var msl = p.mr * 100 * 0.78;
+  var half = range * 100 / 2;
+  var base = moonTransit_(age, p.lo) + p.hi;
+  var ev = [];
+  for (var k = -2; k <= 3; k++){
+    var th = base + k*SEMI;
+    if (th >= 0 && th < 24) ev.push({k:'H', t:th, lv: Math.round(msl + half)});
+    var tl = base + k*SEMI + SEMI/2;
+    if (tl >= 0 && tl < 24) ev.push({k:'L', t:tl, lv: Math.round(msl - half)});
+  }
+  ev.sort(function(a,b){ return a.t - b.t; });
+  return { events: ev, range: range, src: 'calc' };
+}
+
+var REP={"n":"통영","r":"경남 통영","la":34.83578,"lo":128.41167,"mr":1.76,"hi":9.8};
+var WD=['일','월','화','수','목','금','토'];
+var MREC={'6물':1,'7물':1,'8물':1,'9물':1};
+function hm(h){var m=Math.round(((h%24)+24)%24*60);return('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);}
+(function(){
+  var now=new Date(Date.now()+9*36e5);
+  var y=now.getUTCFullYear(),mo=now.getUTCMonth()+1,d=now.getUTCDate();
+  document.getElementById('repName').textContent=REP.n+' 오늘의 물때';
+  document.getElementById('repSub').textContent=REP.r+' · '+y+'년 '+mo+'월 '+d+'일 기준 · 이후 7일';
+  var rows='',recD=[];
+  for(var k=0;k<7;k++){
+    var dt=new Date(Date.UTC(y,mo-1,d+k));
+    var Y=dt.getUTCFullYear(),M=dt.getUTCMonth()+1,D=dt.getUTCDate(),dow=dt.getUTCDay();
+    var t=calcTide_(REP,Y,M,D);
+    var age=moonAge_(Y,M,D),mt=multtae_(age,'W'),isRec=!!MREC[mt.name];
+    if(isRec)recD.push((M)+'/'+D);
+    var hi=t.events.filter(function(e){return e.k==='H';}),lo=t.events.filter(function(e){return e.k==='L';});
+    var hc=hi.map(function(e){return hm(e.t)+' <b>'+e.lv+'</b>';}).join('<br>')||'-';
+    var lc=lo.map(function(e){return hm(e.t)+' <b>'+e.lv+'</b>';}).join('<br>')||'-';
+    rows+='<tr class="'+(k===0?'today ':'')+(isRec?'rec':'')+'">'
+      +'<td class="d">'+M+'.'+D+' <span class="wd '+(dow===0?'sun':dow===6?'sat':'')+'">'+WD[dow]+'</span></td>'
+      +'<td class="mul">'+mt.name+(isRec?' <span class="star">★</span>':'')+'</td>'
+      +'<td>'+(isRec?'<span class="star">추천</span>':'-')+'</td>'
+      +'<td class="hcol">'+hc+'</td><td class="lcol">'+lc+'</td></tr>';
+  }
+  document.getElementById('tbody').innerHTML=rows;
+  document.getElementById('recDays').textContent=recD.length?recD.join(', ')+'일':'없음';
+})();
+</script>
+</body>
+</html>
