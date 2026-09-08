@@ -6712,14 +6712,26 @@ function kSync_(){
     kAlign_();
   } catch(e){}
 }
-/* 카카오 화면과 라이브러리 좌표의 미세 오차(브라우저 배율 등)를 재서 되민다 */
+/* 카카오 배경을 라이브러리(Leaflet) 좌표계에 정합시킨다.
+   ── 중심 정렬(translate)만으로는 부족하다. 카카오(EPSG:5181 TM)와 Leaflet(EPSG:3857 웹메르카토르)은
+      위도에 따라 축척(해상도)이 달라서, 중심은 맞아도 확대·가장자리로 갈수록 핀이 지형과 어긋난다.
+      그래서 두 지도의 「경도 1도당 화면 픽셀폭」을 재서 그 비율만큼 카카오 배경을 scale 로 맞춘다. */
 function kAlign_(){
   try {
     var c = map.getCenter();
-    var kp = KAKAO.map.getProjection().containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng));
+    var proj = KAKAO.map.getProjection();
+    var kp  = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng));
+    var dLng = 0.02;
+    var kp2 = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng + dLng));
+    var lp0 = map.latLngToContainerPoint([c.lat, c.lng]);
+    var lp1 = map.latLngToContainerPoint([c.lat, c.lng + dLng]);
+    var kpx = Math.abs(kp2.x - kp.x), lpx = Math.abs(lp1.x - lp0.x);
+    var s = (kpx > 0.5 && lpx > 0.5) ? (lpx / kpx) : 1;   // 카카오를 Leaflet 축척에 맞추는 배율
+    if (!isFinite(s) || s <= 0) s = 1;
+    s = Math.max(0.5, Math.min(2, s));
     var dx = KAKAO.div.clientWidth/2 - kp.x, dy = KAKAO.div.clientHeight/2 - kp.y;
-    KAKAO.div.style.transform = (Math.abs(dx) > .5 || Math.abs(dy) > .5)
-      ? 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)' : '';
+    KAKAO.div.style.transformOrigin = '50% 50%';
+    KAKAO.div.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + s.toFixed(4) + ')';
   } catch(e){}
 }
 function kSetType_(t){
