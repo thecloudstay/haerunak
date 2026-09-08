@@ -1731,7 +1731,7 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
 /* ══════════ 컴퓨터 화면(900px 이상) — 목록은 왼쪽 판, 원픽은 오른쪽, 지도는 개방 ══════════ */
 @media (min-width:900px){
   .topbar{left:12px;right:auto;width:392px;transform:none}
-  .datestrip{left:420px;right:436px;top:calc(16px + var(--safeT));z-index:17}
+  .datestrip{left:454px;right:436px;top:calc(16px + var(--safeT));z-index:17;justify-content:flex-start}
   .seg{left:12px;right:auto;transform:none;top:calc(104px + var(--safeT))}
   .filters{left:210px;right:auto;top:calc(111px + var(--safeT));padding:0;justify-content:flex-start;max-width:440px;z-index:21}
   .wantbar{left:12px;right:auto;width:368px;top:calc(150px + var(--safeT))}
@@ -1803,8 +1803,34 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
 @keyframes slidein{from{transform:translateX(-36px);opacity:0}to{transform:none;opacity:1}}
 
 
-/* 오늘 칸은 날짜줄 왼쪽에 붙박이 — 스크롤해도 항상 보인다 */
-.dchip.today{position:sticky;left:0;z-index:3;box-shadow:4px 0 10px rgba(3,12,20,.55)}
+/* 오늘 칸 강조 (붙박이 대신 — 돌아오기는 「오늘」 단추가 맡는다) */
+.dchip.today b{color:var(--acc)}
+
+
+/* 상세 날짜 이동줄 + 물때표 버튼 */
+.dt-daynav{display:flex;align-items:center;gap:8px;margin:2px 0 10px}
+.dt-daynav .dnav-btn{flex:0 0 auto;-webkit-appearance:none;appearance:none;cursor:pointer;
+  border:1px solid rgba(140,200,235,.3);background:rgba(255,255,255,.06);color:#cadeeb;
+  font-family:inherit;font-size:12.5px;font-weight:800;padding:9px 12px;border-radius:12px}
+.dt-daynav .dnav-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.dt-daynav .dnav-mid{flex:1;text-align:center;line-height:1.3}
+.dt-daynav .dnav-mid b{font-size:15px;color:var(--acc)}
+.dt-daynav .dnav-mid span{display:block;font-size:11.5px;color:var(--mut)}
+.dt-mtbtn{width:100%;-webkit-appearance:none;appearance:none;cursor:pointer;margin-bottom:14px;
+  border:1px solid rgba(53,208,255,.35);border-radius:13px;padding:12px;
+  background:linear-gradient(100deg,rgba(53,208,255,.14),rgba(46,230,168,.1));
+  color:#8fdcff;font-family:inherit;font-size:13.5px;font-weight:800}
+.dt-mtbtn:hover{background:linear-gradient(100deg,rgba(53,208,255,.22),rgba(46,230,168,.16));color:#fff}
+/* 확장 물때표 — 열 늘어난 판 */
+.mtcard:has(.mtt-full){width:min(940px,100%)}
+.mtt-full th,.mtt-full td{padding:8px 6px;font-size:12px}
+.mtt .mtsub{display:block;color:#6d8ba0;font-size:11px;font-weight:400}
+.mtt .mtsm{color:#b3c9d8;font-size:11.5px;line-height:1.5}
+.mtt .mth i.up,.mtt .mtl i.up{color:#ff8f8f;font-style:normal;font-size:10.5px;font-weight:700}
+.mtt .mth i.dn,.mtt .mtl i.dn{color:#7db8ff;font-style:normal;font-size:10.5px;font-weight:700}
+.mtt .mtfl{min-width:64px}
+.flowb{height:5px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;margin:0 auto 3px;max-width:52px}
+.flowb i{display:block;height:100%;background:linear-gradient(90deg,#35d0ff,#2ee6a8);border-radius:3px}
 
 </style>
 
@@ -2402,7 +2428,58 @@ var POINTS = [
 {i:70, n:'세화항', r:'제주 제주시', s:'J', la:33.52946, lo:126.85484, mr:1.62, hi:10.5, f:'rock', sp:['보말','뿔소라','박하지','톳'], fx:['참돔','벵에돔','무늬오징어','볼락','돌돔'], tag:'동등 갯바위 암반, 보말이랑 게 같이 나와'},
 {i:1223, n:'신창항', r:'제주 제주시', s:'J', la:33.34906, lo:126.18026, mr:1.42, hi:10.3, f:'mix', sp:['보말','뿔소라','군소','톳'], fx:['벵에돔','삼치','감성돔','방어'], tag:'풍차 밑 여밭, 간출암 많아 물때 잘 봐야'},
 {i:1197, n:'이호방파제', r:'제주 제주시', s:'J', la:33.5043, lo:126.45791, mr:1.62, hi:10.4, f:'sand', sp:['보말','뿔소라','톳','파래'], fx:['벵에돔','참돔','한치','농어','부시리'], tag:'모래바닥에 현무암 섞여, 여름 한치 밤낚시'},
-{i:312, n:'행원포구', r:'제주 제주시', s:'J', la:33.5583, lo:126.8083, mr:1.62, hi:10.5, f:'mix', sp:['보말','뿔소라','톳','파래'], fx:['참돔','벵에돔','볼락','무늬오징어','독가시치'], tag:'풍력단지 아래 조간대, 물때 맞으면 넓게 열려'}
+{i:312, n:'행원포구', r:'제주 제주시', s:'J', la:33.5583, lo:126.8083, mr:1.62, hi:10.5, f:'mix', sp:['보말','뿔소라','톳','파래'], fx:['참돔','벵에돔','볼락','무늬오징어','독가시치'], tag:'풍력단지 아래 조간대, 물때 맞으면 넓게 열려'},
+
+  /* ── 2026-09 서해권 해루질·숭어 명소 딥서치 추가 ── */
+  {i:1578, n:'오이도 갯벌', r:'경기 시흥', s:'W', la:37.3459, lo:126.6864, mr:6.08, hi:4.6, f:'mud', sp:['바지락','동죽','굴'], tag:'빨간등대 아래 오이도 어촌체험 갯벌, 오이도역 접근 용이'},
+  {i:1579, n:'시화방조제', r:'경기 시흥', s:'W', la:37.3097, lo:126.6125, mr:6.01, hi:4.7, f:'rock', sp:['소라','박하지','꽃게','갯가재'], tag:'시화나래휴게소 주변 석축, 야간 랜턴 해루질'},
+  {i:1580, n:'선감도', r:'경기 안산', s:'W', la:37.219, lo:126.628, mr:6.01, hi:4.7, f:'mud', isl:1, br:1, sp:['바지락','동죽'], tag:'선감어촌체험 갯벌, 불도방조제 인근'},
+  {i:1581, n:'누에섬·탄도', r:'경기 안산', s:'W', la:37.1832, lo:126.6425, mr:6.01, hi:4.7, f:'mix', isl:1, sp:['바지락','굴'], tag:'탄도항 옆 누에섬 진입로 양쪽 갯벌, 풍력발전기 일몰'},
+  {i:1582, n:'백미리 갯벌', r:'경기 화성', s:'W', la:37.1553, lo:126.6964, mr:6.21, hi:4.9, f:'mud', sp:['바지락','낙지','굴'], tag:'백미리어촌체험, 경운기 갯벌 진입'},
+  {i:1583, n:'전곡항 갯벌', r:'경기 화성', s:'W', la:37.1878, lo:126.6553, mr:6.01, hi:4.7, f:'mix', sp:['바지락','동죽'], tag:'전곡항 마리나 옆 갯벌, 인프라 양호'},
+  {i:1584, n:'동막해수욕장', r:'인천 강화', s:'W', la:37.5837, lo:126.4666, mr:6.01, hi:4.5, f:'mix', isl:1, br:1, sp:['백합','가무락','동죽'], tag:'분오리돈대 아래 4km 평지 갯벌, 초보용 명소, 해무 주의'},
+  {i:1585, n:'장화리', r:'인천 강화', s:'W', la:37.5993, lo:126.4023, mr:5.81, hi:4.5, f:'mud', isl:1, br:1, sp:['백합','가무락','낙지'], tag:'화도면 일몰조망지 앞 갯벌, 고립사고 이력 물때 주의'},
+  {i:1586, n:'여차리 갯벌', r:'인천 강화', s:'W', la:37.5877, lo:126.4139, mr:5.81, hi:4.5, f:'mud', isl:1, br:1, sp:['가무락','칠게','낙지'], tag:'강화갯벌센터 아래 펄갯벌, 저어새 도래지'},
+  {i:1587, n:'흥왕리 선착장', r:'인천 강화', s:'W', la:37.5795, lo:126.4335, mr:5.81, hi:4.5, f:'mud', isl:1, br:1, sp:['낙지','가무락'], tag:'동막 서쪽 4km, 선착장 도보 진입 뻘낙지'},
+  {i:1588, n:'신두리해수욕장', r:'충남 태안', s:'W', la:36.833, lo:126.19, mr:4.19, hi:4.5, f:'sand', sp:['명주조개','골뱅이','꽃게','맛조개'], tag:'해안사구 앞 모래갯벌, 야간 꽃게'},
+  {i:1589, n:'꽃지해수욕장', r:'충남 태안', s:'W', la:36.4757, lo:126.3308, mr:4.25, hi:4.7, f:'mix', isl:1, br:1, sp:['바지락','소라','꽃게','박하지'], tag:'할미할아비바위 주변 갯바위+모래펄'},
+  {i:1590, n:'파도리해수욕장', r:'충남 태안', s:'W', la:36.7346, lo:126.1329, mr:4.19, hi:4.5, f:'rock', sp:['소라','박하지','해삼','낙지'], tag:'몽돌·갯바위 해변, 가족 야간 소라·박하지'},
+  {i:1591, n:'연포해수욕장', r:'충남 태안', s:'W', la:36.7648, lo:126.2299, mr:4.46, hi:4.6, f:'sand', sp:['바지락','맛조개','소라','박하지'], tag:'충남도 공식 해루질 해변, 완만한 모래펄'},
+  {i:1592, n:'청포대해수욕장', r:'충남 태안', s:'W', la:36.6392, lo:126.2648, mr:4.32, hi:4.7, f:'sand', sp:['백합','맛조개','동죽','바지락'], tag:'몽산포~달산포 백합 야간 벨트'},
+  {i:1593, n:'달산포해변', r:'충남 태안', s:'W', la:36.656, lo:126.2708, mr:4.32, hi:4.7, f:'sand', sp:['백합','소라','맛조개'], tag:'몽산포 남쪽 한적한 모래갯벌, 야간 백합'},
+  {i:1594, n:'삼봉해수욕장', r:'충남 태안', s:'W', la:36.5741, lo:126.3287, mr:4.32, hi:4.7, f:'sand', isl:1, br:1, sp:['맛조개','명주조개','소라','개조개'], tag:'주간 맛조개, 폭풍 후 조개띠, 캠핑 병행'},
+  {i:1595, n:'기지포해수욕장', r:'충남 태안', s:'W', la:36.5637, lo:126.3268, mr:4.32, hi:4.7, f:'sand', isl:1, br:1, sp:['명주조개','맛조개','소라'], tag:'삼봉과 이어진 완사면, 파도 후 조개띠'},
+  {i:1596, n:'안면해수욕장', r:'충남 태안', s:'W', la:36.5537, lo:126.3252, mr:4.32, hi:4.7, f:'sand', isl:1, br:1, sp:['골뱅이','맛조개','피조개','개불'], tag:'조개천국 골뱅이·개불 포인트'},
+  {i:1597, n:'꾸지나무골해수욕장', r:'충남 태안', s:'W', la:36.9296, lo:126.2255, mr:4.32, hi:4.5, f:'mix', sp:['바지락','굴','소라','박하지'], tag:'이원반도 서측 만입부, 자갈+펄'},
+  {i:1598, n:'채석포항', r:'충남 태안', s:'W', la:36.7534, lo:126.2041, mr:4.19, hi:4.5, f:'mix', sp:['낙지','소라','박하지'], tag:'겨울~봄 주간 낙지, 물골 낙지구멍'},
+  {i:1599, n:'장고항', r:'충남 당진', s:'W', la:37.0293, lo:126.5445, mr:5.67, hi:4.7, f:'rock', sp:['낙지','소라','박하지','호래기'], tag:'갯바위·석축 야간 워킹, 주먹소라'},
+  {i:1600, n:'왜목마을해수욕장', r:'충남 당진', s:'W', la:37.0532, lo:126.5175, mr:5.67, hi:4.7, f:'mix', sp:['바지락','동죽','소라','박하지'], tag:'해돋이 명소 앞 모래펄, 가족·야간 겸용'},
+  {i:1601, n:'마섬포구', r:'충남 당진', s:'W', la:37.0455, lo:126.5044, mr:5.67, hi:4.7, f:'mud', sp:['바지락','소라','낙지'], tag:'석문방조제 북측, 근교 주간 바지락'},
+  {i:1602, n:'도비도항', r:'충남 당진', s:'W', la:37.009, lo:126.4385, mr:5, hi:4.6, f:'mud', isl:1, br:1, sp:['바지락','낙지','소라'], tag:'대호방조제 연결 옛 섬, 봄낙지·바지락'},
+  {i:1603, n:'벌천포해수욕장', r:'충남 서산', s:'W', la:37.0035, lo:126.3655, mr:5.13, hi:4.4, f:'mix', sp:['꽃게','소라','해삼','박하지'], tag:'가로림만 입구 몽돌+갯바위, 야간 꽃게·차박'},
+  {i:1604, n:'중왕리 왕산포구', r:'충남 서산', s:'W', la:36.9256, lo:126.3987, mr:5.13, hi:4.5, f:'mud', sp:['바지락','낙지','굴','박하지'], tag:'가로림만 펄갯벌, 횃불 해루질 전승 마을'},
+  {i:1605, n:'속동갯벌마을', r:'충남 홍성', s:'W', la:36.6229, lo:126.3772, mr:4.32, hi:4.8, f:'mud', sp:['낙지','바지락','동죽','박하지'], tag:'천수만 펄갯벌 체험, 전망대 아래 낙지·조개'},
+  {i:1606, n:'대천해수욕장 남부', r:'충남 보령', s:'W', la:36.2911, lo:126.5183, mr:4.46, hi:5, f:'mix', sp:['맛조개','바지락','동죽','소라'], tag:'남단 남포방조제 방향 모래펄, 야간 랜턴'},
+  {i:1607, n:'춘장대해수욕장', r:'충남 서천', s:'W', la:36.2229, lo:126.5091, mr:4.46, hi:5, f:'sand', sp:['동죽','맛조개','바지락','박하지'], tag:'완만한 백사장 간조대 전역, 여름 인파'},
+  {i:1608, n:'선도리 갯벌', r:'충남 서천', s:'W', la:36.1419, lo:126.5231, mr:4.52, hi:5.1, f:'mix', sp:['바지락','동죽','맛조개'], tag:'비인면, 간조 시 쌍도까지 갯벌길'},
+  {i:1609, n:'월하성어촌체험마을', r:'충남 서천', s:'W', la:36.1839, lo:126.5064, mr:4.52, hi:5.1, f:'mix', sp:['맛조개','바지락','굴','박하지'], tag:'소금 뿌려 잡는 맛조개(죽합) 명소'},
+  {i:1610, n:'심포항 갯벌', r:'전북 김제', s:'W', la:35.8749, lo:126.7469, mr:4.32, hi:5.3, f:'mud', sp:['백합','동죽','가무락'], tag:'진봉면 망해사 아래 펄, 그레로 캐는 생합'},
+  {i:1611, n:'고사포해수욕장', r:'전북 부안', s:'W', la:35.6524, lo:126.4884, mr:4.19, hi:5.4, f:'sand', sp:['맛조개','바지락','소라','골뱅이'], tag:'하섬 노두길 방향 모래갯벌, 야영장 맛조개'},
+  {i:1612, n:'구시포해수욕장', r:'전북 고창', s:'W', la:35.4437, lo:126.4522, mr:4.39, hi:5.8, f:'sand', sp:['백합','동죽','맛조개'], tag:'명사십리 남단, 야간 백합 그레질'},
+  {i:1613, n:'동호해수욕장', r:'전북 고창', s:'W', la:35.5117, lo:126.4759, mr:4.19, hi:5.4, f:'mix', sp:['바지락','동죽','백합','박하지'], tag:'노지캠핑 병행 무료 해루질, 모래+펄'},
+  {i:1614, n:'톱머리해수욕장', r:'전남 무안', s:'W', la:34.9909, lo:126.381, mr:4.05, hi:6, f:'mix', sp:['바지락','맛조개','낙지','박하지'], tag:'무안공항 인근, 해송림 앞 모래펄 가족 코스'},
+  {i:1615, n:'홀통유원지 갯벌', r:'전남 무안', s:'W', la:35.0552, lo:126.3776, mr:4.05, hi:6, f:'mix', sp:['낙지','바지락','소라','가무락'], tag:'현경면, 청정 무안갯벌 대표, 윈드서핑장 옆'},
+  {i:1616, n:'돌머리해수욕장', r:'전남 함평', s:'W', la:35.0577, lo:126.4903, mr:4.05, hi:6, f:'mud', sp:['바지락','동죽','박하지','낙지'], tag:'해수풀장 옆 갯벌체험장, 함평만 펄'},
+  {i:1617, n:'초지항', r:'인천 강화', s:'W', la:37.6252, lo:126.5316, mr:6.01, hi:4.5, f:'mud', br:1, fx:['숭어','망둥어','갯장어'], tag:'초지대교 아래~방파제 물골, 4~10월(피크 5~6월) 훌치기·원투'},
+  {i:1618, n:'황산도 선착장', r:'인천 강화', s:'W', la:37.6224, lo:126.5285, mr:6.01, hi:4.5, f:'mud', isl:1, br:1, fx:['숭어','망둥어','농어'], tag:'초지대교 남측 연육도, 봄 훌치기·가을 원투'},
+  {i:1619, n:'광성보 앞 염하수로', r:'인천 강화', s:'W', la:37.6613, lo:126.5279, mr:5.94, hi:5.3, f:'mud', br:1, fx:['숭어','농어','우럭','망둥어'], tag:'장어마을~광성보 도보, 5~6월 피크 훌치기·찌'},
+  {i:1620, n:'선두항', r:'인천 강화', s:'W', la:37.5955, lo:126.512, mr:6.01, hi:4.5, f:'mud', br:1, fx:['숭어','망둥어','농어'], tag:'선두리 수로·선착장, 봄~가을 원투·훌치기'},
+  {i:1621, n:'창후항 방파제', r:'인천 강화', s:'W', la:37.7585, lo:126.362, mr:5.4, hi:5.2, f:'mud', br:1, fx:['숭어','망둥어'], tag:'교동수로 구 도선장, 봄 4~6월 훌치기'},
+  {i:1622, n:'어류정항', r:'인천 강화', s:'W', la:37.6425, lo:126.3315, mr:5.54, hi:5, f:'mix', isl:1, br:1, fx:['숭어','농어','망둥어','우럭'], tag:'석모도 남서단, 가을 썰물 방파제 찌·원투'},
+  {i:1623, n:'석모도 석포리 선착장', r:'인천 강화', s:'W', la:37.704, lo:126.3565, mr:5.4, hi:5, f:'mud', isl:1, br:1, fx:['숭어','망둥어'], tag:'구 외포리행 도선장, 봄~초겨울 찌·원투'},
+  {i:1624, n:'석모도 하리선착장', r:'인천 강화', s:'W', la:37.708, lo:126.301, mr:5.27, hi:5.2, f:'mud', isl:1, br:1, fx:['숭어','망둥어','농어'], tag:'미법도행 선착장, 물골 발달, 봄~가을'},
+  {i:1625, n:'교동 월선포', r:'인천 강화', s:'W', la:37.7663, lo:126.3345, mr:5.4, hi:5.2, f:'mud', isl:1, br:1, fx:['숭어','농어','우럭','망둥어'], tag:'교동대교 옆 구 도선장, 물살 강한 교동수로'},
+  {i:1626, n:'교동 남산포', r:'인천 강화', s:'W', la:37.7615, lo:126.283, mr:5.4, hi:5.2, f:'mud', isl:1, br:1, fx:['숭어','농어','망둥어'], tag:'읍내리 남쪽 옛 포구 석축, 봄 훌치기'},
 
 ];
 
@@ -5753,6 +5830,15 @@ function apiWeek_(p, ds, want, days){
     var tide = (bt && bt[dd]) ? bt[dd]
       : (function(){ var a = dd.split('-'); return calcTide_(p, +a[0], +a[1], +a[2]); })();
     var an = analyze_(p, dd, tide, dd === ds ? rec : null, want);
+    var a3 = dd.split('-'), yy = +a3[0], mm = +a3[1], dz = +a3[2];
+    /* 월령·일출몰·월출몰 — 낚시·해루질꾼이 야간 계획에 쓴다 */
+    var age = moonAge_(yy, mm, dz);
+    var sun = sunTimes_(yy, mm, dz, p.la, p.lo);
+    var mev = moonEvents_(yy, mm, dz, p.la, p.lo);
+    var hm2 = function(h){ return (h == null) ? null : Math.round(h*60); };
+    /* 물흐름 % — 그날 조차를 그 지점 대조차 대비로 (사리 100%, 조금 낮음) */
+    var flowPct = (p.mr > 0.05 && an.meta.range != null)
+      ? Math.max(6, Math.min(100, Math.round(an.meta.range / (p.mr * 1.05) * 100))) : null;
     return { ds: dd, mul: an.meta.mul, range: an.meta.range,
              h: an.haeru.score, f: an.fish.score,
              vis: dd === ds ? an.meta.vis : null,   // 기상 예보가 있는 당일만 시야를 낸다
@@ -5760,6 +5846,9 @@ function apiWeek_(p, ds, want, days){
              ev: (tide && tide.events ? tide.events : []).map(function(e){
                return { k: e.k, m: Math.round(e.t*60), lv: (e.lv == null ? null : Math.round(e.lv)) };
              }),
+             flow: flowPct, ld: Math.round(age) + 1, bright: Math.round(moonBright_(age)*100),
+             sr: hm2(sun.rise), ss: hm2(sun.set),
+             mr: hm2(mev.rise), ms: hm2(mev.set),
              hw: an.haeru.window ? [Math.round(an.haeru.window[0]*60), Math.round(an.haeru.window[1]*60)] : null,
              fw: an.fish.window ? [Math.round(an.fish.window[0]*60), Math.round(an.fish.window[1]*60)] : null };
   });
@@ -6045,6 +6134,11 @@ window.BOOT = {today:todayStr_(),count:(typeof pool_==='function'?pool_().length
 'use strict';
 
 /* ══════════════ 상태 ══════════════ */
+/* 빌드 시점이 아니라 방문자의 실제 오늘(한국시)로 맞춘다 — 정적판은 BOOT.today가 빌드 날짜로 굳는다 */
+try {
+  var _kst = new Date(Date.now() + 9*36e5).toISOString().slice(0,10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(_kst)) BOOT.today = _kst;
+} catch(e){}
 var S = {
   ds: BOOT.today, mode: 'haeru', rows: [], sort: 'score', filter: 'all', want: null,
   fmode: 'haeru', sel: null, me: null, markers: {}, loading: false, cur: null
@@ -7256,6 +7350,34 @@ function renderDetail(d){
   head.appendChild(fav);
   b.appendChild(head);
 
+  /* 날짜 이동줄 — 같은 자리의 이전날/다음날을 바로 넘겨 본다 */
+  (function(){
+    var base = parseDs(BOOT.today), cur = parseDs(d.ds);
+    var off = Math.round((cur - base) / 86400000);
+    var wd = ['일','월','화','수','목','금','토'][cur.getDay()];
+    var lbl = off === 0 ? '오늘' : off === 1 ? '내일' : off === -1 ? '어제'
+              : (cur.getMonth()+1) + '/' + cur.getDate();
+    var bar = el('div','dt-daynav');
+    var goDay = function(delta){
+      var nd = new Date(cur.getTime() + delta*86400000);
+      var nds = dstr(nd);
+      var lo = new Date(base.getTime() - 1*86400000), hi = new Date(base.getTime() + 13*86400000);
+      if (nd < lo || nd > hi){ toast('어제부터 13일 뒤까지만 볼 수 있습니다'); return; }
+      S.ds = nds; renderDates();                 // 날짜줄도 같이 맞춘다
+      openDetail(d.point.i, true);               // 같은 자리, 바뀐 날짜로 다시
+    };
+    var prev = el('button','dnav-btn', '‹ 이전날');
+    prev.onclick = function(){ goDay(-1); };
+    var mid = el('div','dnav-mid', '<b>' + lbl + '</b><span>' + (cur.getMonth()+1) + '.' + cur.getDate() + ' ' + wd + '요일</span>');
+    var next = el('button','dnav-btn', '다음날 ›');
+    next.onclick = function(){ goDay(1); };
+    bar.appendChild(prev); bar.appendChild(mid); bar.appendChild(next);
+    b.appendChild(bar);
+    var mtb = el('button','dt-mtbtn', '📋 이 자리 15일 물때표 (만조·간조·물흐름·해달)');
+    mtb.onclick = function(){ openMultae(d.point.i, d.point.n); };
+    b.appendChild(mtb);
+  })();
+
   /* 결론 */
   b.appendChild(tideOnly_()
     ? el('div','dt-verdict tide-note',
@@ -8246,9 +8368,21 @@ function renderDates(){
     }; })(ds, far);
     n.appendChild(c);
   }
-  var on = n.querySelector('.dchip.on');
-  if (on) on.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+  /* 오늘을 보고 있으면 왼쪽 시작점에, 다른 날짜면 그 칸을 가운데로.
+     레이아웃이 끝난 뒤 잡아야 폭이 0이 아니어서 제대로 붙는다 */
+  var apply = function(){
+    var td = n.querySelector('.dchip.today');
+    var on = n.querySelector('.dchip.on');
+    if (S.ds === BOOT.today && td){
+      td.scrollIntoView({ inline:'start', block:'nearest' });
+      n.scrollLeft = Math.max(0, n.scrollLeft - 6);
+    } else if (on){
+      on.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+    }
+    dsCtlSync_();
+  };
   dsCtl_();
+  requestAnimationFrame(function(){ requestAnimationFrame(apply); });
 }
 
 /* ── 날짜줄 이동 단추 — 좌우 화살표 + 「오늘」 복귀 ── */
@@ -8290,11 +8424,10 @@ function dsCtlSync_(){
   /* 「오늘」 단추는 오늘이 화면 밖이거나 다른 날짜를 보고 있을 때만 */
   var need = (S.ds !== BOOT.today);
   if (!need){
-    var chips = st.querySelectorAll('.dchip');
-    var today = chips[1];   /* 어제 다음이 오늘 */
+    var today = st.querySelector('.dchip.today');
     if (today){
-      var x0 = today.offsetLeft - st.scrollLeft, x1 = x0 + today.offsetWidth;
-      need = (x1 < 0 || x0 > st.clientWidth);
+      var tr = today.getBoundingClientRect(), sr = st.getBoundingClientRect();
+      need = (tr.right < sr.left + 4 || tr.left > sr.right - 4);
     }
   }
   var td = $('dsToday'); if (td) td.hidden = !need;
@@ -8801,20 +8934,21 @@ function mtBuild_(){
   d.querySelector('#mtSel').onchange = function(){ mtLoad_(+this.value); };
 }
 function mtClose_(){ if (MT.el) MT.el.hidden = true; }
-function openMultae(){
+function openMultae(forceId, forceName){
   mtBuild_();
   var sel = MT.el.querySelector('#mtSel');
   sel.innerHTML = '';
   var seen = {};
   var fv = favs();
   var cands = [];
+  if (forceId != null && !seen[forceId]){ seen[forceId]=1; cands.push({i:forceId, n:(forceName||'')}); }
   S.rows.forEach(function(r){ if (fv.indexOf(r.i) >= 0 && !seen[r.i]){ seen[r.i]=1; cands.push({i:r.i,n:'★ '+r.n}); } });
   S.rows.slice(0, 20).forEach(function(r){ if (!seen[r.i]){ seen[r.i]=1; cands.push({i:r.i,n:r.n}); } });
   cands.forEach(function(c){
     var o = document.createElement('option'); o.value = c.i; o.textContent = c.n; sel.appendChild(o);
   });
   MT.el.hidden = false;
-  var first = (S.sel && seen[S.sel]) ? S.sel : (cands[0] && cands[0].i);
+  var first = (forceId != null) ? forceId : ((S.sel && seen[S.sel]) ? S.sel : (cands[0] && cands[0].i));
   if (first != null){ sel.value = first; mtLoad_(+first); }
 }
 function mtLoad_(id){
@@ -8828,29 +8962,66 @@ function mtLoad_(id){
       return (typeof ensureWeather === 'function') ? ensureWeather(w.ds).catch(function(){}) : Promise.resolve();
     });
     Promise.all(jobs).then(function(){
-      var h = '<table class="mtt"><thead><tr>'
-            + '<th>날짜</th><th>물때</th><th>만조 <span>(조위cm)</span></th><th>간조 <span>(조위cm)</span></th><th>물흐름</th><th>날씨</th>'
+      var moonIco = function(ld){
+        /* 음력 일자로 달 모양 — 1 삭, 15 보름, 30 그믐 */
+        if (ld == null) return '';
+        var p2 = (ld - 1) / 29.53;
+        if (p2 < .04 || p2 > .96) return '🌑';
+        if (p2 < .21) return '🌒'; if (p2 < .29) return '🌓';
+        if (p2 < .46) return '🌔'; if (p2 < .54) return '🌕';
+        if (p2 < .71) return '🌖'; if (p2 < .79) return '🌗';
+        return '🌘';
+      };
+      var prevHi = null, prevLo = null;
+      var h = '<table class="mtt mtt-full"><thead><tr>'
+            + '<th>날짜</th><th>물때</th><th>물흐름</th>'
+            + '<th>만조 <span>시각·조위·증감</span></th><th>간조 <span>시각·조위·증감</span></th>'
+            + '<th>해<br>뜸/짐</th><th>달<br>뜸/짐</th><th>날씨</th>'
             + '</tr></thead><tbody>';
       d.week.forEach(function(w, i){
         var dt = parseDs(w.ds);
         var wd = WD[dt.getDay()];
         var hi = (w.ev || []).filter(function(e){ return e.k === 'H'; });
         var lo = (w.ev || []).filter(function(e){ return e.k === 'L'; });
-        var f = function(list){
+        /* 전날 대비 조위 증감(cm) — 물이 더 빠지는지/차는지를 화살표로 */
+        var fmt = function(list, prevRef){
           if (!list.length) return '—';
-          return list.map(function(e){
-            return hm(e.m) + (e.lv != null ? ' <b>' + e.lv + '</b>' : '');
+          var out = list.map(function(e){
+            var s2 = hm(e.m);
+            if (e.lv != null){
+              s2 += ' <b>' + e.lv + '</b>';
+              if (prevRef != null){
+                var dv = e.lv - prevRef;
+                if (Math.abs(dv) >= 3) s2 += ' <i class="' + (dv>0?'up':'dn') + '">' + (dv>0?'▲':'▼') + Math.abs(dv) + '</i>';
+              }
+            }
+            return s2;
           }).join('<br>');
+          return out;
         };
+        var curHi = hi.length ? hi[hi.length-1].lv : null;
+        var curLo = lo.length ? lo[lo.length-1].lv : null;
+        var hiCell = fmt(hi, prevHi), loCell = fmt(lo, prevLo);
+        prevHi = curHi; prevLo = curLo;
         var wx = i < 7 ? mtDayWx_(p, w.ds) : null;
-        var wxs = wx ? (wx.sky + '<br><span class="mtwind">' + wx.dir + ' ' + wx.w.toFixed(1) + 'm/s</span>') : '<span class="mtdim">—</span>';
+        var wxs = wx ? (wx.sky + '<br><span class="mtwind">' + wx.dir + ' ' + wx.w.toFixed(1) + '</span>') : '<span class="mtdim">—</span>';
+        var flow = w.flow != null ? w.flow : (w.range != null ? Math.round(w.range/(p.mr*1.05||6)*100) : null);
+        var flowBar = flow != null
+          ? '<div class="flowb"><i style="width:' + Math.min(100,flow) + '%"></i></div><span class="mtsub">' + mtFlow_(w.range) + ' ' + flow + '%</span>'
+          : '—';
+        var sunC = (w.sr!=null||w.ss!=null) ? (hm(w.sr) + '<br><span class="mtsub">' + hm(w.ss) + '</span>') : '—';
+        var moonC = (w.mr!=null||w.ms!=null) ? (hm(w.mr) + '<br><span class="mtsub">' + hm(w.ms) + '</span>') : '—';
         var today = i === 0;
-        h += '<tr' + (today ? ' class="today"' : '') + (dt.getDay() === 0 ? ' data-sun="1"' : '') + '>'
-          + '<td class="mtd">' + (dt.getMonth()+1) + '.' + dt.getDate() + ' <em' + (dt.getDay()===0?' class="sun"':dt.getDay()===6?' class="sat"':'') + '>' + wd + '</em></td>'
-          + '<td class="mtm">' + (w.mul || '—') + '</td>'
-          + '<td class="mth">' + f(hi) + '</td>'
-          + '<td class="mtl">' + f(lo) + '</td>'
-          + '<td>' + mtFlow_(w.range) + (w.range != null ? '<br><span class="mtdim">조차 ' + w.range.toFixed(1) + 'm</span>' : '') + '</td>'
+        h += '<tr' + (today ? ' class="today"' : '') + '>'
+          + '<td class="mtd">' + (dt.getMonth()+1) + '.' + dt.getDate()
+            + ' <em' + (dt.getDay()===0?' class="sun"':dt.getDay()===6?' class="sat"':'') + '>' + wd + '</em></td>'
+          + '<td class="mtm">' + moonIco(w.ld) + ' ' + (w.mul || '—')
+            + (w.ld!=null?'<br><span class="mtsub">달빛 ' + w.bright + '%</span>':'') + '</td>'
+          + '<td class="mtfl">' + flowBar + '</td>'
+          + '<td class="mth">' + hiCell + '</td>'
+          + '<td class="mtl">' + loCell + '</td>'
+          + '<td class="mtsm">' + sunC + '</td>'
+          + '<td class="mtsm">' + moonC + '</td>'
           + '<td class="mtw">' + wxs + '</td>'
           + '</tr>';
       });
