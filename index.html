@@ -6145,6 +6145,53 @@ todayStr_=function(){ var d=new Date(Date.now()+9*36e5); return d.toISOString().
 fetchCoord_=function(){ return null; };
 calibrate_=function(){ return null; };
 
+/* ══ 공식 물때(국립해양조사원) 캐시 — 있으면 자체계산 대신 쓴다 ══
+   data/tide-stations.json + data/tide/<ds>.json 을 받아, 지점에서 가장 가까운
+   관측소(약 30km 안)의 공식 만조·간조로 갈아끼운다. 없으면 자체계산 그대로. */
+var TIDE_ST = null, TIDE_CACHE = {}, TIDE_NEAR = {};
+function tideKm_(a,b,c,d){ var r=Math.PI/180,x=(c-a)*r,y=(d-b)*r;
+  var h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);
+  return 2*6371*Math.asin(Math.sqrt(h)); }
+function nearStation_(p){
+  if (!TIDE_ST) return null;
+  if (TIDE_NEAR[p.i] !== undefined) return TIDE_NEAR[p.i];
+  var best=null, bd=1e9;
+  TIDE_ST.forEach(function(st){ var d=tideKm_(p.la,p.lo,st.la,st.lo); if(d<bd){bd=d;best=st;} });
+  var r = (best && bd <= 30) ? best.code : null;    // 30km 넘으면 그 관측소는 다른 물때다
+  TIDE_NEAR[p.i]=r; return r;
+}
+function ensureTide(ds){
+  if (ensureTide._d[ds]) return ensureTide._d[ds];
+  ensureTide._d[ds] = (function(){
+    var stP = TIDE_ST ? Promise.resolve() : fetch('data/tide-stations.json')
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){ TIDE_ST = (j && j.stations) || []; }).catch(function(){ TIDE_ST=[]; });
+    return stP.then(function(){
+      return fetch('data/tide/'+ds+'.json', {cache:'default'})
+        .then(function(r){ return r.ok?r.json():null; })
+        .then(function(j){ if(j) TIDE_CACHE[ds]=j; }).catch(function(){});
+    });
+  })();
+  return ensureTide._d[ds];
+}
+ensureTide._d = {};
+var _calcTideOrig = calcTide_;
+calcTide_ = function(p, y, mo, d){
+  try {
+    var ds = y + '-' + ('0'+mo).slice(-2) + '-' + ('0'+d).slice(-2);
+    var cache = TIDE_CACHE[ds];
+    if (cache){
+      var code = nearStation_(p);
+      if (code && cache[code] && cache[code].length){
+        var ev = cache[code].map(function(e){ return {k:e.k,t:e.t,lv:e.lv}; });
+        var lv = ev.map(function(x){return x.lv;});
+        return { events: ev, range: (Math.max.apply(null,lv)-Math.min.apply(null,lv))/100, src:'khoa' };
+      }
+    }
+  } catch(e){}
+  return _calcTideOrig(p, y, mo, d);
+};
+
 /* ══ 조황 기록 — 이 기기 저장 (백엔드판은 시트 공동 저장) ══ */
 function catchAll_(){ try { return JSON.parse(localStorage.getItem('hrn_catch')||'[]'); } catch(e){ return []; } }
 apiCatchSave=function(e){
@@ -6202,7 +6249,7 @@ window.google={script:{run:{
       try{ var r=fn.apply(null,args); s&&s(r); }
       catch(e){ console.error(e); f&&f({message:e.message}); }
     };
-    if (ds){ Promise.all([ensureWeather(ds), ensureRemote()]).then(function(rs){ updateNote(rs[0]); setTimeout(go,40); }); }
+    if (ds){ Promise.all([ensureWeather(ds), ensureRemote(), ensureTide(ds)]).then(function(rs){ updateNote(rs[0]); setTimeout(go,40); }); }
     else setTimeout(go,100);},
   apiBoard:function(ds,mode,o){this._call(apiBoard,[ds,mode,o],ds);},
   apiPoint:function(id,ds,w){this._call(apiPoint,[id,ds,w,15],ds);},

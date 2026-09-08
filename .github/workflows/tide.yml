@@ -1,0 +1,36 @@
+# 해루낚 — 국립해양조사원 공식 물때를 미리 받아 저장한다.
+# 시크릿 KHOA_KEY 가 있을 때만 실제로 동작한다(없으면 자체계산 유지).
+name: 물때 자료 갱신
+
+on:
+  schedule:
+    - cron: '30 19 * * *'     # 세계표준시 19:30 = 한국시각 04:30 (하루 1회면 충분 — 예보는 안 바뀐다)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tide
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 물때 받아서 data/tide 만들기
+        env:
+          KHOA_KEY: ${{ secrets.KHOA_KEY }}
+        run: node scripts/fetch-tide.js
+      - name: 바뀌었으면 저장
+        run: |
+          if [ -n "$(git status --porcelain data/tide)" ]; then
+            git config user.name  "haerunak-bot"
+            git config user.email "bot@haerunak.com"
+            git add -A data/tide
+            git commit -m "물때 자료 갱신 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          else
+            echo "바뀐 것 없음(KHOA_KEY 미설정이면 정상)"
+          fi
