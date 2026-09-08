@@ -1832,6 +1832,21 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
 .flowb{height:5px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;margin:0 auto 3px;max-width:52px}
 .flowb i{display:block;height:100%;background:linear-gradient(90deg,#35d0ff,#2ee6a8);border-radius:3px}
 
+
+/* 물때표 추천 별점 */
+.mtt .mtrec{min-width:58px}
+.rec-star{color:#ffcf4d;font-size:12px;letter-spacing:-1px;white-space:nowrap}
+.rec-star .rec-off{color:rgba(255,255,255,.18)}
+.rec-star.rec-approx{color:#9db4c4}
+.rec-best{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:8px;font-size:10.5px;font-weight:800;
+  background:linear-gradient(100deg,#2ee6a8,#35d0ff);color:#04121c}
+.rec-good{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:8px;font-size:10.5px;font-weight:800;
+  background:rgba(46,230,168,.18);color:#2ee6a8}
+.mtt tr[data-best] td{background:rgba(46,230,168,.06)}
+.mtt tr[data-best] .mtd{color:#2ee6a8;font-weight:800}
+.mtfoot .rec-star{font-size:13px}
+.mtfoot .up{color:#ff8f8f}.mtfoot .dn{color:#7db8ff}
+
 </style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -7753,15 +7768,6 @@ function renderDetail(d){
     b.appendChild(s5);
   }
 
-  /* 광고 슬롯 — 지역·시즌 타겟, 금어기 필터 통과분만. 프리미엄은 숨김 */
-  if (d.ad && !isPremium()){
-    var adBox = el('a','adcard');
-    adBox.href = d.ad.url || '#'; adBox.target = '_blank'; adBox.rel = 'noopener sponsored';
-    adBox.innerHTML = '<span class="adtag">제휴</span><b>' + d.ad.t + '</b>' + (d.ad.d ? '<span>' + d.ad.d + '</span>' : '');
-    adBox.addEventListener('click', function(){ bizClick(d.ad.id, 'ad'); });
-    b.appendChild(adBox);
-  }
-
   /* 대상 */
   var s6 = el('div','sec');
   s6.appendChild(el('div','sec-t', S.mode==='fish' ? '이 시기 노릴 어종' : '이 시기 채집물'));
@@ -7860,17 +7866,7 @@ function renderDetail(d){
     b.appendChild(gs);
   }
 
-  /* 이 근처 제휴처 — 비어 있으면 업체를 부른다 */
-  if (!(d.partners && d.partners.length)){
-    var ps0 = el('div','sec');
-    ps0.appendChild(el('div','sec-t','이 근처 <span style="font-weight:600;color:var(--mut2)">(제휴)</span>'));
-    ps0.appendChild(el('div','gauge-l','이 자리 근처에 등록된 배·숙소·낚시점이 아직 없습니다.'));
-    ps0.appendChild(joinBox_('biz',
-      '여기서 배나 숙소, 낚시점 하시나요',
-      '이 화면에 올려드립니다. 나가기 직전에 이 자리를 보고 있는 손님에게 바로 붙습니다. 등록은 무료이고 성사된 것에만 수수료를 받습니다.',
-      'business/', '업체 등록 보기'));
-    b.appendChild(ps0);
-  }
+  /* 이 근처 제휴처 — 등록된 곳이 있을 때만 (빈 권유 상자는 없앤다) */
   if (d.partners && d.partners.length){
     var ps = el('div','sec');
     ps.appendChild(el('div','sec-t','이 근처 <span style="font-weight:600;color:var(--mut2)">(제휴)</span>'));
@@ -7903,6 +7899,15 @@ function renderDetail(d){
     });
     ps.appendChild(el('div','gauge-l','제휴처 등록·광고 문의 thecloudstay@gmail.com'));
     b.appendChild(ps);
+  }
+
+  /* 제휴 광고 — 맨 아래 한 곳에만, 조용히 (지역·시즌 타겟, 프리미엄 숨김) */
+  if (d.ad && !isPremium()){
+    var adBox = el('a','adcard');
+    adBox.href = d.ad.url || '#'; adBox.target = '_blank'; adBox.rel = 'noopener sponsored';
+    adBox.innerHTML = '<span class="adtag">제휴</span><b>' + d.ad.t + '</b>' + (d.ad.d ? '<span>' + d.ad.d + '</span>' : '');
+    adBox.addEventListener('click', function(){ bizClick(d.ad.id, 'ad'); });
+    b.appendChild(adBox);
   }
 
   /* 반대 모드 */
@@ -8925,7 +8930,7 @@ function mtBuild_(){
     +     '<button class="mtx" id="mtClose" aria-label="닫기">×</button>'
     +   '</div>'
     +   '<div class="mtbody" id="mtBody"><p class="mtload">물때를 불러오는 중…</p></div>'
-    +   '<div class="mtfoot">만조·간조 옆 <b>굵은 숫자가 조위(cm)</b> · 물때 바다타임 · 기상 오픈메테오 · 8일째부터는 물때만</div>'
+    +   '<div class="mtfoot"><b class="rec-star">★</b> 그날의 해루질·낚시 추천도 · 만조·간조 옆 <b>굵은 숫자가 조위(cm)</b>, <b class="up">▲</b>/<b class="dn">▼</b>는 전날 대비 증감 · 물때 바다타임 · 기상 오픈메테오 · 8일째부터는 물때만</div>'
     + '</div>';
   document.body.appendChild(d);
   MT.el = d;
@@ -8973,8 +8978,9 @@ function mtLoad_(id){
         return '🌘';
       };
       var prevHi = null, prevLo = null;
+      var mMode = S.mode === 'fish' ? 'f' : 'h';
       var h = '<table class="mtt mtt-full"><thead><tr>'
-            + '<th>날짜</th><th>물때</th><th>물흐름</th>'
+            + '<th>날짜</th><th>물때</th><th>' + (mMode==='h'?'해루질':'낚시') + '<br>추천</th><th>물흐름</th>'
             + '<th>만조 <span>시각·조위·증감</span></th><th>간조 <span>시각·조위·증감</span></th>'
             + '<th>해<br>뜸/짐</th><th>달<br>뜸/짐</th><th>날씨</th>'
             + '</tr></thead><tbody>';
@@ -9009,14 +9015,31 @@ function mtLoad_(id){
         var flowBar = flow != null
           ? '<div class="flowb"><i style="width:' + Math.min(100,flow) + '%"></i></div><span class="mtsub">' + mtFlow_(w.range) + ' ' + flow + '%</span>'
           : '—';
+        /* 해루질/낚시 추천 별 — 그날 점수를 5점 만점 별로. 예보 밖(8일~)이면 물때만으로 근사 */
+        var sc = (mMode === 'f') ? w.f : w.h;
+        var stars, slab;
+        if (sc != null && i < 7){
+          var st5 = Math.max(0, Math.min(5, Math.round(sc/20)));
+          stars = '<span class="rec-star">' + '★'.repeat(st5) + '<span class="rec-off">' + '★'.repeat(5-st5) + '</span></span>';
+          slab = sc >= 78 ? '<span class="rec-best">강추</span>' : sc >= 62 ? '<span class="rec-good">추천</span>' : '';
+        } else {
+          /* 물때만 나오는 날: 해루질은 물 많이 빠지는 사리, 낚시는 조금 물때가 유리 */
+          var fp = flow || 0;
+          var good = (mMode === 'h') ? (fp >= 82) : (fp >= 30 && fp <= 70);
+          stars = '<span class="rec-star rec-approx">' + (good ? '★★★☆☆' : '★★☆☆☆') + '</span>';
+          slab = good ? '<span class="rec-good">물때 좋음</span>' : '';
+        }
+        var recCell = stars + (slab ? '<br>' + slab : '');
         var sunC = (w.sr!=null||w.ss!=null) ? (hm(w.sr) + '<br><span class="mtsub">' + hm(w.ss) + '</span>') : '—';
         var moonC = (w.mr!=null||w.ms!=null) ? (hm(w.mr) + '<br><span class="mtsub">' + hm(w.ms) + '</span>') : '—';
         var today = i === 0;
-        h += '<tr' + (today ? ' class="today"' : '') + '>'
+        var bestRow = (sc != null && i < 7 && sc >= 78);
+        h += '<tr' + (today ? ' class="today"' : '') + (bestRow ? ' data-best="1"' : '') + '>'
           + '<td class="mtd">' + (dt.getMonth()+1) + '.' + dt.getDate()
             + ' <em' + (dt.getDay()===0?' class="sun"':dt.getDay()===6?' class="sat"':'') + '>' + wd + '</em></td>'
           + '<td class="mtm">' + moonIco(w.ld) + ' ' + (w.mul || '—')
             + (w.ld!=null?'<br><span class="mtsub">달빛 ' + w.bright + '%</span>':'') + '</td>'
+          + '<td class="mtrec">' + recCell + '</td>'
           + '<td class="mtfl">' + flowBar + '</td>'
           + '<td class="mth">' + hiCell + '</td>'
           + '<td class="mtl">' + loCell + '</td>'
