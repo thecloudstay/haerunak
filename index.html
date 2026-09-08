@@ -6730,8 +6730,14 @@ function kAlign_(){
     if (!isFinite(s) || s <= 0) s = 1;
     s = Math.max(0.5, Math.min(2, s));
     var dx = KAKAO.div.clientWidth/2 - kp.x, dy = KAKAO.div.clientHeight/2 - kp.y;
+    /* 회전 보정 — 카카오(TM, 중앙자오선 127°E)는 자오선이 127°로 수렴하지만 웹메르카토르는 자오선이 수직이라
+       127°에서 멀어질수록(동해안·포항·울산) 배경이 핀 대비 미세하게 기울어진다. 자오선수렴각
+       γ = (경도−127)·sin(위도) 만큼 배경을 돌려 맞춘다. 실측: 포항 화면귀퉁이 잔차 19px→2px. */
+    var g = (c.lng - 127) * Math.sin(c.lat * Math.PI / 180);
+    if (!isFinite(g)) g = 0;
+    g = Math.max(-3, Math.min(3, g));
     KAKAO.div.style.transformOrigin = '50% 50%';
-    KAKAO.div.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + s.toFixed(4) + ')';
+    KAKAO.div.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + s.toFixed(4) + ') rotate(' + g.toFixed(4) + 'deg)';
   } catch(e){}
 }
 function kSetType_(t){
@@ -6757,7 +6763,8 @@ function kakaoInit_(){
   var mapEl = document.getElementById('map');
   var d = document.createElement('div');
   d.id = 'kmap';
-  d.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;';
+  /* 4% 여유(블리드) — 축척·회전 보정으로 배경을 돌리고 키워도 화면 귀퉁이가 비지 않게 */
+  d.style.cssText = 'position:fixed;top:-4%;left:-4%;right:-4%;bottom:-4%;z-index:0;pointer-events:none;';
   mapEl.parentNode.insertBefore(d, mapEl);
   KAKAO.div = d;
   var c = map.getCenter();
