@@ -824,6 +824,47 @@ body.map-sat .leaflet-container{background:#0b1a22}
 }
 @keyframes pulse{0%{transform:scale(.85);opacity:.9}70%{transform:scale(1.5);opacity:0}100%{opacity:0}}
 
+
+/* ── 물때표·바람 오버레이 ── */
+.mtwrap{position:fixed;inset:0;z-index:1200;background:rgba(3,12,20,.62);
+  display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
+.mtcard{width:min(720px,100%);max-height:min(86vh,780px);display:flex;flex-direction:column;
+  border-radius:20px;overflow:hidden;background:#07202f;border:1px solid rgba(140,200,235,.3);
+  box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.mthead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.mthead h3{margin:0;font-size:16px;flex:1}
+.mthead select{background:#0a2436;color:#d7e8f2;border:1px solid rgba(140,200,235,.35);
+  border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13.5px;max-width:46%}
+.mtx{-webkit-appearance:none;appearance:none;border:0;background:rgba(255,255,255,.08);color:#cadeeb;
+  width:32px;height:32px;border-radius:10px;font-size:18px;cursor:pointer}
+.mtbody{overflow:auto;-webkit-overflow-scrolling:touch}
+.mtload{padding:34px 0;text-align:center;color:#8ba6b8}
+.mtt{width:100%;border-collapse:collapse;font-size:13px}
+.mtt th{position:sticky;top:0;background:#0a2436;color:#9fc0d4;font-size:11.5px;font-weight:800;
+  padding:9px 8px;text-align:center;letter-spacing:.2px}
+.mtt th span{font-weight:600;color:#6d8ba0}
+.mtt td{padding:9px 8px;text-align:center;border-top:1px solid rgba(140,200,235,.12);line-height:1.5;vertical-align:middle}
+.mtt tr.today{background:rgba(46,230,168,.09)}
+.mtt tr.today .mtd{color:var(--acc);font-weight:800}
+.mtt .mtd em{font-style:normal;color:#8ba6b8;margin-left:2px}
+.mtt .mtd em.sun{color:#ff8f8f}
+.mtt .mtd em.sat{color:#7db8ff}
+.mtt .mtm{font-weight:800;color:#8fdcff}
+.mtt .mth b,.mtt .mtl b{font-size:14px;letter-spacing:-.2px}
+.mtt .mth b{color:#35d0ff}
+.mtt .mtl b{color:#ffb020}
+.mtt .mtwind{color:#9fc0d4;font-size:12px}
+.mtt .mtdim,.mtdim{color:#6d8ba0;font-size:12px;font-weight:400}
+.mtfoot{padding:10px 14px;border-top:1px solid var(--line);color:#8ba6b8;font-size:11.5px;line-height:1.5}
+.mtfoot b{color:#d7e8f2}
+.sort.mtbtn{background:linear-gradient(100deg,rgba(53,208,255,.18),rgba(46,230,168,.14));
+  border:1px solid rgba(53,208,255,.4);color:#8fdcff;font-weight:800}
+/* 윈디 */
+.wdcard{width:min(900px,100%);height:min(86vh,720px)}
+.wdbody{flex:1;min-height:0}
+.wdbody iframe{width:100%;height:100%;border:0;display:block}
+.wdsw{margin-bottom:8px}
+
 /* ── 상단 ─────────────────────────────── */
 .topbar{
   position:fixed;z-index:20;left:12px;right:12px;top:calc(10px + var(--safeT));
@@ -5621,17 +5662,23 @@ function apiPoint(id, ds, want, days){
 
 function apiWeek_(p, ds, want, days){
   var bt = fetchBadatime_(p.i);
-  var days = [], base = new Date(ds + 'T00:00:00+09:00');
-  for (var k = 0; k < (days || 7); k++)
-    days.push(Utilities.formatDate(new Date(base.getTime() + k*86400000), CFG.TZ, 'yyyy-MM-dd'));
+  /* 주의 — 예전엔 지역변수 days 가 인자를 덮어써 반복이 0회가 되는 버그가 있었다 */
+  var n = Math.min(15, Math.max(7, Number(days) || 7));
+  var list = [], base = new Date(ds + 'T00:00:00+09:00');
+  for (var k = 0; k < n; k++)
+    list.push(Utilities.formatDate(new Date(base.getTime() + k*86400000), CFG.TZ, 'yyyy-MM-dd'));
   var rec = fetchWeather_([p], ds)[gridKey_(p.la, p.lo)];
-  return days.map(function(dd){
+  return list.map(function(dd){
     var tide = (bt && bt[dd]) ? bt[dd]
       : (function(){ var a = dd.split('-'); return calcTide_(p, +a[0], +a[1], +a[2]); })();
     var an = analyze_(p, dd, tide, dd === ds ? rec : null, want);
     return { ds: dd, mul: an.meta.mul, range: an.meta.range,
              h: an.haeru.score, f: an.fish.score,
              vis: dd === ds ? an.meta.vis : null,   // 기상 예보가 있는 당일만 시야를 낸다
+             /* 만조·간조 시각과 수위(cm) — 물때표의 핵심 숫자 */
+             ev: (tide && tide.events ? tide.events : []).map(function(e){
+               return { k: e.k, m: Math.round(e.t*60), lv: (e.lv == null ? null : Math.round(e.lv)) };
+             }),
              hw: an.haeru.window ? [Math.round(an.haeru.window[0]*60), Math.round(an.haeru.window[1]*60)] : null,
              fw: an.fish.window ? [Math.round(an.fish.window[0]*60), Math.round(an.fish.window[1]*60)] : null };
   });
@@ -5881,7 +5928,7 @@ window.google={script:{run:{
     if (ds){ Promise.all([ensureWeather(ds), ensureRemote()]).then(function(rs){ updateNote(rs[0]); setTimeout(go,40); }); }
     else setTimeout(go,100);},
   apiBoard:function(ds,mode,o){this._call(apiBoard,[ds,mode,o],ds);},
-  apiPoint:function(id,ds,w){this._call(apiPoint,[id,ds,w],ds);},
+  apiPoint:function(id,ds,w){this._call(apiPoint,[id,ds,w,15],ds);},
   apiSpecies:function(ds,m){this._call(apiSpecies,[ds,m]);},
   apiSearch:function(q){this._call(apiSearch,[q]);},
   apiZones:function(){this._call(apiZones,[]);},
@@ -8529,6 +8576,155 @@ $('wantbarX').onclick = function(){ S.want = null; S._moved = false; load(); };
     }, 260);
   });
 })();
+
+
+/* ══════════════ 물때표 한눈에 — 상세로 안 들어가고 바로 본다 ══════════════
+ * 요일·물때·만조·간조(수위 숫자)·물흐름·날씨를 한 표로. 수위(cm)가 주인공이다. */
+var MT = { el:null, sel:null };
+function mtDayWx_(p, dd){
+  var rec = WXC && WXC[dd + '|' + gridKey_(p.la, p.lo)];
+  if (!rec || !rec.wind) return null;
+  var w = rec.wind, dgs = rec.wdir || [], cl = rec.cloud || [], rn = rec.rain || [];
+  var n = Math.min(24, w.length), ws = 0, cd = 0, rs = 0, dx = 0, dy = 0;
+  for (var i = 0; i < n; i++){
+    ws += w[i] || 0; cd += cl[i] || 0; rs += rn[i] || 0;
+    var a = (dgs[i] || 0) * Math.PI / 180; dx += Math.sin(a); dy += Math.cos(a);
+  }
+  var deg = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+  var D8 = ['북','북동','동','남동','남','남서','서','북서'];
+  return { w: ws/n, dir: D8[Math.round(deg/45) % 8],
+           sky: rs > 1 ? '비' : cd/n >= 70 ? '흐림' : cd/n >= 35 ? '구름' : '맑음' };
+}
+function mtFlow_(range){
+  if (range == null) return '';
+  return range >= 7 ? '급함' : range >= 5 ? '셈' : range >= 3 ? '보통' : '느림';
+}
+function mtBuild_(){
+  if (MT.el) return;
+  var d = el('div','mtwrap');
+  d.id = 'mtwrap'; d.hidden = true;
+  d.innerHTML =
+      '<div class="mtcard glass">'
+    +   '<div class="mthead">'
+    +     '<h3>물때표</h3>'
+    +     '<select id="mtSel" aria-label="지점 선택"></select>'
+    +     '<button class="mtx" id="mtClose" aria-label="닫기">×</button>'
+    +   '</div>'
+    +   '<div class="mtbody" id="mtBody"><p class="mtload">물때를 불러오는 중…</p></div>'
+    +   '<div class="mtfoot">만조·간조 옆 <b>굵은 숫자가 조위(cm)</b> · 물때 바다타임 · 기상 오픈메테오 · 8일째부터는 물때만</div>'
+    + '</div>';
+  document.body.appendChild(d);
+  MT.el = d;
+  d.addEventListener('click', function(e){ if (e.target === d) mtClose_(); });
+  d.querySelector('#mtClose').onclick = mtClose_;
+  d.querySelector('#mtSel').onchange = function(){ mtLoad_(+this.value); };
+}
+function mtClose_(){ if (MT.el) MT.el.hidden = true; }
+function openMultae(){
+  mtBuild_();
+  var sel = MT.el.querySelector('#mtSel');
+  sel.innerHTML = '';
+  var seen = {};
+  var fv = favs();
+  var cands = [];
+  S.rows.forEach(function(r){ if (fv.indexOf(r.i) >= 0 && !seen[r.i]){ seen[r.i]=1; cands.push({i:r.i,n:'★ '+r.n}); } });
+  S.rows.slice(0, 20).forEach(function(r){ if (!seen[r.i]){ seen[r.i]=1; cands.push({i:r.i,n:r.n}); } });
+  cands.forEach(function(c){
+    var o = document.createElement('option'); o.value = c.i; o.textContent = c.n; sel.appendChild(o);
+  });
+  MT.el.hidden = false;
+  var first = (S.sel && seen[S.sel]) ? S.sel : (cands[0] && cands[0].i);
+  if (first != null){ sel.value = first; mtLoad_(+first); }
+}
+function mtLoad_(id){
+  var body = MT.el.querySelector('#mtBody');
+  body.innerHTML = '<p class="mtload">물때를 불러오는 중…</p>';
+  google.script.run.withSuccessHandler(function(d){
+    if (!d || d.error || !d.week){ body.innerHTML = '<p class="mtload">불러오지 못했습니다</p>'; return; }
+    var p = d.point;
+    /* 예보 닿는 날짜의 날씨를 미리 받아 둔다 (있는 것만) */
+    var jobs = d.week.slice(0, 7).map(function(w){
+      return (typeof ensureWeather === 'function') ? ensureWeather(w.ds).catch(function(){}) : Promise.resolve();
+    });
+    Promise.all(jobs).then(function(){
+      var h = '<table class="mtt"><thead><tr>'
+            + '<th>날짜</th><th>물때</th><th>만조 <span>(조위cm)</span></th><th>간조 <span>(조위cm)</span></th><th>물흐름</th><th>날씨</th>'
+            + '</tr></thead><tbody>';
+      d.week.forEach(function(w, i){
+        var dt = parseDs(w.ds);
+        var wd = WD[dt.getDay()];
+        var hi = (w.ev || []).filter(function(e){ return e.k === 'H'; });
+        var lo = (w.ev || []).filter(function(e){ return e.k === 'L'; });
+        var f = function(list){
+          if (!list.length) return '—';
+          return list.map(function(e){
+            return hm(e.m) + (e.lv != null ? ' <b>' + e.lv + '</b>' : '');
+          }).join('<br>');
+        };
+        var wx = i < 7 ? mtDayWx_(p, w.ds) : null;
+        var wxs = wx ? (wx.sky + '<br><span class="mtwind">' + wx.dir + ' ' + wx.w.toFixed(1) + 'm/s</span>') : '<span class="mtdim">—</span>';
+        var today = i === 0;
+        h += '<tr' + (today ? ' class="today"' : '') + (dt.getDay() === 0 ? ' data-sun="1"' : '') + '>'
+          + '<td class="mtd">' + (dt.getMonth()+1) + '.' + dt.getDate() + ' <em' + (dt.getDay()===0?' class="sun"':dt.getDay()===6?' class="sat"':'') + '>' + wd + '</em></td>'
+          + '<td class="mtm">' + (w.mul || '—') + '</td>'
+          + '<td class="mth">' + f(hi) + '</td>'
+          + '<td class="mtl">' + f(lo) + '</td>'
+          + '<td>' + mtFlow_(w.range) + (w.range != null ? '<br><span class="mtdim">조차 ' + w.range.toFixed(1) + 'm</span>' : '') + '</td>'
+          + '<td class="mtw">' + wxs + '</td>'
+          + '</tr>';
+      });
+      h += '</tbody></table>';
+      body.innerHTML = h;
+    });
+  }).withFailureHandler(function(){
+    body.innerHTML = '<p class="mtload">불러오지 못했습니다</p>';
+  }).apiPoint(id, S.ds, null);
+}
+/* 정렬 줄에 물때표 단추를 끼워 넣는다 — 첫 화면에서 한 번에 연다 */
+(function(){
+  var sorts = $('sorts');
+  if (!sorts) return;
+  var b = document.createElement('button');
+  b.className = 'sort mtbtn'; b.type = 'button'; b.textContent = '물때표';
+  b.onclick = function(e){ e.stopPropagation(); openMultae(); };
+  sorts.appendChild(b);
+})();
+
+/* ══════════════ 바람·풍향 — 윈디 화면을 그 자리에 띄운다 ══════════════ */
+var WINDY = { el:null };
+function openWindy(){
+  if (!WINDY.el){
+    var d = el('div','mtwrap');
+    d.id = 'wdwrap'; d.hidden = true;
+    d.innerHTML =
+        '<div class="mtcard glass wdcard">'
+      +   '<div class="mthead"><h3>바람·풍향 <span class="mtdim">윈디</span></h3>'
+      +   '<button class="mtx" id="wdClose" aria-label="닫기">×</button></div>'
+      +   '<div class="wdbody"><iframe id="wdFrame" title="바람 지도" frameborder="0" loading="lazy"></iframe></div>'
+      + '</div>';
+    document.body.appendChild(d);
+    WINDY.el = d;
+    d.addEventListener('click', function(e){ if (e.target === d) d.hidden = true; });
+    d.querySelector('#wdClose').onclick = function(){ WINDY.el.hidden = true; };
+  }
+  var c = map.getCenter(), z = Math.min(11, Math.max(5, map.getZoom()));
+  WINDY.el.querySelector('#wdFrame').src =
+    'https://embed.windy.com/embed2.html?lat=' + c.lat.toFixed(3) + '&lon=' + c.lng.toFixed(3)
+    + '&detailLat=' + c.lat.toFixed(3) + '&detailLon=' + c.lng.toFixed(3)
+    + '&zoom=' + z + '&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true'
+    + '&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=m%2Fs&metricTemp=%C2%B0C&radarRange=-1';
+  WINDY.el.hidden = false;
+}
+/* 지도 왼쪽 아래 — 어장·갯골 토글 옆에 바람 단추 */
+var wdCtl = L.control({position:'bottomleft'});
+wdCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw wdsw');
+  d.innerHTML = '<button class="basebtn" id="wdBtn" type="button">바람</button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(){ openWindy(); });
+  return d;
+};
+wdCtl.addTo(map);
 
 })();
 </script>
