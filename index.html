@@ -1761,6 +1761,24 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
   body.has-ticker .topbar{top:calc(38px + var(--safeT))}
   /* 물때표 카드는 가운데 그대로 */
 }
+
+/* 날짜줄 이동 단추 */
+.dsctl{
+  position:fixed;z-index:21;transform:translateY(-50%);
+  -webkit-appearance:none;appearance:none;border:1px solid rgba(140,200,235,.35);cursor:pointer;
+  background:rgba(7,26,38,.92);color:#cadeeb;font-family:inherit;
+  width:28px;height:28px;border-radius:50%;font-size:17px;line-height:1;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+.dsctl:hover{background:rgba(20,50,70,.95);color:#fff}
+#dsToday{
+  width:auto;height:28px;border-radius:14px;padding:0 12px;font-size:12px;
+  background:linear-gradient(100deg,#2ee6a8,#35d0ff);color:#04121c;border:0;
+}
+.dsctl[hidden]{display:none}
+
 </style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -8170,6 +8188,61 @@ function renderDates(){
   }
   var on = n.querySelector('.dchip.on');
   if (on) on.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+  dsCtl_();
+}
+
+/* ── 날짜줄 이동 단추 — 좌우 화살표 + 「오늘」 복귀 ── */
+function dsCtl_(){
+  var st = $('datestrip'); if (!st) return;
+  if (!$('dsPrev')){
+    var mk = function(id, html, fn){
+      var b = document.createElement('button');
+      b.id = id; b.className = 'dsctl'; b.type = 'button'; b.innerHTML = html; b.onclick = fn;
+      document.body.appendChild(b); return b;
+    };
+    mk('dsPrev', '&#8249;', function(){ st.scrollBy({ left:-280, behavior:'smooth' }); });
+    mk('dsNext', '&#8250;', function(){ st.scrollBy({ left: 280, behavior:'smooth' }); });
+    mk('dsToday', '오늘', function(){
+      if (S.ds !== BOOT.today){ S.ds = BOOT.today; renderDates(); load(); }
+      else {
+        var on2 = st.querySelector('.dchip.on');
+        if (on2) on2.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+      }
+    });
+    st.addEventListener('scroll', function(){ dsCtlSync_(); }, { passive:true });
+    window.addEventListener('resize', function(){ dsCtlSync_(); });
+  }
+  dsCtlSync_();
+}
+function dsCtlSync_(){
+  var st = $('datestrip'); if (!st || !$('dsPrev')) return;
+  var r = st.getBoundingClientRect();
+  var midY = (r.top + r.height/2);
+  var place = function(id, x, fromRight){
+    var b = $(id); if (!b) return;
+    b.style.top = midY + 'px';
+    if (fromRight){ b.style.right = x + 'px'; b.style.left = 'auto'; }
+    else { b.style.left = x + 'px'; b.style.right = 'auto'; }
+  };
+  place('dsPrev', r.left + 2, false);
+  place('dsNext', (window.innerWidth - r.right) + 2, true);
+  place('dsToday', (window.innerWidth - r.right) + 34, true);
+  /* 「오늘」 단추는 오늘이 화면 밖이거나 다른 날짜를 보고 있을 때만 */
+  var need = (S.ds !== BOOT.today);
+  if (!need){
+    var chips = st.querySelectorAll('.dchip');
+    var today = chips[1];   /* 어제 다음이 오늘 */
+    if (today){
+      var x0 = today.offsetLeft - st.scrollLeft, x1 = x0 + today.offsetWidth;
+      need = (x1 < 0 || x0 > st.clientWidth);
+    }
+  }
+  var td = $('dsToday'); if (td) td.hidden = !need;
+  /* 화살표는 넘칠 때만 */
+  var over = st.scrollWidth > st.clientWidth + 8;
+  var pv = $('dsPrev'), nx = $('dsNext');
+  if (pv) pv.hidden = !over;
+  if (nx) nx.hidden = !over;
 }
 
 /* ══════════════ 모드 토글 ══════════════ */
