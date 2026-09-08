@@ -1847,6 +1847,16 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
 .mtfoot .rec-star{font-size:13px}
 .mtfoot .up{color:#ff8f8f}.mtfoot .dn{color:#7db8ff}
 
+
+/* 물때표 모바일 — 야간 골든타임 한 칸 */
+.mtnight b{color:#8fdcff}
+@media(max-width:680px){
+  .mtcard:has(.mtt-full){width:100%}
+  .mtt-narrow th,.mtt-narrow td{padding:7px 3px;font-size:11px}
+  .mtt-narrow .mtm .mtsub{display:none}
+  .mtt-narrow .mtfl{min-width:44px}
+}
+
 </style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -9119,10 +9129,12 @@ function mtLoad_(id){
       };
       var prevHi = null, prevLo = null;
       var mMode = S.mode === 'fish' ? 'f' : 'h';
-      var h = '<table class="mtt mtt-full"><thead><tr>'
+      var narrow = false; try { narrow = window.matchMedia('(max-width:680px)').matches; } catch(e){}
+      var h = '<table class="mtt mtt-full' + (narrow?' mtt-narrow':'') + '"><thead><tr>'
             + '<th>날짜</th><th>물때</th><th>' + (mMode==='h'?'해루질':'낚시') + '<br>추천</th><th>물흐름</th>'
             + '<th>만조 <span>시각·조위·증감</span></th><th>간조 <span>시각·조위·증감</span></th>'
-            + '<th>해<br>뜸/짐</th><th>달<br>뜸/짐</th><th>날씨</th>'
+            + (narrow ? '<th>야간</th>' : '<th>해<br>뜸/짐</th><th>달<br>뜸/짐</th>')
+            + '<th>날씨</th>'
             + '</tr></thead><tbody>';
       d.week.forEach(function(w, i){
         var dt = parseDs(w.ds);
@@ -9172,6 +9184,19 @@ function mtLoad_(id){
         var recCell = stars + (slab ? '<br>' + slab : '');
         var sunC = (w.sr!=null||w.ss!=null) ? (hm(w.sr) + '<br><span class="mtsub">' + hm(w.ss) + '</span>') : '—';
         var moonC = (w.mr!=null||w.ms!=null) ? (hm(w.mr) + '<br><span class="mtsub">' + hm(w.ms) + '</span>') : '—';
+        /* 야간 골든타임 — 해 지고, 달빛 적을 때(달 지면 더 어둡다)가 밤 채집 명당.
+           해루질에 특히 중요: 낙지·꽃게가 달 밝으면 경계한다. */
+        var night = '—';
+        if (w.ss != null){
+          var afterDark = hm(w.ss);
+          if (w.bright != null && w.bright >= 55 && w.ms != null && w.ms > w.ss){
+            night = '<b>' + hm(w.ms) + '~</b><br><span class="mtsub">달 진 뒤(달빛 ' + w.bright + '%)</span>';
+          } else if (w.bright != null && w.bright < 35){
+            night = '<b>' + afterDark + '~</b><br><span class="mtsub">어두운 밤(달빛 ' + w.bright + '%)</span>';
+          } else {
+            night = '<b>' + afterDark + '~</b><br><span class="mtsub">일몰 후</span>';
+          }
+        }
         var today = i === 0;
         var bestRow = (sc != null && i < 7 && sc >= 78);
         h += '<tr' + (today ? ' class="today"' : '') + (bestRow ? ' data-best="1"' : '') + '>'
@@ -9183,8 +9208,8 @@ function mtLoad_(id){
           + '<td class="mtfl">' + flowBar + '</td>'
           + '<td class="mth">' + hiCell + '</td>'
           + '<td class="mtl">' + loCell + '</td>'
-          + '<td class="mtsm">' + sunC + '</td>'
-          + '<td class="mtsm">' + moonC + '</td>'
+          + (narrow ? ('<td class="mtsm mtnight">' + night + '</td>')
+                    : ('<td class="mtsm">' + sunC + '</td><td class="mtsm">' + moonC + '</td>'))
           + '<td class="mtw">' + wxs + '</td>'
           + '</tr>';
       });
