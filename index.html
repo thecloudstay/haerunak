@@ -1857,6 +1857,9 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
   .mtt-narrow .mtfl{min-width:44px}
 }
 
+
+.eosw .basebtn.ac.on{background:linear-gradient(100deg,#ff5252,#d81b1b);color:#fff;box-shadow:0 2px 9px rgba(216,27,27,.4)}
+
 </style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -6585,7 +6588,8 @@ eoCtl.onAdd = function(){
   var d = L.DomUtil.create('div','basesw eosw');
   d.innerHTML = '<button class="basebtn on" id="eoBtn" type="button">어장</button>'
               + '<button class="basebtn on gg" id="ggBtn" type="button">갯골</button>'
-              + '<button class="basebtn on rk" id="rkBtn" type="button">갯바위</button>';
+              + '<button class="basebtn on rk" id="rkBtn" type="button">갯바위</button>'
+              + '<button class="basebtn ac" id="acBtn" type="button">사고</button>';
   L.DomEvent.disableClickPropagation(d);
   L.DomEvent.on(d, 'click', function(e){
     var t = e.target;
@@ -6607,11 +6611,18 @@ eoCtl.onAdd = function(){
       if (RK_ON && map.getZoom() < RK_MINZ) toast('지도를 확대하면 갯바위가 보입니다');
       rkVis_();
       try { localStorage.setItem('hrn_rk', RK_ON ? '1' : '0'); } catch(err){}
+    } else if (t && t.id === 'acBtn'){
+      AC_ON = !AC_ON;
+      t.className = 'basebtn ac' + (AC_ON ? ' on' : '');
+      if (AC_ON) toast('붉을수록 인명사고 잦은 구역입니다 — 안전 참고');
+      acVis_();
+      try { localStorage.setItem('hrn_ac', AC_ON ? '1' : '0'); } catch(err){}
     }
   });
   try { if (localStorage.getItem('hrn_eo') === '0'){ EO_ON = false; d.querySelector('#eoBtn').className = 'basebtn'; } } catch(e){}
   try { if (localStorage.getItem('hrn_gg') === '0'){ GG_ON = false; d.querySelector('#ggBtn').className = 'basebtn gg'; } } catch(e){}
   try { if (localStorage.getItem('hrn_rk') === '0'){ RK_ON = false; d.querySelector('#rkBtn').className = 'basebtn rk'; } } catch(e){}
+  try { if (localStorage.getItem('hrn_ac') === '1'){ AC_ON = true; d.querySelector('#acBtn').className = 'basebtn ac on'; acVis_(); } } catch(e){}
   return d;
 };
 eoCtl.addTo(map);
@@ -6890,6 +6901,44 @@ function rkVis_(){
   else { if (map.hasLayer(RK_LAYER)) map.removeLayer(RK_LAYER); }
 }
 map.on('moveend zoomend', rkVis_);
+
+/* ══════════════ 연안 인명사고 히트맵 — 개방해 인명사고(2025) 2만여 건 ══════════════
+ * 안전 정보이자 B2G·보험 상품의 근거. 위험도 = 건수 + 사망·실종 가중. 기본은 꺼둔다(원하면 켜기). */
+var AC_LAYER = L.layerGroup();
+var AC_ON = false, AC_LOADED = false, AC_DATA = null;
+function acRisk_(c){ return c.n + (c.d + c.m) * 4; }        // 사망·실종은 4배 가중
+function acColor_(r){ return r >= 40 ? '#d81b1b' : r >= 18 ? '#ff6a00' : r >= 8 ? '#ffa51f' : '#ffd24d'; }
+function acDraw_(){
+  AC_LAYER.clearLayers();
+  if (!AC_DATA) return;
+  var z = map.getZoom();
+  AC_DATA.cells.forEach(function(c){
+    var r = acRisk_(c);
+    if (z < 9 && r < 8) return;                 // 낮은 배율에선 위험한 곳만
+    var rad = Math.min(1400, 300 + r * 22);
+    var col = acColor_(r);
+    var pg = L.circle([c.la, c.lo], { radius: rad, renderer: EO_RENDER,
+      color: col, weight: 0, fillColor: col, fillOpacity: .22 });
+    pg.bindPopup('<div style="line-height:1.5"><b style="color:#d33">⚠ 연안 인명사고 다발</b>'
+      + '<br>이 2km 구역 누적 <b>' + c.n + '건</b>'
+      + (c.d ? ' · 사망 <b style="color:#d33">' + c.d + '명</b>' : '')
+      + (c.m ? ' · 실종 <b style="color:#d33">' + c.m + '명</b>' : '')
+      + '<br>주 유형: ' + c.t
+      + '<br><span style="color:#888">출처 국립해양조사원 인명사고(2025)</span></div>');
+    pg.addTo(AC_LAYER);
+  });
+}
+function acVis_(){
+  if (AC_ON){
+    if (!map.hasLayer(AC_LAYER)) AC_LAYER.addTo(map);
+    if (!AC_LOADED){
+      AC_LOADED = true;
+      fetch('data/accidents.json').then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ AC_DATA = j; acDraw_(); }).catch(function(){});
+    } else acDraw_();
+  } else { if (map.hasLayer(AC_LAYER)) map.removeLayer(AC_LAYER); }
+}
+map.on('moveend zoomend', function(){ if (AC_ON) acDraw_(); });
 
 /* ══════════════ 낚시금지·제한구역 — 낚시 관리 및 육성법 ══════════════ */
 var NF_LAYER = L.layerGroup().addTo(map);
