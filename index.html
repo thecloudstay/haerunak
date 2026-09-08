@@ -753,9 +753,18 @@ h1,h2,h3,h4,p{margin:0}
 }
 
 
-/* 카카오맵 배경 — 밝은 지도 위에서 핀이 또렷하게 */
-body.map-kakao .pin{box-shadow:0 0 0 2px rgba(0,0,0,.45),0 3px 12px rgba(0,0,0,.55)}
-body.map-kakao .vignette{opacity:.35}
+/* 카카오맵 배경 — 밝은 지도 위에서 또렷하게 (핀 전면 보정) */
+body.map-kakao .pin{
+  border:2.5px solid #fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.28),0 5px 14px rgba(15,35,55,.35);
+}
+body.map-kakao .pin::before{filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+body.map-kakao .pin::after{background:#12324a;box-shadow:0 0 0 1.5px #fff}
+body.map-kakao .pin.sm{opacity:.96;border-width:2px}
+body.map-kakao .pin.on{border-color:#12324a}
+body.map-kakao .pin-top{box-shadow:0 0 0 3px rgba(11,151,104,.4),0 5px 14px rgba(15,35,55,.4)}
+body.map-kakao .pin-top .halo{border-color:#0b9768}
+body.map-kakao .vignette{opacity:.22}
 body.map-kakao .leaflet-container{background:transparent}
 
 /* 위성 모드: 배경이 밝아 핀 테두리·비네트를 강하게 */
@@ -6114,6 +6123,25 @@ getBase_('dark').addTo(map);
 function setBase_(k){
   if (k === curBase) return;
   if (!TILE_SRC[k]) return;
+  /* 카카오 모드: 지도=카카오 일반, 위성=카카오 위성+지명, 어둡게=기존 다크 지도 */
+  if (typeof KAKAO !== 'undefined' && KAKAO.on){
+    Object.keys(LIVE).forEach(function(kk){ if (LIVE[kk] && map.hasLayer(LIVE[kk])) map.removeLayer(LIVE[kk]); });
+    if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
+    if (k === 'lite'){
+      kakaoShow_(false);
+      var dk = getBase_('dark');
+      dk.addTo(map); dk.bringToBack();
+    } else {
+      kakaoShow_(true);
+      kSetType_(k === 'sat' ? 'HYBRID' : 'ROADMAP');
+    }
+    curBase = k;
+    document.body.className = document.body.className.replace(/\s*map-sat\b/,'') + (k === 'sat' ? ' map-sat' : '');
+    var kb = document.querySelectorAll('.basesw:not(.eosw) .basebtn');
+    for (var i2 = 0; i2 < kb.length; i2++) kb[i2].className = 'basebtn' + (kb[i2].getAttribute('data-b') === k ? ' on' : '');
+    try { localStorage.setItem('hrn_base', k); } catch(e){}
+    return;
+  }
   var old = LIVE[curBase];
   if (old && map.hasLayer(old)) map.removeLayer(old);
   if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
@@ -6223,6 +6251,8 @@ map.on('zoomend', function(){ if (S.rows.length) drawPins(); });
 var ZONE_LAYER = L.layerGroup().addTo(map);
 var ZONE_STYLE = { color:'#ff5252', weight:1.6, opacity:.85, fillColor:'#ff5252', fillOpacity:.16 };
 var ZONE_STYLE_EST = { color:'#ff7a7a', weight:1.4, opacity:.7, dashArray:'5 4', fillColor:'#ff5252', fillOpacity:.08 };
+var ZONE_STYLE_KK = { color:'#d92c2c', weight:1.8, opacity:.9, fillColor:'#e23a3a', fillOpacity:.18 };
+var ZONE_STYLE_KE = { color:'#d95050', weight:1.6, opacity:.8, dashArray:'5 4', fillColor:'#e23a3a', fillOpacity:.1 };
 function zonePopup_(z){
   return '<div style="max-width:230px;line-height:1.5">'
     + '<b style="color:#d33">⛔ 출입통제구역</b><br><b>' + z.n + '</b>'
@@ -6237,9 +6267,11 @@ function drawZones_(list){
   ZONE_LAYER.clearLayers();
   (list || []).forEach(function(z){
     if (!z || !z.la || !z.lo) return;
+    var zs  = brightMap_() ? ZONE_STYLE_KK : ZONE_STYLE;
+    var zse = brightMap_() ? ZONE_STYLE_KE : ZONE_STYLE_EST;
     var sh = (z.poly && z.poly.length >= 3)
-      ? L.polygon(z.poly, ZONE_STYLE)
-      : L.circle([z.la, z.lo], Object.assign({ radius: 400 }, z.est ? ZONE_STYLE_EST : ZONE_STYLE));
+      ? L.polygon(z.poly, zs)
+      : L.circle([z.la, z.lo], Object.assign({ radius: 400 }, z.est ? zse : zs));
     sh.bindTooltip('⛔ ' + z.n, { direction:'top', opacity:.9 });
     sh.bindPopup(zonePopup_(z));
     sh.addTo(ZONE_LAYER);
@@ -6269,10 +6301,20 @@ var EO_STYLE = {
   Y: { c:'#b39af0', fo:.12 },   // 기타 양식
   J: { c:'#41b9d5', fo:.12 }    // 정치망
 };
+/* 밝은 지도(카카오) 위에서는 더 진한 색을 쓴다 */
+var EO_STYLE_K = {
+  M: { c:'#e08600', fo:.24 },
+  P: { c:'#4a63d8', fo:.16 },
+  H: { c:'#0d9e63', fo:.16 },
+  Y: { c:'#7a55cc', fo:.16 },
+  J: { c:'#0e8fb5', fo:.16 }
+};
+function brightMap_(){ return document.body.classList.contains('map-kakao'); }
+function eoStyleOf_(k){ return (brightMap_() ? EO_STYLE_K : EO_STYLE)[k] || EO_STYLE.Y; }
 var EO_NAME = { M:'마을어업 (어촌계 관리수역)', P:'패류 양식장', H:'해조류 양식장', Y:'양식장', J:'정치망 어장' };
 function eoPopup_(f){
   var s = '<div style="max-width:230px;line-height:1.5">'
-    + '<b style="color:' + EO_STYLE[f.k].c + '">■ ' + EO_NAME[f.k] + '</b>';
+    + '<b style="color:' + eoStyleOf_(f.k).c + '">■ ' + EO_NAME[f.k] + '</b>';
   if (f.f) s += '<br>품목: ' + f.f;
   if (f.a) s += '<br>' + f.a;
   if (f.ha) s += '<br>면적 ' + f.ha + 'ha';
@@ -6293,9 +6335,9 @@ function eoDrawCell_(key){
   feats._drawn = true;
   feats.forEach(function(f){
     (f.p || []).forEach(function(ring){
-      var st = EO_STYLE[f.k] || EO_STYLE.Y;
-      var pg = L.polygon(ring, { renderer: EO_RENDER, color: st.c, weight: 1,
-                                 opacity: .55, fillColor: st.c, fillOpacity: st.fo });
+      var st = eoStyleOf_(f.k);
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color: st.c, weight: brightMap_() ? 1.2 : 1,
+                                 opacity: brightMap_() ? .75 : .55, fillColor: st.c, fillOpacity: st.fo });
       pg.bindPopup(eoPopup_(f));
       pg.addTo(EO_LAYER);
     });
@@ -6346,8 +6388,10 @@ function ggDrawCell_(key){
   feats._drawn = true;
   feats.forEach(function(rings){
     rings.forEach(function(ring){
-      var pg = L.polygon(ring, { renderer: EO_RENDER, color:'#37c4f2', weight:1,
-                                 opacity:.65, fillColor:'#37c4f2', fillOpacity:.22 });
+      var gc = brightMap_() ? '#0b7fc9' : '#37c4f2';
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color: gc, weight: brightMap_() ? 1.2 : 1,
+                                 opacity: brightMap_() ? .8 : .65, fillColor: gc,
+                                 fillOpacity: brightMap_() ? .28 : .22 });
       pg.bindPopup(GG_POP);
       pg.addTo(GG_LAYER);
     });
@@ -6397,8 +6441,10 @@ function rkDrawCell_(key){
   feats._drawn = true;
   feats.forEach(function(rings){
     rings.forEach(function(ring){
-      var pg = L.polygon(ring, { renderer: EO_RENDER, color:'#d8b47a', weight:1,
-                                 opacity:.6, fillColor:'#d8b47a', fillOpacity:.20 });
+      var rc = brightMap_() ? '#8a6534' : '#d8b47a';
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color: rc, weight: brightMap_() ? 1.2 : 1,
+                                 opacity: brightMap_() ? .75 : .6, fillColor: rc,
+                                 fillOpacity: brightMap_() ? .26 : .20 });
       pg.bindPopup(RK_POP);
       pg.addTo(RK_LAYER);
     });
@@ -6451,8 +6497,9 @@ function loadNofish_(){
       if (!j || !j.list) return;
       j.list.forEach(function(z){
         (z.p || []).forEach(function(ring){
-          var pg = L.polygon(ring, { renderer: EO_RENDER, color:'#ff5c8a', weight:1.4,
-                                     opacity:.8, fillColor:'#ff5c8a', fillOpacity:.18 });
+          var fc = brightMap_() ? '#d81b60' : '#ff5c8a';
+          var pg = L.polygon(ring, { renderer: EO_RENDER, color: fc, weight: 1.4,
+                                     opacity: .85, fillColor: fc, fillOpacity: brightMap_() ? .2 : .18 });
           pg.bindTooltip('🚫 낚시' + z.t + (z.n ? ' · ' + z.n : ''), { direction:'top', opacity:.9 });
           pg.bindPopup(nfPopup_(z));
           pg.addTo(NF_LAYER);
