@@ -1779,6 +1779,33 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
 }
 .dsctl[hidden]{display:none}
 
+
+/* 상세 되돌아가기 단추 — 컴퓨터 화면에서만 */
+#dtBack{display:none}
+@media (min-width:900px){
+  .detail{inset:auto;left:12px;top:calc(154px + var(--safeT));bottom:12px;width:392px}
+  .detail-scrim{display:none}
+  .detail-panel{
+    position:absolute;inset:0;max-height:none;border-radius:20px;width:auto;
+    border-bottom:1px solid rgba(140,200,235,.25);
+    animation:slidein .3s var(--sp);
+    transform:none;   /* 720px 규칙의 가운데 이동 해제 */
+  }
+  #detailHandle{display:none}
+  #dtBack{
+    display:flex;align-items:center;gap:4px;margin:12px 18px 0;
+    -webkit-appearance:none;appearance:none;border:1px solid rgba(140,200,235,.3);cursor:pointer;
+    background:rgba(255,255,255,.06);color:#cadeeb;font-family:inherit;
+    padding:7px 14px;border-radius:12px;font-size:12.5px;font-weight:800;width:fit-content;
+  }
+  #dtBack:hover{background:rgba(255,255,255,.12);color:#fff}
+}
+@keyframes slidein{from{transform:translateX(-36px);opacity:0}to{transform:none;opacity:1}}
+
+
+/* 오늘 칸은 날짜줄 왼쪽에 붙박이 — 스크롤해도 항상 보인다 */
+.dchip.today{position:sticky;left:0;z-index:3;box-shadow:4px 0 10px rgba(3,12,20,.55)}
+
 </style>
 
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -5595,6 +5622,8 @@ function apiBoard(ds, mode, opts){
     // 차로 가는 섬 = 다리·방조제·연륙도로로 차량 진입이 확인된 섬(br 표식)만.
     // 배편 정보가 없다고 다리섬으로 치던 예전 논리는 연평도·백령도까지 새게 했다.
     if (opts.car && !p.br) return false;
+    // 펄 갯벌은 낚싯대를 던질 자리가 아니다 — 낚시 대상이 명시된 곳만 낚시 모드에 남긴다
+    if (mode === 'fish' && p.f === 'mud' && !p.fx) return false;
     if (opts.want){
       var arr = speciesOf_(p, mode);
       if (arr.indexOf(opts.want) < 0) return false;
@@ -7063,26 +7092,57 @@ window.addEventListener('popstate', function(){
   if (!q.spot){ if (typeof closeDetail === 'function') closeDetail(); }
 });
 
-function openDetail(id){
-  pushRoute_('spot', id);
+function isDesk_(){ try { return window.matchMedia('(min-width:900px)').matches; } catch(e){ return false; } }
+function openDetail(id, auto){
+  if (!auto) pushRoute_('spot', id);
   refEvent('open');
   S.sel = id;
   var d = $('detail'); d.hidden = false;
+  /* 컴퓨터 화면: 상세가 왼쪽 판을 대신한다 — 되돌아갈 「목록」 단추를 붙인다 */
+  if (!$('dtBack')){
+    var bk = document.createElement('button');
+    bk.id = 'dtBack'; bk.type = 'button'; bk.innerHTML = '&#8249; 목록';
+    bk.onclick = closeDetail;
+    $('detailPanel').insertBefore(bk, $('detailBody'));
+  }
   $('detailBody').innerHTML = '<div class="sk" style="height:120px"></div><div class="sk" style="height:180px"></div><div class="sk" style="height:120px"></div>';
   google.script.run
     .withSuccessHandler(renderDetail)
     .withFailureHandler(function(){ $('detailBody').innerHTML = '<p class="row-verdict" style="padding:30px 0;text-align:center">정보를 불러오지 못했습니다.</p>'; })
     .apiPoint(id, S.ds, S.want, isPremium() ? 15 : 7);
   var m = S.markers[id];
-  if (m){ map.panTo([m.getLatLng().lat - 0.35, m.getLatLng().lng], { animate:true }); }
+  if (m && !auto){
+    if (isDesk_()) map.panTo(m.getLatLng(), { animate:true });
+    else map.panTo([m.getLatLng().lat - 0.35, m.getLatLng().lng], { animate:true });
+  }
 }
 function closeDetail(){
   var p = $('detailPanel');
   p.style.transition = 'transform .3s var(--sp)';
-  p.style.transform = 'translateY(100%)';
+  p.style.transform = isDesk_() ? 'translateX(-110%)' : 'translateY(100%)';
   setTimeout(function(){ $('detail').hidden = true; p.style.transform = ''; p.style.transition = ''; }, 280);
 }
 $('detailScrim').onclick = closeDetail;
+
+/* ── 지도 중심 항해 — 확대해서 다가가면 그 지점 정보가 왼쪽에 뜬다 (컴퓨터 화면) ── */
+function autoDetail_(){
+  if (!isDesk_()) return;
+  if (map.getZoom() < 12) return;
+  if (!S.rows || !S.rows.length) return;
+  var c = map.getCenter(), best = null, bd = 1e9;
+  S.rows.forEach(function(r){
+    var d2 = dist(c.lat, c.lng, r.la, r.lo);
+    if (d2 < bd){ bd = d2; best = r; }
+  });
+  if (!best || bd > 6) return;                       // 중심에서 6km 안에 지점이 있어야
+  if (S.sel === best.i && !$('detail').hidden) return;
+  openDetail(best.i, true);                          // 자동 — 지도는 안 움직인다
+}
+autoDetail_._t = null;
+map.on('moveend zoomend', function(){
+  clearTimeout(autoDetail_._t);
+  autoDetail_._t = setTimeout(autoDetail_, 550);
+});
 
 /* ── 화면이 살아나는 느낌 ──
    숫자가 갑자기 튀어나오는 것보다, 차오르는 걸 눈으로 보는 편이
@@ -8178,7 +8238,7 @@ function renderDates(){
     var ds = dstr(d);
     var far = k > WX_DAYS;
     var lbl = k===0 ? '오늘' : k===1 ? '내일' : k===-1 ? '어제' : (d.getMonth()+1)+'/'+d.getDate();
-    var c = el('button','dchip'+(ds===S.ds?' on':'')+(far?' far':''),
+    var c = el('button','dchip'+(ds===S.ds?' on':'')+(far?' far':'')+(k===0?' today':''),
       '<b>'+lbl+'</b><span>'+(far?'물때만':WD[d.getDay()])+'</span>');
     (function(x, fx){ c.onclick = function(){
       if (S.ds===x) return; S.ds = x; renderDates(); load();
