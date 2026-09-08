@@ -864,6 +864,10 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .wdbody{flex:1;min-height:0}
 .wdbody iframe{width:100%;height:100%;border:0;display:block}
 .wdsw{margin-bottom:8px}
+.basebtn#wdBtn.on{background:linear-gradient(100deg,#4aa3ff,#37c0a8);color:#04121c;box-shadow:0 2px 9px rgba(74,163,255,.4)}
+.wind-arrow{background:none;border:0;pointer-events:none}
+.wind-arrow svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
+.wind-spd{position:absolute;left:50%;top:100%;transform:translate(-50%,-2px);font-size:9.5px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.7),0 0 3px rgba(0,0,0,.5)}
 
 /* ── 상단 ─────────────────────────────── */
 .topbar{
@@ -7463,6 +7467,8 @@ function render(){
   drawPins();
   renderPick();
   renderList();
+  /* 바람 오버레이가 켜져 있으면 날짜·데이터 갱신에 맞춰 다시 그린다 */
+  try { if (typeof WINDL !== 'undefined' && WINDL.on && typeof ensureWeather === 'function'){ ensureWeather(S.ds).then(function(){ windDraw_(); }).catch(function(){ windDraw_(); }); } } catch(e){}
   $('tagline').textContent = tideOnly_()
     ? '물때만 · 점수는 7일 이내 제공'
     : MODE_NAME[S.mode] + ' · ' + S.rows.length + '곳'
@@ -9552,38 +9558,74 @@ function mtLoad_(id){
   sorts.appendChild(b);
 })();
 
-/* ══════════════ 바람·풍향 — 윈디 화면을 그 자리에 띄운다 ══════════════ */
-var WINDY = { el:null };
-function openWindy(){
-  if (!WINDY.el){
-    var d = el('div','mtwrap');
-    d.id = 'wdwrap'; d.hidden = true;
-    d.innerHTML =
-        '<div class="mtcard glass wdcard">'
-      +   '<div class="mthead"><h3>바람·풍향 <span class="mtdim">윈디</span></h3>'
-      +   '<button class="mtx" id="wdClose" aria-label="닫기">×</button></div>'
-      +   '<div class="wdbody"><iframe id="wdFrame" title="바람 지도" frameborder="0" loading="lazy"></iframe></div>'
-      + '</div>';
-    document.body.appendChild(d);
-    WINDY.el = d;
-    d.addEventListener('click', function(e){ if (e.target === d) d.hidden = true; });
-    d.querySelector('#wdClose').onclick = function(){ WINDY.el.hidden = true; };
-  }
-  var c = map.getCenter(), z = Math.min(11, Math.max(5, map.getZoom()));
-  WINDY.el.querySelector('#wdFrame').src =
-    'https://embed.windy.com/embed2.html?lat=' + c.lat.toFixed(3) + '&lon=' + c.lng.toFixed(3)
-    + '&detailLat=' + c.lat.toFixed(3) + '&detailLon=' + c.lng.toFixed(3)
-    + '&zoom=' + z + '&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true'
-    + '&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=m%2Fs&metricTemp=%C2%B0C&radarRange=-1';
-  WINDY.el.hidden = false;
+/* ══════════════ 바람·풍향 — 지도 위에 실시간 바람 화살표(Open-Meteo, 카카오/지도 직접 표시) ══════════════
+   기존 윈디 iframe(embed.windy.com)은 접속 차단·X-Frame 문제로 자주 에러가 나서 제거.
+   대신 사이트가 이미 받는 Open-Meteo 격자 바람으로 화살표를 직접 그린다 → 팝업 없음, 카카오 위에서도 동작. */
+var WINDL = { layer:null, on:false, ds:null };
+function windColor_(ms){
+  return ms>=12 ? '#ff4d4d' : ms>=8 ? '#ff8c1a' : ms>=5 ? '#37c0a8' : ms>=2 ? '#4aa3ff' : '#9db4c4';
 }
+function windHour_(){
+  /* S.ds가 오늘이면 현재 한국시각 시(時), 아니면 정오 12시 */
+  try {
+    if (S.ds === BOOT.today){ return new Date(Date.now()+9*36e5).getUTCHours(); }
+  } catch(e){}
+  return 12;
+}
+function windArrowIcon_(deg, ms){
+  var col = windColor_(ms), len = 15 + Math.min(13, ms*1.1);
+  /* 화살표는 바람이 불어가는 쪽(풍향+180)을 가리킨다 */
+  var svg = '<svg width="34" height="34" viewBox="0 0 34 34" style="transform:rotate('+deg+'deg);overflow:visible">'
+    + '<line x1="17" y1="'+(17+len/2)+'" x2="17" y2="'+(17-len/2)+'" stroke="'+col+'" stroke-width="2.4" stroke-linecap="round"/>'
+    + '<path d="M17 '+(17-len/2-1)+' l-4.5 6 l4.5 -2.4 l4.5 2.4 z" fill="'+col+'"/></svg>';
+  return L.divIcon({ className:'wind-arrow', html:svg
+    + '<span class="wind-spd" style="color:'+col+'">'+Math.round(ms)+'</span>',
+    iconSize:[34,34], iconAnchor:[17,17] });
+}
+function windDraw_(){
+  if (!WINDL.on) return;
+  if (!WINDL.layer){ WINDL.layer = L.layerGroup().addTo(map); }
+  WINDL.layer.clearLayers();
+  var ds = S.ds, hr = windHour_();
+  var b = map.getBounds().pad(0.15);
+  var drawn = 0;
+  for (var key in WXC){
+    if (key.indexOf(ds + '|') !== 0) continue;
+    var gk = key.slice(ds.length+1), parts = gk.split(',');
+    var la = +parts[0], lo = +parts[1];
+    if (isNaN(la) || isNaN(lo) || !b.contains([la, lo])) continue;
+    var rec = WXC[key];
+    if (!rec || !rec.wind) continue;
+    var ms = rec.wind[hr]; var dg = (rec.wdir && rec.wdir[hr] != null) ? rec.wdir[hr] : 0;
+    if (ms == null) continue;
+    L.marker([la, lo], { icon: windArrowIcon_((dg + 180) % 360, ms), interactive:false, keyboard:false, zIndexOffset:-500 }).addTo(WINDL.layer);
+    drawn++;
+  }
+  var btn = document.getElementById('wdBtn'); if (btn) btn.classList.toggle('on', true);
+  if (!drawn){ /* 이 화면에 격자 없음 — 조용히 둠 */ }
+}
+function windToggle_(){
+  WINDL.on = !WINDL.on;
+  var btn = document.getElementById('wdBtn');
+  if (!WINDL.on){
+    if (WINDL.layer) WINDL.layer.clearLayers();
+    if (btn) btn.classList.remove('on');
+    return;
+  }
+  if (btn){ btn.classList.add('on'); btn.textContent = '바람'; }
+  var ds = S.ds;
+  if (typeof ensureWeather === 'function'){
+    ensureWeather(ds).then(function(){ windDraw_(); }).catch(function(){ windDraw_(); });
+  } else { windDraw_(); }
+}
+map.on('moveend', function(){ if (WINDL.on) windDraw_(); });
 /* 지도 왼쪽 아래 — 어장·갯골 토글 옆에 바람 단추 */
 var wdCtl = L.control({position:'bottomleft'});
 wdCtl.onAdd = function(){
   var d = L.DomUtil.create('div','basesw wdsw');
   d.innerHTML = '<button class="basebtn" id="wdBtn" type="button">바람</button>';
   L.DomEvent.disableClickPropagation(d);
-  L.DomEvent.on(d, 'click', function(){ openWindy(); });
+  L.DomEvent.on(d, 'click', function(){ windToggle_(); });
   return d;
 };
 wdCtl.addTo(map);
