@@ -4955,7 +4955,7 @@ function analyze_(p, ds, tide, wxRec, want){
 
   // 대상 활성 — 수온 적정 + 제철 + 야행성 보정
   var hAll = speciesOf_(p, 'haeru');
-  var hSeason = inSeason_(hAll, mo, SEASON_SP);
+  var hSeason = rankTargets_(inSeason_(hAll, mo, SEASON_SP), p, mo, 'haeru');
   var hTherm = 0;
   hSeason.forEach(function(t){ var v = thermalFit_(t.n, hWx.sst); if (v > hTherm) hTherm = v; });
   // 실제 조황(잡힌 사례) — 이 해역·이맘때 실제 채집 보고 강도로 모델을 보정
@@ -5077,7 +5077,7 @@ function analyze_(p, ds, tide, wxRec, want){
                   + 0.14*band_(fChil === null ? fWx.feel : fChil, 4, 30, 10));
 
   var fAll = speciesOf_(p, 'fish');
-  var fSeason = inSeason_(fAll, mo, SEASON_FX);
+  var fSeason = rankTargets_(inSeason_(fAll, mo, SEASON_FX), p, mo, 'fish');
   var fTherm = 0, fBestName = null;
   fSeason.forEach(function(t){
     var v = thermalFit_(t.n, fWx.sst) * (0.6 + t.v*0.1333);
@@ -5295,6 +5295,41 @@ function applyWant_(p, want, mo, d, hAll, fAll, hWx, fWx, hSeason, fSeason){
            ban: ban, reason: reason, name: want };
 }
 
+
+/* 대상 순서 — 제철 점수만 쓰면 어디나 「낙지·바지락」이 앞에 서서 결론이 똑같아진다.
+   그 해역·이맘때 실제 조황 강도와, 그 해역 포인트들 사이에서 드문 종일수록(희소성) 가점을 줘
+   백사장항의 대하, 벌교의 꼬막, 갯바위의 굴처럼 그 자리만의 특징 종이 앞에 나오게 한다. */
+var _SPFREQ = null;
+function speciesFreq_(){
+  if (_SPFREQ) return _SPFREQ;
+  var f = {}, n = {};
+  for (var i = 0; i < POINTS.length; i++){
+    var q = POINTS[i], z = zoneOf_(q);
+    n[z] = (n[z] || 0) + 1;
+    var seen = {};
+    (q.sp || []).concat(q.fx || []).forEach(function(nm){ if (seen[nm]) return; seen[nm] = 1; f[z] = f[z] || {}; f[z][nm] = (f[z][nm] || 0) + 1; });
+  }
+  _SPFREQ = { f: f, n: n };
+  return _SPFREQ;
+}
+function rankTargets_(list, p, mo, kind){
+  try {
+    var z = zoneOf_(p), fq = speciesFreq_();
+    var tot = (fq.n[z] || 1), row = fq.f[z] || {};
+    var listOrder = (kind === 'haeru' ? (p.sp || []) : (p.fx || []));
+    list.forEach(function(t, idx){
+      var cv = catchAt_(t.n, z, mo);                       // 실제 조황 0~2, 없으면 중립
+      var catchB = (cv === null) ? 0.5 : cv * 0.5;           // 0~1
+      var rare = 1 - Math.min(1, (row[t.n] || 0) / tot);    // 해역 내 희소성 0~1
+      var pos = listOrder.indexOf(t.n);                      // 자료가 앞세운 순서(대표종)도 존중
+      var posB = pos < 0 ? 0 : Math.max(0, 0.9 - pos * 0.3);
+      t.k = t.v + 0.8 * catchB + 0.5 * rare + posB;
+    });
+    list.sort(function(a, b){ return b.k - a.k; });
+  } catch(e){}
+  return list;
+}
+
 function grade_(s){
   if (s >= 88) return 'S';
   if (s >= 76) return 'A';
@@ -5356,9 +5391,9 @@ function demoteMurky_(list, visQ){
   if (visQ >= 0.18) return list;
   var out = list.map(function(t){
     if (!SIGHT_HUNT[t.n]) return t;
-    return { n: t.n, v: Math.max(0.3, t.v * 0.5), murk: 1 };
+    return { n: t.n, v: Math.max(0.3, t.v * 0.5), k: (t.k != null ? t.k * 0.5 : undefined), murk: 1 };
   });
-  out.sort(function(a, b){ return b.v - a.v; });
+  out.sort(function(a, b){ return (b.k != null ? b.k : b.v) - (a.k != null ? a.k : a.v); });
   return out;
 }
 
@@ -5367,9 +5402,9 @@ function demoteNocturnal_(list, lowT, sun){
   if (dl <= 0) return list;                                 // 밤 물때면 손대지 않는다
   var out = list.map(function(t){
     if (!isNocturnal_(t.n)) return t;
-    return { n: t.n, v: Math.max(0.4, t.v * (dl >= 1 ? 0.34 : 0.7)), night: 1 };
+    return { n: t.n, v: Math.max(0.4, t.v * (dl >= 1 ? 0.34 : 0.7)), k: (t.k != null ? t.k * (dl >= 1 ? 0.34 : 0.7) : undefined), night: 1 };
   });
-  out.sort(function(a, b){ return b.v - a.v; });
+  out.sort(function(a, b){ return (b.k != null ? b.k : b.v) - (a.k != null ? a.k : a.v); });
   return out;
 }
 
