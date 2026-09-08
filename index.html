@@ -7621,6 +7621,28 @@ function renderDetail(d){
       + zh));
   }
 
+  /* 이 자리 일대 인명사고 이력 — 안전 경고 (사고 데이터가 로드돼 있을 때) */
+  (function(){
+    var slot = el('div','');
+    b.appendChild(slot);
+    var show = function(data){
+      if (!data || !data.cells) return;
+      var la = d.point.la, lo = d.point.lo, hit = null;
+      for (var i = 0; i < data.cells.length; i++){
+        var c = data.cells[i];
+        var dla = (c.la - la) * 111, dlo = (c.lo - lo) * 89;
+        if (dla*dla + dlo*dlo <= 2.2*2.2){ if (!hit || c.n > hit.n) hit = c; }
+      }
+      if (!hit || (hit.n < 3 && !hit.d && !hit.m)) return;
+      slot.className = 'dt-verdict bad';
+      slot.innerHTML = '<b>⚠ 이 일대는 인명사고가 있었습니다</b> — 반경 2km 누적 <b>' + hit.n + '건</b>'
+        + (hit.d ? ' · 사망 <b>' + hit.d + '명</b>' : '') + (hit.m ? ' · 실종 <b>' + hit.m + '명</b>' : '')
+        + ' (주로 ' + hit.t + '). 구명조끼·물때 확인 필수. <span style="color:#8ba6b8">출처 국립해양조사원</span>';
+    };
+    if (typeof AC_DATA !== 'undefined' && AC_DATA){ show(AC_DATA); }
+    else { fetch('data/accidents.json').then(function(r){ return r.ok?r.json():null; }).then(show).catch(function(){}); }
+  })();
+
   /* 진입·퇴로 — 갯벌에서 사고는 대부분 "언제 나와야 하는지" 몰라서 난다 */
   if (S.mode === 'haeru' && meta.wade){
     var wd = meta.wade;
