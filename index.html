@@ -7693,7 +7693,7 @@ function renderPick(){
   $('pickCta').onclick = function(){ openDetail(top.i); };
   var bd = $('pick').querySelector('.pick-badge');
   bd.dataset.n = top.n; bd.dataset.s = top.score;
-  if (!S._moved){ S._moved = true; map.setView([top.la - 0.55, top.lo], 8, { animate:true }); }
+  if (!S._moved){ S._moved = true; if (!S.sel) map.setView([top.la - 0.55, top.lo], 8, { animate:true }); }   /* 딥링크로 상세가 열려 있으면 그 자리 확대를 유지 */
 }
 
 function renderSkeleton(){
@@ -7789,6 +7789,7 @@ function openDetail(id, auto){
   var m = S.markers[id];
   if (!auto){
     /* 핀이 아직 없어도(딥링크 직후) 좌표표에서 찾아 그 자리로 간다. 전국 화면이면 13단계로 다가간다. */
+    S._moved = true;   /* 첫 렌더의 전국 이동이 이 확대를 덮지 않게 */
     var ll = m ? m.getLatLng() : null;
     if (!ll){ try { var pp = (typeof pointById_ === 'function') ? pointById_(id) : null; if (pp && pp.la) ll = L.latLng(pp.la, pp.lo); } catch(e){} }
     if (ll){
