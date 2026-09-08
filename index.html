@@ -4481,6 +4481,71 @@ function feedOverlap_(events, dawn, dusk, sunrise, sunset){
 }
 
 /** 시간창 안에서 조류 유속이 낚시에 알맞은 정도 */
+/* ══════════════ 어종별 선호 물때 단계 ══════════════
+ * 실전에서 어종마다 잘 되는 물때가 다르다. 특히 서해 강화 숭어는 물이 차오르는
+ * 들물~만조에 훌치기가 되고 간조(물 다 빠진 정조)에는 사실상 안 된다.
+ * 단계: 'flood'=들물(밀물), 'ebb'=날물(썰물), 'high'=만조 부근, 'low'=간조 부근,
+ *       'move'=물 움직일 때(들·날물 공통, 정조 싫음), 'any'=무관.
+ * 근거 확인된 것만 넣고, 나머지는 손대지 않는다(any). */
+var FISH_TIDE = {
+  '숭어':'flood',      // 들물~만조 훌치기·찌, 간조엔 안 됨(강화 대표)
+  '농어':'move',       // 물 흐를 때, 특히 초들물·초날물
+  '망둥어':'flood',    // 물 차오를 때 갯벌 위로 붙는다
+  '밴댕이':'move',
+  '갑오징어':'move', '주꾸미':'move', '무늬오징어':'move', '한치':'move',
+  '갈치':'move', '고등어':'move', '전갱이':'move', '삼치':'move',
+  '참돔':'move', '감성돔':'move', '돌돔':'move', '벵에돔':'move',
+  '광어':'move', '우럭':'any', '놀래미':'any', '쥐노래미':'any', '볼락':'any',
+  '백조기':'move', '보리멸':'move', '붕장어':'ebb', '갯장어':'ebb'
+};
+/* 해루질 채집물 — 대부분 「물 빠질 때(날물~간조)」 드러난 갯벌·바위에서 줍는다.
+ * 낙지·문어 등 야행성 구멍 사냥도 물 빠진 갯벌이 기본. */
+var HAERU_TIDE = {
+  '낙지':'low', '문어':'low', '주꾸미':'low', '박하지':'low', '꽃게':'low',
+  '갯가재':'low', '쏙':'low', '칠게':'low', '짱뚱어':'low',
+  '바지락':'low', '동죽':'low', '백합':'low', '가무락':'low', '모시조개':'low',
+  '맛조개':'low', '개조개':'low', '가리맛조개':'low', '참꼬막':'low', '피조개':'low',
+  '명주조개':'low', '골뱅이':'low', '개불':'low',
+  '소라':'low', '뿔소라':'low', '피뿔고둥':'low', '고둥':'low', '갯고둥':'low',
+  '보말':'low', '배말':'low', '따개비':'low', '거북손':'low', '군소':'low',
+  '굴':'low', '홍합':'low', '해삼':'low', '오분자기':'low', '성게':'low',
+  '돌멍게':'low', '미역':'low', '톳':'low', '청각':'low', '파래':'low', '갯고둥':'low'
+};
+/* 그 시각의 물때 단계를 잰다.
+ * 반환 {rising:들물여부, level01:0(간조)~1(만조), slack:정조(0.15미만 움직임)} */
+function tideStageAt_(tide, hour){
+  var ev = (tide.events || []).slice().sort(function(a,b){ return a.t - b.t; });
+  if (ev.length < 2) return { rising:true, level:0.5, slack:false };
+  var prev = null, next = null;
+  for (var k = 0; k < ev.length - 1; k++){
+    if (hour >= ev[k].t && hour <= ev[k+1].t){ prev = ev[k]; next = ev[k+1]; break; }
+  }
+  if (!prev){
+    if (hour < ev[0].t){ next = ev[0]; prev = { t: ev[0].t - 6.21, k:(ev[0].k==='H'?'L':'H') }; }
+    else { prev = ev[ev.length-1]; next = { t: prev.t + 6.21, k:(prev.k==='H'?'L':'H') }; }
+  }
+  var span = next.t - prev.t; if (span <= 0) return { rising:true, level:0.5, slack:false };
+  var ph = (hour - prev.t)/span;                       // 0~1
+  var rising = (next.k === 'H');                       // 다음이 만조면 들물
+  // 코사인 보간 — 정조(만조·간조 순간)에서 완만
+  var lvl = rising ? (0.5 - 0.5*Math.cos(Math.PI*ph)) : (0.5 + 0.5*Math.cos(Math.PI*ph));
+  var slack = (ph < 0.12 || ph > 0.88);                // 만·간조 직전후 = 정조
+  return { rising:rising, level:lvl, slack:slack };
+}
+/* 어종이 원하는 물때인지 0(안 맞음)~1(딱 맞음) */
+function tideStageFit_(pref, st){
+  if (!pref || pref === 'any') return 1;
+  var L = st.level, up = st.rising, slack = st.slack;
+  switch(pref){
+    case 'flood': return up ? (0.35 + 0.65*L) : Math.max(0.12, 0.5 - 0.4*L);   // 들물·물 높을수록↑, 날물·간조↓
+    case 'ebb':   return !up ? (0.35 + 0.65*(1-L)) : Math.max(0.12, 0.5 - 0.4*(1-L));
+    case 'high':  return Math.max(0.15, L);                                     // 만조 부근
+    case 'low':   return Math.max(0.15, 1 - L);                                 // 간조 부근(갯벌 드러남)
+    case 'move':  return slack ? 0.3 : (0.55 + 0.45*Math.abs(L-0.5)*2*0);       // 정조만 싫다
+    default: return 1;
+  }
+}
+
 function flowFit_(p, tide, from, to){
   var best = 0, sum = 0, n = 0;
   for (var t = from; t <= to; t += 0.25){
@@ -4692,8 +4757,28 @@ function analyze_(p, ds, tide, wxRec, want){
   var fq  = clamp01_((Math.log(Math.max(0.03, visF.vis)) - Math.log(fvb.lo)) / (Math.log(fvb.hi) - Math.log(fvb.lo)));
   var sTurb = 10 * (fq < 0.55 ? clamp01_(fq / 0.55) : (1 - 0.2 * clamp01_((fq - 0.85) / 0.15)));
 
+  /* ── 대상어 물때 적합성 — 숭어처럼 특정 물때에만 되는 어종을 걸러낸다 ── */
+  var fStage = tideStageAt_(tide, ((fMid % 24) + 24) % 24);
+  var fTideFit = 1, fTideWorst = null, fTideWorstV = 2;
+  fSeason.forEach(function(t){
+    var pf = FISH_TIDE[t.n];
+    if (!pf) return;
+    var v = tideStageFit_(pf, fStage);
+    if (v < fTideWorstV){ fTideWorstV = v; fTideWorst = { n:t.n, pref:pf, v:v }; }
+  });
+  /* 계절 대표 어종들의 평균이 아니라 「제철 1순위 어종」 기준으로 본다.
+     제철 어종이 물때 안 맞으면 그날은 공치기 쉽다. */
+  if (fSeason.length){
+    var top = fSeason[0];
+    var pf0 = FISH_TIDE[top.n];
+    if (pf0) fTideFit = tideStageFit_(pf0, fStage);
+  }
+
   var fRaw = sFeed + sFlow + sSea + sSst + sPres + sTurb;
+  /* 물때가 안 맞으면 최대 40%까지 깎는다 — 아예 0으로 만들진 않되(다른 어종 여지) 상위 노출은 막는다 */
+  fRaw = fRaw * (0.60 + 0.40 * fTideFit);
   var fCap = 100;
+  if (fTideFit < 0.35) fCap = Math.min(fCap, 45);   // 제철어가 물때 안 맞으면 상단 배제
   if (fWx.wave !== null){
     if (fWx.wave >= 2.5) fCap = Math.min(fCap, 20);
     else if (fWx.wave >= 1.8) fCap = Math.min(fCap, 36);
@@ -4720,6 +4805,13 @@ function analyze_(p, ds, tide, wxRec, want){
   if (flow.fit > 0.72) fWhy.push('조류 ' + flow.peak.toFixed(1) + '노트 — 알맞음');
   else if (flow.peak > 2.2) fWarn.push('조류 ' + flow.peak.toFixed(1) + '노트 — 채비가 안 섬');
   else if (flow.peak < 0.25 && p.mr > 0.4) fWarn.push('조류 거의 없음 — 입질 뜸함');
+  if (fTideWorst && fTideWorstV < 0.4){
+    var PW = { flood:'들물(밀물)', ebb:'날물(썰물)', high:'만조 부근', low:'간조 부근', move:'물 움직일 때' };
+    fWarn.push(fTideWorst.n + '은(는) ' + (PW[fTideWorst.pref]||'맞는 물때') + '에 잘 됩니다 — 이 시각 물때가 안 맞습니다');
+  } else if (fSeason.length && FISH_TIDE[fSeason[0].n] && fTideFit > 0.7){
+    var PW2 = { flood:'들물', ebb:'날물', high:'만조', low:'간조', move:'물 흐를 때' };
+    fWhy.push(fSeason[0].n + ' 물때(' + (PW2[FISH_TIDE[fSeason[0].n]]||'') + ')가 맞음');
+  }
   if (fBestName && fTherm > 0.75) fWhy.push('수온이 ' + fBestName + '에 맞음');
   if (fWx.sst !== null && fTherm < 0.35) fWarn.push('수온 ' + fWx.sst.toFixed(1) + '도 — 대상어 적정에서 벗어남');
   if (dp <= -2 && dp > -9) fWhy.push('기압 하강 국면 — 활성 상승');
