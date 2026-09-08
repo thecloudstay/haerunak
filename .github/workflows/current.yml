@@ -1,0 +1,42 @@
+# 해루낚 — 조류(유향·유속) 예측을 미리 받아 저장소에 넣어 둔다.
+#
+# 국립해양조사원 신 바다누리(khoa.go.kr/oceandata) 오픈API. 저장소 시크릿 KHOA_KEY 가 있어야 돈다.
+# 하루 한 번(한국시각 04:40) 오늘·내일 격자 조류 + 포인트별 최강창낙조·전류를 받는다.
+
+name: 조류 자료 갱신
+
+on:
+  schedule:
+    - cron: '40 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: current
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 조류 받아서 data/cur 만들기
+        env:
+          KHOA_KEY: ${{ secrets.KHOA_KEY }}
+        run: node scripts/fetch-current.js
+
+      - name: 바뀌었으면 저장
+        run: |
+          if [ -n "$(git status --porcelain data/cur)" ]; then
+            git config user.name  "haerunak-bot"
+            git config user.email "bot@haerunak.com"
+            git add -A data/cur
+            git commit -m "조류 자료 갱신 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase
+            git push
+          else
+            echo "바뀐 것 없음"
+          fi

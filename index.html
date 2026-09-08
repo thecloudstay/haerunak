@@ -869,6 +869,19 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .wind-arrow{background:none;border:0;pointer-events:none}
 .wind-arrow svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
 .wind-spd{position:absolute;left:50%;top:100%;transform:translate(-50%,-2px);font-size:9.5px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.7),0 0 3px rgba(0,0,0,.5)}
+/* 조류 */
+.basebtn#crBtn.on{background:linear-gradient(100deg,#ffd23f,#ff8c1a);color:#1a1200;box-shadow:0 2px 9px rgba(255,140,26,.4)}
+.cur-arrow{background:none;border:0;pointer-events:none}
+.cur-arrow svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
+.cur-spd{position:absolute;left:50%;top:100%;transform:translate(-50%,-2px);font-size:9px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.7),0 0 3px rgba(0,0,0,.5)}
+.dt-cur{margin:8px 0 2px;padding:9px 11px;border-radius:12px;background:rgba(255,210,63,.08);border:1px solid rgba(255,210,63,.25);font-size:12.5px}
+.dt-cur b{color:#ffd23f}
+.dt-cur-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.dt-cur-ev{padding:3px 8px;border-radius:8px;background:rgba(255,255,255,.06);font-weight:700}
+.dt-cur-ev i{font-style:normal;opacity:.8;margin-right:3px}
+.dt-cur-ev.slack{background:rgba(55,192,168,.18);color:#8ff0dc}
+.dt-cur-ev.strong{background:rgba(255,61,61,.16);color:#ffb3b3}
+.dt-cur-note{margin-top:6px;font-size:11.5px;opacity:.75;line-height:1.4}
 
 /* ── 상단 ─────────────────────────────── */
 .topbar{
@@ -7593,6 +7606,7 @@ function render(){
   renderList();
   /* 바람 오버레이가 켜져 있으면 날짜·데이터 갱신에 맞춰 다시 그린다 */
   try { if (typeof WINDL !== 'undefined' && WINDL.on && typeof ensureWeather === 'function'){ ensureWeather(S.ds).then(function(){ windDraw_(); }).catch(function(){ windDraw_(); }); } } catch(e){}
+  try { if (typeof CURL !== 'undefined' && CURL.on) curDraw_(); } catch(e){}
   $('tagline').textContent = tideOnly_()
     ? '물때만 · 점수는 7일 이내 제공'
     : MODE_NAME[S.mode] + ' · ' + S.rows.length + '곳'
@@ -7936,6 +7950,25 @@ function renderDetail(d){
     var mtb = el('button','dt-mtbtn', '📋 이 자리 15일 물때표 (만조·간조·물흐름·해달)');
     mtb.onclick = function(){ openMultae(d.point.i, d.point.n); };
     b.appendChild(mtb);
+    /* 조류 — 국립해양조사원 예측이 받아져 있으면 이 자리의 최강창조·낙조·전류(물 멈춤) 시각을 보여준다.
+       해루질은 전류 앞뒤가 물살이 약해 안전하고, 최강류 때는 갯골 건너기가 위험하다. */
+    (function(){
+      var box = el('div','dt-cur'); box.hidden = true; b.appendChild(box);
+      fetch('data/cur/pt/' + S.ds + '.json', {cache:'default'})
+        .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+        .then(function(j){
+          var ev = j && j[String(d.point.i)];
+          if (!ev || !ev.length) return;
+          var ord = {'전류':0,'최강창조':1,'최강낙조':2};
+          var html = '<b>🌊 조류(국립해양조사원 예측)</b><div class="dt-cur-row">'
+            + ev.slice().sort(function(a,b2){ return a.t < b2.t ? -1 : 1; }).map(function(e){
+                var cls = e.k === '전류' ? 'slack' : (e.v >= 80 ? 'strong' : '');
+                return '<span class="dt-cur-ev ' + cls + '"><i>' + e.t + '</i> ' + e.k + (e.k === '전류' ? '' : ' ' + e.v + 'cm/s') + '</span>';
+              }).join('')
+            + '</div><div class="dt-cur-note">전류(물 멈춤) 앞뒤 1시간이 물살이 가장 약합니다. 최강류 시각엔 갯골·물골을 건너지 마세요.</div>';
+          box.innerHTML = html; box.hidden = false;
+        }).catch(function(){});
+    })();
     var calb = document.createElement('a');
     calb.className = 'dt-calbtn'; calb.href = 'calendar/';
     calb.innerHTML = '📅 한 달 물때달력 무료 인쇄 · <b>해루질 추천일(★)</b>';
@@ -9772,14 +9805,74 @@ function windToggle_(){
     ensureWeather(ds).then(function(){ windDraw_(); }).catch(function(){ windDraw_(); });
   } else { windDraw_(); }
 }
-map.on('moveend', function(){ if (WINDL.on) windDraw_(); });
-/* 지도 왼쪽 아래 — 어장·갯골 토글 옆에 바람 단추 */
+map.on('moveend', function(){ if (WINDL.on) windDraw_(); if (CURL.on) curDraw_(); });
+
+/* ══════════════ 조류(유향·유속) 겹쳐 보기 ══════════════
+   국립해양조사원 수치조류도 예측을 자동작업이 data/cur/<날짜>/<시>.json 으로 받아 둔다.
+   화살표는 물이 흘러가는 쪽을 가리키고, 색·길이는 유속(cm/s). 해루질은 전류(물 멈춤) 전후가 안전하다. */
+var CURL = { layer:null, on:false, cache:{}, miss:{} };
+function curColor_(v){ /* cm/s */
+  return v>=100 ? '#ff3d3d' : v>=60 ? '#ff8c1a' : v>=30 ? '#ffd23f' : v>=15 ? '#37c0a8' : '#8fb3c9';
+}
+function curHour_(){
+  try { if (S.ds === BOOT.today){ return new Date(Date.now()+9*36e5).getUTCHours(); } } catch(e){}
+  return 12;
+}
+function curArrowIcon_(deg, v){
+  var col = curColor_(v), len = 12 + Math.min(16, v/7);
+  var svg = '<svg width="34" height="34" viewBox="0 0 34 34" style="transform:rotate('+deg+'deg);overflow:visible">'
+    + '<line x1="17" y1="'+(17+len/2)+'" x2="17" y2="'+(17-len/2)+'" stroke="'+col+'" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="3 2"/>'
+    + '<path d="M17 '+(17-len/2-1)+' l-4 5.5 l4 -2 l4 2 z" fill="'+col+'"/></svg>';
+  return L.divIcon({ className:'cur-arrow', html:svg + '<span class="cur-spd" style="color:'+col+'">'+Math.round(v)+'</span>', iconSize:[34,34], iconAnchor:[17,17] });
+}
+function curLoad_(ds, hh){
+  var key = ds + '/' + (hh<10?'0':'') + hh;
+  if (CURL.cache[key]) return Promise.resolve(CURL.cache[key]);
+  if (CURL.miss[key]) return Promise.resolve(null);
+  return fetch('data/cur/' + key + '.json', {cache:'default'})
+    .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+    .then(function(j){ if(!j || !j.g || !j.g.length) throw 0; CURL.cache[key] = j; return j; })
+    .catch(function(){ CURL.miss[key] = 1; return null; });
+}
+function curDraw_(){
+  if (!CURL.on) return;
+  if (!CURL.layer){ CURL.layer = L.layerGroup().addTo(map); }
+  var ds = S.ds, hh = curHour_();
+  curLoad_(ds, hh).then(function(j){
+    if (!CURL.on) return;
+    CURL.layer.clearLayers();
+    var btn = document.getElementById('crBtn');
+    if (!j){ if (btn){ btn.classList.add('on'); btn.textContent = '조류·자료없음'; } return; }
+    if (btn){ btn.classList.add('on'); btn.textContent = '조류 ' + (hh<10?'0':'') + hh + '시'; }
+    var cells = j.g;   /* [위도,경도,유속,유향] */
+    var b = map.getBounds(), sz = map.getSize();
+    /* 화면 표시격자마다 가장 가까운 예측격자 값을 샘플링 — 바람과 같은 방식이라 어느 배율에서도 적당히 보인다 */
+    var sw = b.getSouthWest(), ne = b.getNorthEast();
+    var cols = Math.max(3, Math.min(11, Math.round(sz.x/88))), rows = Math.max(3, Math.min(11, Math.round(sz.y/88)));
+    var dLa = (ne.lat-sw.lat)/rows, dLo = (ne.lng-sw.lng)/cols;
+    var lim = Math.max(0.02, Math.pow(Math.min(dLa, dLo)*0.8, 2));   /* 격자에서 화면칸 하나 넘게 떨어지면(육지 깊숙이) 비움 */
+    for (var r=0;r<rows;r++) for (var q=0;q<cols;q++){
+      var pLa = sw.lat + dLa*(r+0.5), pLo = sw.lng + dLo*(q+0.5), best=null, bd=1e9;
+      for (var k=0;k<cells.length;k++){ var e=cells[k]; var dd=(e[0]-pLa)*(e[0]-pLa)+(e[1]-pLo)*(e[1]-pLo); if(dd<bd){bd=dd;best=e;} }
+      if (!best || bd > lim) continue;
+      L.marker([pLa, pLo], { icon: curArrowIcon_(best[3], best[2]), interactive:false, keyboard:false, zIndexOffset:-600 }).addTo(CURL.layer);
+    }
+  });
+}
+function curToggle_(){
+  CURL.on = !CURL.on;
+  var btn = document.getElementById('crBtn');
+  if (!CURL.on){ if (CURL.layer) CURL.layer.clearLayers(); if (btn){ btn.classList.remove('on'); btn.textContent = '조류'; } return; }
+  curDraw_();
+}
+/* 지도 왼쪽 아래 — 어장·갯골 토글 옆에 바람·조류 단추 */
 var wdCtl = L.control({position:'bottomleft'});
 wdCtl.onAdd = function(){
   var d = L.DomUtil.create('div','basesw wdsw');
-  d.innerHTML = '<button class="basebtn" id="wdBtn" type="button">바람</button>';
+  d.innerHTML = '<button class="basebtn" id="wdBtn" type="button">바람</button><button class="basebtn" id="crBtn" type="button">조류</button>';
   L.DomEvent.disableClickPropagation(d);
-  L.DomEvent.on(d, 'click', function(){ windToggle_(); });
+  L.DomEvent.on(d.querySelector('#wdBtn'), 'click', function(){ windToggle_(); });
+  L.DomEvent.on(d.querySelector('#crBtn'), 'click', function(){ curToggle_(); });
   return d;
 };
 wdCtl.addTo(map);
