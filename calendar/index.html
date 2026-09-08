@@ -30,6 +30,10 @@ body{margin:0;color:var(--ink);font-family:'Pretendard Variable',Pretendard,'Not
 .ctl select:hover,.ctl button:hover{border-color:#b9c6ce}
 .ctl .mv{font-size:16px;font-weight:800;min-width:112px;text-align:center;border:0;background:none}
 .ctl .dl{background:linear-gradient(100deg,var(--brand),var(--brand2));color:#fff;font-weight:800;border:0;box-shadow:0 2px 8px rgba(11,122,90,.25)}
+.ctl .sh{background:#fff;color:var(--brand);font-weight:800;border:1px solid var(--recln)}
+.ctl .sh:hover{background:var(--recbg)}
+.sh-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#0b2130;color:#eaf4fb;padding:11px 18px;border-radius:12px;font-size:13.5px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:50;opacity:0;transition:opacity .25s}
+.sh-toast.on{opacity:1}
 /* 이번 달 추천 요약 스트립 */
 .rec-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--recbg);border:1px solid var(--recln);border-radius:13px;padding:11px 15px;margin-bottom:16px}
 .rec-strip .lab{font-weight:800;font-size:13.5px;color:#8a5e00;white-space:nowrap}
@@ -99,6 +103,7 @@ td.rec .mul{color:#b07400}
     <div class="mv" id="mv"></div>
     <button id="next">›</button>
     <button class="dl" id="dl">🖨 인쇄·PDF 저장</button>
+    <button class="sh" id="sh">🔗 공유</button>
   </div>
   <div class="rec-strip">
     <span class="lab"><span class="s">★</span> 이번 달 해루질 추천</span>
@@ -232,6 +237,20 @@ document.getElementById('prev').onclick=function(){curM--;if(curM<1){curM=12;cur
 document.getElementById('next').onclick=function(){curM++;if(curM>12){curM=1;curY++;}render();};
 regSel.onchange=render;
 document.getElementById('dl').onclick=function(){window.print();};
+function shToast(msg){var t=document.createElement('div');t.className='sh-toast';t.textContent=msg;document.body.appendChild(t);requestAnimationFrame(function(){t.classList.add('on');});setTimeout(function(){t.classList.remove('on');setTimeout(function(){t.remove();},300);},1800);}
+document.getElementById('sh').onclick=function(){
+  var p=REGIONS[+regSel.value];
+  var url='https://haerunak.com/calendar/';
+  var title='해루낚 물때달력';
+  var text=p.n+' '+curY+'년 '+curM+'월 물때달력 — 해루질 추천일(★) 한눈에. 무료 다운로드';
+  if(navigator.share){
+    navigator.share({title:title,text:text,url:url}).catch(function(){});
+  } else if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text+'\n'+url).then(function(){shToast('링크를 복사했어요 — 붙여넣기로 공유하세요');}).catch(function(){shToast(url);});
+  } else {
+    shToast(url);
+  }
+};
 render();
 </script>
 </body>
