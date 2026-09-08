@@ -6228,7 +6228,11 @@ function drawPins(){
   S.markers = {};
   var z = map.getZoom();
   var placed = [];                       // 큰 핀이 이미 차지한 화면 좌표
-  var MIN = z >= 11 ? 0 : (z >= 9 ? 30 : 38);
+  /* 낮은 배율에서는 자리 다툼에서 밀린 핀을 아예 생략한다 — 첫 화면이 깔끔해야 한다.
+     rows 는 점수순이라 남는 핀이 곧 그 동네 1등이고, 확대하면 다 나온다. */
+  var MIN  = z >= 11 ? 0 : (z >= 9 ? 40 : 52);
+  var HIDE = z < 10;                     // 겹침 시 생략(저배율) / 작게 표시(고배율)
+  var fv = favs();
   S.rows.forEach(function(r, idx){
     var pt = map.latLngToLayerPoint([r.la, r.lo]);
     var small = false;
@@ -6236,6 +6240,7 @@ function drawPins(){
       var dx = placed[k].x - pt.x, dy = placed[k].y - pt.y;
       if (dx*dx + dy*dy < MIN*MIN){ small = true; break; }
     }
+    if (small && HIDE && fv.indexOf(r.i) < 0) return;   // 즐겨찾기는 항상 보인다
     if (!small) placed.push(pt);
     var m = L.marker([r.la, r.lo], { icon: pinIcon(r, idx === 0, small), zIndexOffset: 1000 - idx });
     m.on('click', function(){ openDetail(r.i); });
