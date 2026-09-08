@@ -4,58 +4,95 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>물때달력 무료 다운로드 — 해루낚</title>
-<meta name="description" content="전국 서해안 지역별 월간 물때달력을 무료로 내려받으세요. 만조·간조 시각, 물때, 조위, 물흐름을 한 장에. 인쇄하면 그대로 PDF가 됩니다. 바다타임 유료 달력과 달리 해루낚은 무료입니다.">
+<meta name="description" content="전국 서해안 지역별 월간 물때달력을 무료로 내려받으세요. 만조·간조 시각, 조위(cm), 물때에 더해 해루질 추천일(★)을 한 장에. 백색 배경으로 A4 인쇄가 깔끔합니다. 바다타임 유료 달력과 달리 해루낚은 무료입니다.">
 <link rel="canonical" href="https://haerunak.com/calendar/">
 <style>
-:root{--bg:#0a1922;--card:#0f2431;--line:rgba(140,200,235,.18);--acc:#2ee6a8;--acc2:#35d0ff;--mut:#8ba6b8;--hi:#35d0ff;--lo:#ffb020}
+:root{
+  --bg:#ffffff; --paper:#ffffff; --ink:#1b2a32; --mut:#6a7a84;
+  --line:#dbe3e8; --line2:#eef2f5;
+  --hi:#1565c0; --lo:#c25e00;
+  --rec:#e39a00; --recbg:#fff6df; --recln:#f2cf7a;
+  --sat:#1769c9; --sun:#d3453b;
+  --brand:#0b7a5a; --brand2:#0aa07a;
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:#dce9f0;font-family:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif}
-.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 60px}
-.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
-.top h1{font-size:22px;margin:0}
-.top .free{background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;font-weight:800;font-size:12px;padding:3px 10px;border-radius:10px}
-.sub{color:var(--mut);font-size:13.5px;line-height:1.6;margin:0 0 16px}
-.sub a{color:var(--acc2);text-decoration:none}
-.ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.ctl select,.ctl button{font-family:inherit;font-size:14px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:#dce9f0;padding:10px 13px;cursor:pointer}
-.ctl .mv{font-size:16px;font-weight:800;min-width:110px;text-align:center}
-.ctl .dl{background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;font-weight:800;border:0}
-.cal{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
-.cal-h{display:flex;align-items:baseline;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
-.cal-h b{font-size:18px}.cal-h span{color:var(--mut);font-size:13px}
+html,body{background:#eef1f3}
+body{margin:0;color:var(--ink);font-family:'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto;padding:22px 16px 64px}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.top h1{font-size:23px;margin:0;letter-spacing:-.02em}
+.top .free{background:linear-gradient(100deg,var(--brand),var(--brand2));color:#fff;font-weight:800;font-size:12px;padding:4px 11px;border-radius:20px;letter-spacing:.02em}
+.sub{color:#4a5b64;font-size:13.5px;line-height:1.65;margin:0 0 16px;max-width:760px}
+.sub a{color:var(--brand);text-decoration:none;font-weight:700}
+.sub .star{color:var(--rec);font-weight:800}
+.ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.ctl select,.ctl button{font-family:inherit;font-size:14px;border-radius:11px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 13px;cursor:pointer}
+.ctl select:hover,.ctl button:hover{border-color:#b9c6ce}
+.ctl .mv{font-size:16px;font-weight:800;min-width:112px;text-align:center;border:0;background:none}
+.ctl .dl{background:linear-gradient(100deg,var(--brand),var(--brand2));color:#fff;font-weight:800;border:0;box-shadow:0 2px 8px rgba(11,122,90,.25)}
+/* 이번 달 추천 요약 스트립 */
+.rec-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--recbg);border:1px solid var(--recln);border-radius:13px;padding:11px 15px;margin-bottom:16px}
+.rec-strip .lab{font-weight:800;font-size:13.5px;color:#8a5e00;white-space:nowrap}
+.rec-strip .lab .s{color:var(--rec)}
+.rec-strip .days{display:flex;gap:7px;flex-wrap:wrap}
+.rec-chip{background:#fff;border:1px solid var(--recln);border-radius:9px;padding:4px 10px;font-size:13px;font-weight:700;color:#7a5200}
+.rec-chip b{color:var(--rec)}
+.rec-strip .none{color:#8a5e00;font-size:13px}
+.paper{background:var(--paper);border:1px solid var(--line);border-top:6px solid var(--brand);border-radius:4px 4px 14px 14px;overflow:hidden;box-shadow:0 8px 26px rgba(30,50,64,.09)}
+.cal-h{display:flex;align-items:center;gap:14px;padding:16px 20px 15px;border-bottom:2px solid var(--ink)}
+.cal-h .mo{display:flex;align-items:baseline;gap:9px}
+.cal-h .mo .big{font-size:30px;font-weight:900;letter-spacing:-.03em;line-height:1}
+.cal-h .mo .yr{font-size:14px;font-weight:700;color:var(--mut)}
+.cal-h .reg{color:var(--mut);font-size:13px;font-weight:600;padding-left:2px}
+.cal-h .mini{margin-left:auto;font-size:11.5px;color:var(--mut);font-weight:700;background:var(--recbg);border:1px solid var(--recln);padding:5px 10px;border-radius:20px}
+.cal-h .mini .s{color:var(--rec);font-weight:900}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
-th{padding:8px 4px;font-size:12px;color:var(--mut);font-weight:700;border-bottom:1px solid var(--line)}
-th.sun{color:#ff8f8f}th.sat{color:#7db8ff}
-td{border:1px solid var(--line);vertical-align:top;height:96px;padding:5px 6px;position:relative}
-td.off{background:rgba(0,0,0,.15)}
-.dn{font-weight:800;font-size:13px}
-.dn.sun{color:#ff8f8f}.dn.sat{color:#7db8ff}
-.mul{font-size:11px;color:var(--acc);font-weight:700;margin-left:4px}
-.moon{position:absolute;top:5px;right:6px;font-size:12px}
-.ti{margin-top:3px;font-size:10.5px;line-height:1.5}
+th{padding:10px 4px;font-size:12.5px;color:var(--mut);font-weight:800;border-bottom:1px solid var(--line);background:#fbfdfe}
+th.sun{color:var(--sun)}th.sat{color:var(--sat)}
+td{border:1px solid var(--line2);vertical-align:top;height:112px;padding:7px 8px;position:relative;background:#fff}
+td.wsun{background:#fdf4f3}td.wsat{background:#f3f8fe}
+td.off{background:#f7f9fa}
+td.rec{background:var(--recbg)}
+td.rec:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--rec)}
+td.today{box-shadow:inset 0 0 0 2px var(--brand)}
+.dn{font-weight:900;font-size:17px;font-variant-numeric:tabular-nums;line-height:1}
+.dn.sun{color:var(--sun)}.dn.sat{color:var(--sat)}
+.mul{font-size:11px;color:#3b8f6f;font-weight:800;margin-left:5px;vertical-align:2px}
+td.rec .mul{color:#b07400}
+.rstar{color:var(--rec);font-weight:900;font-size:13px;margin-left:2px;letter-spacing:-1px}
+.moon{position:absolute;top:8px;right:8px;font-size:14px;opacity:.9}
+.ti{margin-top:6px;font-size:10.5px;line-height:1.6;font-variant-numeric:tabular-nums}
 .ti .h b{color:var(--hi)}.ti .l b{color:var(--lo)}
 .ti em{font-style:normal;color:var(--mut)}
-.foot{color:var(--mut);font-size:12px;line-height:1.6;margin-top:14px}
-.foot b{color:#dce9f0}
-.back{display:inline-block;margin-top:18px;color:var(--acc2);text-decoration:none;font-weight:700}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:13px 2px 0;font-size:12px;color:var(--mut)}
+.legend b{color:var(--ink)}
+.legend .k{display:inline-flex;align-items:center;gap:5px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--recln);background:var(--recbg)}
+.foot{color:var(--mut);font-size:12px;line-height:1.65;margin-top:16px;max-width:820px}
+.foot b{color:var(--ink)}
+.back{display:inline-block;margin-top:18px;color:var(--brand);text-decoration:none;font-weight:800}
 @media print{
-  body{background:#fff;color:#111}
+  @page{size:A4 landscape;margin:9mm}
+  html,body{background:#fff}
   .wrap{max-width:none;padding:0}
-  .top,.sub,.ctl,.foot,.back{display:none}
-  .cal{border:1px solid #333;border-radius:0}
-  th{color:#333;border-bottom:1px solid #333}
-  td{border:1px solid #999;height:104px}
-  .dn.sun,.th.sun{color:#c00}.dn.sat{color:#06c}
-  .mul{color:#0a7}.ti .h b{color:#06c}.ti .l b{color:#c60}.moon{color:#333}
-  .cal-h b{color:#111}
+  .top,.sub,.ctl,.rec-strip,.legend,.foot,.back{display:none}
+  .paper{border:0;border-radius:0;box-shadow:none}
+  .cal-h{padding:0 0 8px}
+  .cal-h .mini{display:inline}
+  th{background:#fff;color:#333;border-bottom:1px solid #333;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  td{border:1px solid #b7bfc4;height:112px}
+  td.rec{background:#fff8e6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  td.rec:before{background:#e39a00;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .dn.sun{color:#c00}.dn.sat{color:#06c}.mul{color:#0a7}
+  .ti .h b{color:#06c}.ti .l b{color:#c60}.moon{color:#333}.rstar{color:#d98a00}
 }
-@media(max-width:640px){td{height:auto;min-height:64px}.ti{font-size:9px}.moon{display:none}}
+@media(max-width:640px){td{height:auto;min-height:66px}.ti{font-size:9.2px}.moon{display:none}.top h1{font-size:20px}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top"><h1>물때달력</h1><span class="free">무료 다운로드</span></div>
-  <p class="sub">서해안 지역별 한 달 물때를 한 장에. 지역·달을 고르고 <b>「인쇄·PDF 저장」</b>을 누르면 그대로 저장됩니다. 만조 <b style="color:#35d0ff">▲</b> 간조 <b style="color:#ffb020">▼</b> 옆 숫자는 조위(cm). · <a href="/">해루낚 홈으로</a></p>
+  <p class="sub">서해안 지역별 한 달 물때를 한 장에. <b class="star">★ 표시는 해루질 추천일(6~9물)</b> — 조차가 커 갯벌이 넓게 드러나는 날입니다. 지역·달을 고르고 <b>「인쇄·PDF 저장」</b>을 누르면 백색 배경 그대로 A4로 저장됩니다. 만조 <b style="color:#1565c0">▲</b> 간조 <b style="color:#c25e00">▼</b> 옆 숫자는 조위(cm). · <a href="/">해루낚 지도로</a></p>
   <div class="ctl">
     <select id="reg"></select>
     <button id="prev">‹</button>
@@ -63,13 +100,23 @@ td.off{background:rgba(0,0,0,.15)}
     <button id="next">›</button>
     <button class="dl" id="dl">🖨 인쇄·PDF 저장</button>
   </div>
-  <div class="cal">
-    <div class="cal-h"><b id="calTitle"></b><span id="calReg"></span></div>
+  <div class="rec-strip">
+    <span class="lab"><span class="s">★</span> 이번 달 해루질 추천</span>
+    <div class="days" id="recDays"></div>
+  </div>
+  <div class="paper">
+    <div class="cal-h"><div class="mo"><span class="big" id="calTitle"></span><span class="yr" id="calYr"></span></div><span class="reg" id="calReg"></span><span class="mini" id="calMini"><span class="s">★</span> 해루질 추천일(6~9물)</span></div>
     <table><thead><tr>
       <th class="sun">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th class="sat">토</th>
     </tr></thead><tbody id="calBody"></tbody></table>
   </div>
-  <p class="foot"><b>물때</b>는 자체 조석계산 기준입니다(공식 예보 연동 준비 중). 실제 출조 전 현장 물때를 한 번 더 확인하세요. · 기상·바람은 <a href="/" style="color:#35d0ff">해루낚 지도</a>에서. · 무단 재판매 금지, 개인·동호회 이용은 자유입니다.</p>
+  <div class="legend">
+    <span class="k"><span class="sw"></span> <b>★ 해루질 추천일</b> — 6·7·8·9물</span>
+    <span class="k"><b style="color:#1565c0">▲</b> 만조 시각·조위(cm)</span>
+    <span class="k"><b style="color:#c25e00">▼</b> 간조 시각·조위(cm)</span>
+    <span class="k">🌑 달 모양(물때 참고)</span>
+  </div>
+  <p class="foot"><b>왜 6~9물인가?</b> 물때가 사리(대조)에 가까울수록 밀물·썰물의 높이차(조차)가 커져 갯벌이 더 넓고 오래 드러납니다. 낙지·바지락·박하지 채집은 이 시기 간조 전후 1~2시간이 황금 타이밍입니다. · <b>물때</b>는 자체 조석계산 기준입니다(공식 예보 연동 준비 중). 실제 출조 전 현장 물때를 한 번 더 확인하세요. · 기상·바람은 <a href="/" style="color:#0b7a5a">해루낚 지도</a>에서. · 무단 재판매 금지, 개인·동호회 이용은 자유입니다.</p>
   <a class="back" href="/">← 해루낚으로 돌아가기</a>
 </div>
 <script>
@@ -77,6 +124,7 @@ var SYN = 29.530588853;      // 삭망월(일)
 var LUNI_DAY = 24.8412;      // 태음일(시간)
 var SEMI = 12.4206;          // 반일주조 주기(시간)
 var MULTTAE = ['7물','8물','9물','10물','11물','12물','13물','조금','무시','1물','2물','3물','4물','5물','6물'];
+var REC_SET = {'6물':1,'7물':1,'8물':1,'9물':1};   // 해루질 추천 물때(조차 큰 사리권)
 function toJD_(d){ return d.getTime()/86400000 + 2440587.5; }
 function moonAge_(y,m,d){
   var dt = new Date(Date.UTC(y, m-1, d, 3, 0, 0)); // KST 12시 = UTC 03시
@@ -84,49 +132,26 @@ function moonAge_(y,m,d){
   return age;
 }
 function multtae_(age, sea){
-  var lunarDay = Math.round(age) + 1;          // 음력 일자 근사(삭 당일=1일)
+  var lunarDay = Math.round(age) + 1;
   if (lunarDay > 30) lunarDay = 30;
   var idx = (lunarDay - 1) % 15;
-  if (sea && sea !== 'W') idx = (idx + 1) % 15;   // 남해·동해·제주는 한 물 앞선 표기
+  if (sea && sea !== 'W') idx = (idx + 1) % 15;
   return { name: MULTTAE[idx], idx: idx, lunarDay: lunarDay };
-}
-function moonBright_(age){
-  return (1 - Math.cos(2*Math.PI*age/SYN)) / 2;
 }
 function moonTransit_(age, lon){
   var solarNoon = 12 + (135 - lon)/15;
   return ((solarNoon + age * (LUNI_DAY - 24)) % LUNI_DAY + LUNI_DAY) % LUNI_DAY;
 }
-function sunTimes_(y,m,d,lat,lon){
-  var rad = Math.PI/180;
-  var jd = toJD_(new Date(Date.UTC(y, m-1, d, 0,0,0)));
-  var lw = -lon;
-  var n = Math.round(jd - 2451545.0 - 0.0009 - lw/360);
-  var Js = 2451545.0 + 0.0009 + lw/360 + n;
-  var M = (357.5291 + 0.98560028*(Js - 2451545.0)) % 360;
-  var C = 1.9148*Math.sin(M*rad) + 0.0200*Math.sin(2*M*rad) + 0.0003*Math.sin(3*M*rad);
-  var lam = (M + C + 180 + 102.9372) % 360;
-  var Jt = Js + 0.0053*Math.sin(M*rad) - 0.0069*Math.sin(2*lam*rad);
-  var dec = Math.asin(Math.sin(lam*rad) * Math.sin(23.44*rad));
-  var cosW = (Math.sin(-0.833*rad) - Math.sin(lat*rad)*Math.sin(dec)) / (Math.cos(lat*rad)*Math.cos(dec));
-  if (cosW > 1) return { rise:null, set:null, noon:12 };     // 극야
-  if (cosW < -1) return { rise:0, set:24, noon:12 };         // 백야
-  var w = Math.acos(cosW)/rad;
-  var f = function(J){ return ((J - Math.floor(jd)) * 24 + 9 + 12) % 24; }; // KST 변환
-  return { rise: f(Jt - w/360), set: f(Jt + w/360), noon: f(Jt) };
-}
 function calcTide_(p, y, mo, d){
   var age = moonAge_(y, mo, d);
-  // 조석 지연(age of tide): 사리는 삭·망 당일이 아니라 약 하루 뒤에 온다
   var eff = age - 1.0;
   var phase = 2*Math.PI*eff/SYN;
-  var sf = 1 + 0.447*Math.cos(2*phase);                       // 실측 대조로 보정한 계수
-  var anom = 1 + 0.05*Math.cos(2*Math.PI*(eff+3)/27.5545);    // 근지점 보정(근사)
-  var range = p.mr * sf * anom * 0.94;                        // m
-  var msl = p.mr * 100 * 0.78;                           // 평균해면 cm
+  var sf = 1 + 0.447*Math.cos(2*phase);
+  var anom = 1 + 0.05*Math.cos(2*Math.PI*(eff+3)/27.5545);
+  var range = p.mr * sf * anom * 0.94;
+  var msl = p.mr * 100 * 0.78;
   var half = range * 100 / 2;
-
-  var base = moonTransit_(age, p.lo) + p.hi;             // 첫 만조
+  var base = moonTransit_(age, p.lo) + p.hi;
   var ev = [];
   for (var k = -2; k <= 3; k++){
     var th = base + k*SEMI;
@@ -145,14 +170,30 @@ var now=new Date(Date.now()+9*36e5);
 var curY=now.getUTCFullYear(), curM=now.getUTCMonth()+1;
 var regSel=document.getElementById('reg');
 REGIONS.forEach(function(r,i){var o=document.createElement('option');o.value=i;o.textContent=r.n+' ('+r.r+')';regSel.appendChild(o);});
+
+// 추천일 클러스터를 "3~6일, 18~21일" 형태로 요약
+function summarizeRec(recDays){
+  if(!recDays.length) return [];
+  var groups=[], cur=[recDays[0]];
+  for(var i=1;i<recDays.length;i++){
+    if(recDays[i]===recDays[i-1]+1) cur.push(recDays[i]);
+    else { groups.push(cur); cur=[recDays[i]]; }
+  }
+  groups.push(cur);
+  return groups.map(function(g){ return g.length>1 ? (g[0]+'~'+g[g.length-1]+'일') : (g[0]+'일'); });
+}
+
 function render(){
   var p=REGIONS[+regSel.value];
   document.getElementById('mv').textContent=curY+'. '+curM;
-  document.getElementById('calTitle').textContent=curY+'년 '+curM+'월';
+  document.getElementById('calTitle').textContent=curM+'월';
+  document.getElementById('calYr').textContent=curY;
   document.getElementById('calReg').textContent=p.n+' · '+p.r+' 물때';
+  var tNow=new Date(Date.now()+9*36e5), tY=tNow.getUTCFullYear(), tM=tNow.getUTCMonth()+1, tD=tNow.getUTCDate();
   var first=new Date(Date.UTC(curY,curM-1,1)), start=first.getUTCDay();
   var days=new Date(Date.UTC(curY,curM,0)).getUTCDate();
   var body=document.getElementById('calBody');body.innerHTML='';
+  var recDays=[];
   var row;
   for(var cell=0;cell<Math.ceil((start+days)/7)*7;cell++){
     if(cell%7===0){row=document.createElement('tr');body.appendChild(row);}
@@ -162,13 +203,29 @@ function render(){
     var dow=(start+dnum-1)%7;
     var t=calcTide_(p,curY,curM,dnum);
     var age=moonAge_(curY,curM,dnum), mt=multtae_(age,'W'), ld=Math.round(age)+1;
+    var isRec = !!REC_SET[mt.name];
+    if(isRec) recDays.push(dnum);
     var hi=t.events.filter(function(e){return e.k==='H';}), lo=t.events.filter(function(e){return e.k==='L';});
     var fH=hi.map(function(e){return '<div class="h">'+hm(e.t)+' <b>'+e.lv+'</b></div>';}).join('');
     var fL=lo.map(function(e){return '<div class="l">'+hm(e.t)+' <b>'+e.lv+'</b></div>';}).join('');
+    var cls=[];
+    if(dow===0)cls.push('wsun'); else if(dow===6)cls.push('wsat');
+    if(isRec)cls.push('rec');
+    if(curY===tY&&curM===tM&&dnum===tD)cls.push('today');
+    td.className=cls.join(' ');
     td.innerHTML='<span class="dn'+(dow===0?' sun':dow===6?' sat':'')+'">'+dnum+'</span>'
-      +'<span class="mul">'+mt.name+'</span><span class="moon">'+moonIco(ld)+'</span>'
+      +'<span class="mul">'+mt.name+'</span>'+(isRec?'<span class="rstar">★</span>':'')
+      +'<span class="moon">'+moonIco(ld)+'</span>'
       +'<div class="ti">'+fH+fL+'</div>';
     row.appendChild(td);
+  }
+  // 추천 요약 스트립
+  var rd=document.getElementById('recDays');
+  var ranges=summarizeRec(recDays);
+  if(ranges.length){
+    rd.innerHTML=ranges.map(function(s){return '<span class="rec-chip"><b>'+s+'</b></span>';}).join('');
+  } else {
+    rd.innerHTML='<span class="none">이번 달 추천일 없음</span>';
   }
 }
 document.getElementById('prev').onclick=function(){curM--;if(curM<1){curM=12;curY--;}render();};

@@ -1821,6 +1821,20 @@ body.has-ticker .filters{ top:calc(196px + var(--safeT)) }
   background:linear-gradient(100deg,rgba(53,208,255,.14),rgba(46,230,168,.1));
   color:#8fdcff;font-family:inherit;font-size:13.5px;font-weight:800}
 .dt-mtbtn:hover{background:linear-gradient(100deg,rgba(53,208,255,.22),rgba(46,230,168,.16));color:#fff}
+/* 상세 패널 — 물때달력 유도 링크 */
+.dt-calbtn{display:block;text-align:center;text-decoration:none;margin:-4px 0 14px;
+  border:1px solid rgba(227,154,0,.4);border-radius:13px;padding:11px;
+  background:linear-gradient(100deg,rgba(227,154,0,.16),rgba(255,176,32,.09));
+  color:#ffcf7a;font-size:13px;font-weight:800}
+.dt-calbtn b{color:#ffe0a3}
+.dt-calbtn:hover{background:linear-gradient(100deg,rgba(227,154,0,.26),rgba(255,176,32,.15));color:#fff}
+/* 물때표 팝업 — 달력 유도 배너 */
+.mtcal{display:block;text-align:center;text-decoration:none;
+  padding:11px 14px;border-top:1px solid var(--line);
+  background:linear-gradient(100deg,rgba(227,154,0,.16),rgba(255,176,32,.08));
+  color:#ffcf7a;font-size:13px;font-weight:800}
+.mtcal b{color:#ffe0a3}
+.mtcal:hover{background:linear-gradient(100deg,rgba(227,154,0,.24),rgba(255,176,32,.13));color:#fff}
 /* 확장 물때표 — 열 늘어난 판 */
 .mtcard:has(.mtt-full){width:min(940px,100%)}
 .mtt-full th,.mtt-full td{padding:8px 6px;font-size:12px}
@@ -7673,6 +7687,10 @@ function renderDetail(d){
     var mtb = el('button','dt-mtbtn', '📋 이 자리 15일 물때표 (만조·간조·물흐름·해달)');
     mtb.onclick = function(){ openMultae(d.point.i, d.point.n); };
     b.appendChild(mtb);
+    var calb = document.createElement('a');
+    calb.className = 'dt-calbtn'; calb.href = 'calendar/';
+    calb.innerHTML = '📅 한 달 물때달력 무료 인쇄 · <b>해루질 추천일(★)</b>';
+    b.appendChild(calb);
   })();
 
   /* 결론 */
@@ -9234,6 +9252,7 @@ function mtBuild_(){
     +     '<button class="mtx" id="mtClose" aria-label="닫기">×</button>'
     +   '</div>'
     +   '<div class="mtbody" id="mtBody"><p class="mtload">물때를 불러오는 중…</p></div>'
+    +   '<a class="mtcal" href="calendar/">📅 이 달 물때달력 무료 인쇄·PDF — <b>해루질 추천일(★) 한눈에</b></a>'
     +   '<div class="mtfoot"><b class="rec-star">★</b> 그날의 해루질·낚시 추천도 · 만조·간조 옆 <b>굵은 숫자가 조위(cm)</b>, <b class="up">▲</b>/<b class="dn">▼</b>는 전날 대비 증감 · 물때 바다타임 · 기상 오픈메테오 · 8일째부터는 물때만</div>'
     + '</div>';
   document.body.appendChild(d);
