@@ -6705,6 +6705,21 @@ function kAlign_(){
     var kpx = Math.abs(kp2.x - kp.x), lpx = Math.abs(lp1.x - lp0.x);
     var s = (kpx > 0.5 && lpx > 0.5) ? (lpx / kpx) : 1;   // 카카오를 Leaflet 축척에 맞추는 배율
     if (!isFinite(s) || s <= 0) s = 1;
+    /* 단계 자가보정 — 배율이 0.71 미만/1.41 초과면 카카오 확대단계가 한 단계 어긋난 것(초기 레이아웃 전 보정 실패 등).
+       배경을 반으로 줄여 검은 여백이 생기는 대신, 단계를 옮기고 다시 잰다. */
+    var tries = 0;
+    while ((s < 0.71 || s > 1.41) && tries < 2){
+      KAKAO.off += (s < 0.71) ? 1 : -1;
+      KAKAO.map.setLevel(kl_(map.getZoom()));
+      KAKAO.map.setCenter(new kakao.maps.LatLng(c.lat, c.lng));
+      proj = KAKAO.map.getProjection();
+      kp  = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng));
+      kp2 = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng + dLng));
+      kpx = Math.abs(kp2.x - kp.x);
+      s = (kpx > 0.5 && lpx > 0.5) ? (lpx / kpx) : 1;
+      if (!isFinite(s) || s <= 0) s = 1;
+      tries++;
+    }
     s = Math.max(0.5, Math.min(2, s));
     var dx = KAKAO.div.clientWidth/2 - kp.x, dy = KAKAO.div.clientHeight/2 - kp.y;
     /* 회전 보정 — 카카오(TM, 중앙자오선 127°E)는 자오선이 127°로 수렴하지만 웹메르카토르는 자오선이 수직이라
@@ -7772,9 +7787,15 @@ function openDetail(id, auto){
     .withFailureHandler(function(){ $('detailBody').innerHTML = '<p class="row-verdict" style="padding:30px 0;text-align:center">정보를 불러오지 못했습니다.</p>'; })
     .apiPoint(id, S.ds, S.want, isPremium() ? 15 : 7);
   var m = S.markers[id];
-  if (m && !auto){
-    if (isDesk_()) map.panTo(m.getLatLng(), { animate:true });
-    else map.panTo([m.getLatLng().lat - 0.35, m.getLatLng().lng], { animate:true });
+  if (!auto){
+    /* 핀이 아직 없어도(딥링크 직후) 좌표표에서 찾아 그 자리로 간다. 전국 화면이면 13단계로 다가간다. */
+    var ll = m ? m.getLatLng() : null;
+    if (!ll){ try { var pp = (typeof pointById_ === 'function') ? pointById_(id) : null; if (pp && pp.la) ll = L.latLng(pp.la, pp.lo); } catch(e){} }
+    if (ll){
+      var z = map.getZoom(), tz = z < 10 ? 13 : z;
+      var off = isDesk_() ? 0 : (tz >= 13 ? 0.012 : 0.35);
+      map.setView([ll.lat - off, ll.lng], tz, { animate: z >= 10 });
+    }
   }
 }
 function closeDetail(){
