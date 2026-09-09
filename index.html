@@ -733,6 +733,15 @@ h1,h2,h3,h4,p{margin:0}
   box-shadow:0 2px 9px rgba(31,196,192,.4);
 }
 .basesw{flex-wrap:wrap;max-width:min(76vw,330px)}
+.bsep{flex:0 0 auto;width:1px;height:16px;margin:0 3px;background:rgba(255,255,255,.2);align-self:center}
+.basebtn.fl3::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0;background:var(--mut2)}
+.basebtn.fl3[data-fl="mud"]::before{background:#8a6a45}
+.basebtn.fl3[data-fl="sand"]::before{background:#f2dfa6;border-radius:2px}
+.basebtn.fl3[data-fl="mix"]::before{background:linear-gradient(135deg,#8a6a45 50%,#f2dfa6 50%);border-radius:2px}
+.eosw .basebtn.fl3.on{
+  background:linear-gradient(100deg,#f2dfa6,#8a6a45);color:#241a06;
+  box-shadow:0 2px 9px rgba(200,165,110,.45);
+}
 .eosw .basebtn.cl.on{
   background:linear-gradient(100deg,#e8d5a0,#7f97a8);color:#10202b;
   box-shadow:0 2px 9px rgba(160,180,200,.4);
@@ -2082,10 +2091,6 @@ body.map-kakao .dchip span{color:#b5cad8}
   <button class="fchip" data-f="land">육지</button>
   <button class="fchip" data-f="isl">섬 전체</button>
   <button class="fchip" data-f="car">차로 가는 섬</button>
-  <span class="fsep" aria-hidden="true"></span>
-  <button class="fchip fl" data-fl="mud" title="펄갯벌 — 낙지·가무락·칠게">펄</button>
-  <button class="fchip fl" data-fl="sand" title="모래갯벌 — 맛조개·동죽·백합">모래</button>
-  <button class="fchip fl" data-fl="mix" title="혼합갯벌 — 바지락·굴·박하지">펄+모래</button>
 </div>
 
 <!-- 어종 지정 표시 -->
@@ -7278,10 +7283,25 @@ eoCtl.onAdd = function(){
               + '<button class="basebtn on" id="eoBtn" type="button">어장</button>'
               + '<button class="basebtn on gg" id="ggBtn" type="button">갯골</button>'
               + '<button class="basebtn on rk" id="rkBtn" type="button">갯바위</button>'
-              + '<button class="basebtn ac" id="acBtn" type="button">사고</button>';
+              + '<button class="basebtn ac" id="acBtn" type="button">사고</button>'
+              + '<span class="bsep" aria-hidden="true"></span>'
+              + '<button class="basebtn fl3" data-fl="mud" type="button" title="펄갯벌 — 낙지·가무락·칠게">펄</button>'
+              + '<button class="basebtn fl3" data-fl="sand" type="button" title="모래갯벌 — 맛조개·동죽·백합">모래</button>'
+              + '<button class="basebtn fl3" data-fl="mix" type="button" title="혼합갯벌 — 바지락·굴·박하지">펄+모래</button>';
   L.DomEvent.disableClickPropagation(d);
   L.DomEvent.on(d, 'click', function(e){
     var t = e.target;
+    if (t && t.classList && t.classList.contains('fl3')){
+      var k = t.dataset.fl;
+      S.floors[k] = !S.floors[k];
+      t.classList.toggle('on', !!S.floors[k]);
+      applyFloor_();
+      try { flatDraw_(); legDraw_(); } catch(err){}
+      if (!S.rows.length) toast('이 지형은 지금 조건에 없습니다');
+      S._moved = false;
+      render();
+      return;
+    }
     if (t && t.id === 'clBtn'){
       CL_ON = !CL_ON;
       t.className = 'basebtn cl' + (CL_ON ? ' on' : '');
