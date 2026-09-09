@@ -1066,8 +1066,8 @@ body.sheet-off .ticker{display:none}
 .leg-b b{font-size:9.5px;font-weight:800;color:#8ba6b8;margin-top:5px}
 .leg-b b:first-child{margin-top:0}
 .leg-b span{display:flex;align-items:center;gap:6px;white-space:nowrap}
-.leg-b i{flex:0 0 auto;width:11px;height:11px;border-radius:3px}
-.leg-b i.ln{height:3.5px;border-radius:2px}
+.leg-b i{flex:0 0 auto;width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.35)}
+.leg-b svg.ln{flex:0 0 auto;width:26px;height:8px;overflow:visible}
 @media (max-width:520px){ .legend{max-width:132px;font-size:10px;margin-bottom:calc(158px + var(--safeB))} }
 
 /* ── 바텀시트 ────────────────────────── */
@@ -2034,7 +2034,7 @@ body.map-kakao .dchip span{color:#b5cad8}
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="mask-icon" href="icon.svg" color="#2ee6a8">
 <meta name="naver-site-verification" content="91e427302481f46851e378e769ad02f7d8660b2d">
-<meta name="description" content="물때 해석은 앱이 합니다. 전국 604곳을 조석·수중시야·조류·바람·수온·금어기로 분석해 오늘 어디 가서 뭐를 잡을지 결론만 알려드립니다.">
+<meta name="description" content="물때 해석은 앱이 합니다. 전국 601곳을 조석·수중시야·조류·바람·수온·금어기로 분석해 오늘 어디 가서 뭐를 잡을지 결론만 알려드립니다.">
 <link rel="canonical" href="https://haerunak.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="해루낚">
@@ -2686,7 +2686,7 @@ var POINTS = [
   {i:1612, n:'구시포해수욕장', r:'전북 고창', s:'W', la:35.44572, lo:126.43538, kd:'B', sig:['백합'], mr:4.39, hi:5.8, f:'sand', sp:['백합','동죽','맛조개'], tag:'명사십리 남단, 야간 백합 그레질'},
   {i:1613, n:'동호해수욕장', r:'전북 고창', s:'W', la:35.51827, lo:126.48357, kd:'B', sig:['백합'], mr:4.19, hi:5.4, f:'mix', sp:['백합','동죽','맛조개'], fx:['보리멸','망둥어','놀래미'], tag:'노지캠핑 병행 무료 해루질, 모래+펄'},
   {i:1614, n:'톱머리해수욕장', r:'전남 무안', s:'W', la:34.96816, lo:126.38670, kd:'B', mr:4.05, hi:6, f:'mix', sp:['바지락','동죽','맛조개'], fx:['보리멸','숭어','농어'], tag:'무안공항 인근, 해송림 앞 모래펄 가족 코스'},
-  {i:1615, n:'홀통유원지 갯벌', r:'전남 무안', s:'W', la:35.0552, lo:126.3776, kd:'H', fx:['낙지'], mr:4.05, hi:6, f:'mix', sp:['꼬막','낙지','바지락','소라','가무락'], tag:'현경면, 청정 무안갯벌 대표, 윈드서핑장 옆'},
+  {i:1615, n:'홀통 갯벌', r:'전남 무안', s:'W', la:35.0552, lo:126.3776, kd:'H', fx:['낙지'], mr:4.05, hi:6, f:'mix', sp:['꼬막','낙지','바지락','소라','가무락'], tag:'현경면, 청정 무안갯벌 대표, 윈드서핑장 옆'},
   {i:1616, n:'돌머리해수욕장', r:'전남 함평', s:'W', la:35.08678, lo:126.44118, kd:'H', fx:['낙지','숭어','농어'], mr:4.05, hi:6, f:'mud', sp:['낙지','바지락','동죽','박하지'], tag:'해수풀장 옆 갯벌체험장, 함평만 펄'},
   {i:1617, n:'초지항', r:'인천 강화', s:'W', la:37.636, lo:126.53167, kd:'F', mr:6.01, hi:4.5, f:'mud', br:1, fx:['숭어','농어','붕장어'], sp:['낙지','동죽','바지락'], tag:'초지대교 아래~방파제 물골, 4~10월(피크 5~6월) 훌치기·원투'},
   {i:1618, n:'황산도 선착장', r:'인천 강화', s:'W', la:37.625, lo:126.5388, kd:'F', mr:6.01, hi:4.5, f:'mud', isl:1, br:1, fx:['숭어','망둥어','농어'], sp:['낙지','바지락','동죽'], tag:'초지대교 남측 연육도, 봄 훌치기·가을 원투'},
@@ -2714,7 +2714,6 @@ var POINTS = [
   {i:2200, n:'사량도 대항 갯바위', r:'경남 통영', s:'S', la:34.8038, lo:128.2911, kd:'F', mr:1.3, hi:9.8, f:'rock', isl:1, sp:['거북손','홍합','고둥'], fx:['감성돔','벵에돔','볼락'], tag:'지리산 조망 갯바위 명당'},
   {i:2201, n:'욕지도 삼여 갯바위', r:'경남 통영', s:'S', la:34.6758, lo:128.2661, kd:'B', mr:1.62, hi:9.7, f:'rock', isl:1, sp:['홍합','전복','군소'], fx:['참돔','감성돔','돌돔','볼락','농어','벵에돔'], tag:'욕지도 대표 참돔 포인트'},
   {i:2202, n:'연화도 용머리', r:'경남 통영', s:'S', la:34.63636, lo:128.37513, kd:'B', mr:1.28, hi:9.7, f:'rock', isl:1, sp:['홍합','거북손','고둥'], fx:['감성돔','벵에돔','참돔','돌돔','부시리','농어'], tag:'용머리 해안 갯바위 명당'},
-  {i:2203, n:'미륵도 달아공원', r:'경남 통영', s:'S', la:34.76820, lo:128.40683, kd:'B', mr:1.3, hi:9.8, f:'rock', isl:1, br:1, sp:['고둥','홍합'], fx:['감성돔','볼락','학공치'], tag:'한려수도 조망 갯바위'},
   {i:2205, n:'구조라 갯바위', r:'경남 거제', s:'S', la:34.7717, lo:128.6972, kd:'B', mr:1.42, hi:9.8, f:'mix', isl:1, br:1, sp:['홍합','고둥','거북손'], fx:['참돔','감성돔','벵에돔'], tag:'몽돌+백사장 혼합 포인트'},
   {i:2206, n:'학동 흑진주몽돌', r:'경남 거제', s:'S', la:34.77467, lo:128.64153, kd:'B', mr:1.15, hi:9.8, f:'rock', isl:1, br:1, sp:['소라','전복','보말','홍합'], fx:['벵에돔','볼락','감성돔'], tag:'몽돌해변 야간 볼락 포인트'},
   {i:2207, n:'여차~홍포 갯바위길', r:'경남 거제', s:'S', la:34.7264, lo:128.6494, kd:'F', mr:1.15, hi:9.8, f:'rock', isl:1, br:1, sp:['거북손','홍합','군소'], fx:['감성돔','벵에돔','돌돔'], tag:'남해안 최고 갯바위길'},
@@ -2777,7 +2776,7 @@ var POINTS = [
   {i:2427, n:'주문도 조개골해변', r:'인천 강화', s:'W', la:37.65802, lo:126.19780, kd:'B', mr:5.27, hi:5.0, f:'mix', isl:1, sp:['바지락','동죽','고둥'], fx:['망둥어','숭어'], tag:'이름 그대로 조개 갯벌'},
   {i:2428, n:'볼음도 영뜰해변', r:'인천 강화', s:'W', la:37.66800, lo:126.18475, kd:'B', mr:5.27, hi:5.0, f:'mix', isl:1, sp:['동죽','바지락','가무락','낙지'], fx:['숭어','농어'], tag:'청정 서해 끝섬 갯벌'},
   {i:2429, n:'구봉도', r:'경기 안산', s:'W', la:37.28046, lo:126.54767, kd:'H', mr:6.01, hi:4.7, f:'mix', isl:1, br:1, sp:['바지락','굴','고둥','꽃게'], fx:['망둥어','우럭','놀래미'], tag:'구봉도 갯벌, 바지락·소라'},
-  {i:2430, n:'구봉도 낙조전망대', r:'경기 안산', s:'W', la:37.2298, lo:126.5541, kd:'H', mr:6.01, hi:4.7, f:'mix', isl:1, br:1, sp:['바지락','굴','고둥'], fx:['망둥어','우럭','놀래미'], tag:'구봉도 서쪽 암반갯벌'},
+  {i:2430, n:'구봉도 갯벌', r:'경기 안산', s:'W', la:37.2298, lo:126.5541, kd:'H', mr:6.01, hi:4.7, f:'mix', isl:1, br:1, sp:['바지락','굴','고둥'], fx:['망둥어','우럭','놀래미'], tag:'구봉도 서쪽 암반갯벌'},
   {i:2431, n:'대부 종현동 갯벌', r:'경기 안산', s:'W', la:37.211, lo:126.608, kd:'B', mr:6.01, hi:4.7, f:'mud', isl:1, br:1, sp:['바지락','동죽','낙지','가무락'], fx:['망둥어','숭어','붕장어'], tag:'종현 갯벌체험, 낙지'},
   {i:2432, n:'방아머리해변', r:'경기 안산', s:'W', la:37.28915, lo:126.57677, kd:'B', mr:6.01, hi:4.7, f:'mix', isl:1, br:1, sp:['맛조개','동죽','바지락','박하지'], fx:['망둥어','숭어','우럭'], tag:'모래+갯벌, 가족갯벌체험'},
   {i:2434, n:'불도 갯벌', r:'경기 안산', s:'W', la:37.202, lo:126.635, kd:'B', mr:6.01, hi:4.7, f:'mud', isl:1, br:1, sp:['맛조개','바지락','동죽'], fx:['망둥어','숭어'], tag:'불도 조용한 펄갯벌'},
@@ -2839,10 +2838,8 @@ var POINTS = [
   {i:2533, n:'북성포구', r:'인천 중구', s:'W', la:37.48307, lo:126.61448, kd:'F', mr:6.01, hi:4.5, f:'mud', sp:['낙지','동죽','바지락'], fx:['망둥어','붕장어'], tag:'마지막 남은 재래포구'},
   {i:2534, n:'만석부두', r:'인천 동구', s:'W', la:37.49160, lo:126.62226, kd:'F', mr:6.01, hi:4.5, f:'mix', sp:['주꾸미','굴','고둥','바지락'], fx:['주꾸미','망둥어','붕장어'], tag:'배낚시 선착 명당'},
   {i:2535, n:'화수부두', r:'인천 동구', s:'W', la:37.4878, lo:126.6098, kd:'F', mr:6.01, hi:4.5, f:'mud', sp:['동죽','바지락'], fx:['광어','농어','숭어','망둥어','붕장어'], tag:'옛 포구 원투낚시터'},
-  {i:2536, n:'아암도해안공원', r:'인천 연수', s:'W', la:37.4122, lo:126.6412, kd:'B', mr:6.08, hi:4.6, f:'mud', sp:['동죽','바지락','낙지'], fx:['망둥어','숭어'], tag:'도심 속 갯벌산책로'},
   {i:2537, n:'예단포', r:'인천 중구', s:'W', la:37.5313, lo:126.5019, kd:'B', mr:6.01, hi:4.5, f:'mud', isl:1, br:1, sp:['낙지','동죽','바지락'], fx:['망둥어','우럭','숭어'], tag:'영종대교 아래 옛포구'},
   {i:2539, n:'삼목선착장', r:'인천 중구', s:'W', la:37.49951, lo:126.45244, kd:'F', mr:6.01, hi:4.5, f:'mix', isl:1, br:1, sp:['주꾸미','굴','고둥','바지락'], fx:['주꾸미','망둥어','숭어'], tag:'신도행 여객선 부두'},
-  {i:2540, n:'씨사이드파크', r:'인천 중구', s:'W', la:37.4743, lo:126.5262, kd:'B', mr:6.01, hi:4.5, f:'sand', isl:1, br:1, sp:['동죽','바지락','맛조개'], fx:['망둥어','숭어'], tag:'영종 해안 산책낚시'},
   {i:2541, n:'굴업도 동뿌리', r:'인천 옹진', s:'W', la:37.1975, lo:125.993, kd:'F', mr:4.59, hi:3.9, f:'rock', isl:1, sp:['굴','홍합','고둥'], fx:['우럭','놀래미','농어'], tag:'명품섬 갯바위포인트'},
   {i:2543, n:'대이작 큰풀안해변', r:'인천 옹진', s:'W', la:37.16938, lo:126.26308, kd:'B', mr:4.73, hi:4.0, f:'mix', isl:1, sp:['백합','바지락','동죽','낙지'], fx:['망둥어','숭어'], tag:'대이작도 몽돌해변'},
   {i:2544, n:'대이작 작은풀안해변', r:'인천 옹진', s:'W', la:37.17089, lo:126.25711, kd:'B', mr:4.73, hi:4.0, f:'sand', isl:1, sp:['바지락','동죽','맛조개'], fx:['망둥어','보리멸'], tag:'프라이빗 백사장비치'},
@@ -7510,15 +7507,15 @@ map.on('moveend zoomend', eoVis_);
  * 0.25도 조각으로 나눠 보이는 데만 받는다. */
 var CL_LAYER = L.layerGroup(), CL_ON = false, CL_MINZ = 11, CL_IDX = null, CL_CELL = {};
 var CL_KIND = {
-  sand:   { c:'#e8d5a0', w:3.4, ko:'모래 해안', t:'맛조개·동죽·백합 — 장화보다 갯벌화가 편하다' },
-  mudsand:{ c:'#c9ab7d', w:3.4, ko:'뻘+모래 해안', t:'바지락·백합·낙지가 섞여 나온다' },
-  mud:    { c:'#8a6f52', w:3.4, ko:'뻘 해안', t:'낙지·가무락·칠게 — 발이 깊이 빠진다' },
-  sandgv: { c:'#d8c9a4', w:3,   ko:'모래+자갈 해안', t:'고둥·게, 물가에 미역·톳' },
-  gravel: { c:'#b3c0ca', w:3,   ko:'자갈 해안', t:'고둥·거북손, 미끄러우니 조심' },
-  rock:   { c:'#7f97a8', w:3,   ko:'암반 해안', t:'굴·홍합·거북손, 갯바위 낚시 자리' },
-  cliff:  { c:'#5d7285', w:3.6, ko:'절벽 해안', t:'접근 자체가 위험 — 위에서 내려가지 말 것' },
-  flat:   { c:'#8fa3b1', w:2.2, ko:'평탄 해안', t:'재질이 따로 안 잡힌 완만한 해안 — 앞바다 갯벌 색을 함께 보세요' },
-  art:    { c:'#d5dce2', w:2.8, ko:'인공 해안(방파제·부두·방벽)', t:'낚시 자리 — 해루질 바닥은 아니다' }
+  mud:    { c:'#8a6a45', w:4.2, d:null,      ko:'뻘 해안',   t:'낙지·가무락·칠게 — 발이 깊이 빠진다' },
+  mudsand:{ c:'#c2a06d', w:4,   d:'12 5',    ko:'뻘+모래 해안', t:'바지락·백합·낙지가 섞여 나온다' },
+  sand:   { c:'#f2dfa6', w:4,   d:null,      ko:'모래 해안', t:'맛조개·동죽·백합 — 갯벌화가 편하다' },
+  sandgv: { c:'#e0c98f', w:3.6, d:'9 4 2 4', ko:'모래+자갈 해안', t:'고둥·게, 물가에 미역·톳' },
+  gravel: { c:'#9fb3c2', w:3.6, d:'2 5',     ko:'자갈 해안', t:'고둥·거북손 — 미끄러우니 조심' },
+  rock:   { c:'#5b7a90', w:4.2, d:null,      ko:'암반 해안', t:'굴·홍합·거북손, 갯바위 낚시 자리' },
+  cliff:  { c:'#6d8ba1', w:5,   d:'3 3',     ko:'절벽 해안', t:'접근 자체가 위험 — 위에서 내려가지 말 것' },
+  art:    { c:'#d8dde2', w:3.4, d:'7 6',     ko:'인공 해안(방파제·부두)', t:'낚시 자리 — 해루질 바닥은 아니다' },
+  flat:   { c:'#7d919f', w:2.4, d:'1 6',     ko:'평탄 해안', t:'재질이 안 잡힌 곳 — 앞바다 갯벌 색을 함께 보세요' }
 };
 function clPop_(k){
   var d = CL_KIND[k] || CL_KIND.flat;
@@ -7533,7 +7530,8 @@ function clDrawCell_(key){
   fs.forEach(function(it){
     var d = CL_KIND[it[0]] || CL_KIND.flat;
     var ln = L.polyline(it[1], { renderer: EO_RENDER, color: d.c, weight: d.w,
-                                 opacity: bright ? .95 : .8, lineCap:'round', lineJoin:'round' });
+                                 dashArray: d.d || null,
+                                 opacity: bright ? 1 : .88, lineCap: d.d ? 'butt' : 'round', lineJoin:'round' });
     ln.bindPopup(clPop_(it[0]));
     ln.addTo(CL_LAYER);
   });
@@ -7574,9 +7572,9 @@ map.on('moveend zoomend', clVis_);
  * 자료는 72KB 한 장이라 처음 켤 때 한 번만 받는다. */
 var FLAT_LAYER = L.layerGroup(), FLAT_ON = true, FLAT_DATA = null, FLAT_MINZ = 8;
 var FLAT_COL = {
-  mud:  { d:'#7d5f3f', l:'#5c4a33', ko:'펄갯벌',  t:'낙지·가무락·칠게가 붙는 바닥' },
-  sand: { d:'#f0dca8', l:'#c9a961', ko:'모래갯벌', t:'맛조개·동죽·백합이 나오는 바닥' },
-  mix:  { d:'#b8926a', l:'#977450', ko:'혼합갯벌', t:'바지락·굴·박하지가 섞여 나온다' }
+  mud:  { d:'#6f5133', l:'#4f3f2b', ko:'펄갯벌',  t:'낙지·가무락·칠게가 붙는 바닥' },
+  sand: { d:'#f5e3a8', l:'#c9a54e', ko:'모래갯벌', t:'맛조개·동죽·백합이 나오는 바닥' },
+  mix:  { d:'#c08f57', l:'#a17342', ko:'혼합갯벌', t:'바지락·굴·박하지가 섞여 나온다' }
 };
 function flatPop_(f){
   var c = FLAT_COL[f] || FLAT_COL.mix;
@@ -10627,7 +10625,10 @@ function legHtml_(){
     rows.push('<b>해안 재질</b>');
     ['mud','mudsand','sand','sandgv','gravel','rock','cliff','art','flat'].forEach(function(k){
       var d = CL_KIND[k]; if (!d) return;
-      rows.push('<span><i class="ln" style="background:' + d.c + '"></i>' + d.ko.replace(/\s*\(.*\)/,'') + '</span>');
+      var svg = '<svg class="ln" viewBox="0 0 26 8" aria-hidden="true"><line x1="1" y1="4" x2="25" y2="4" stroke="' + d.c
+              + '" stroke-width="' + Math.min(5, d.w) + '" stroke-linecap="' + (d.d ? 'butt' : 'round') + '"'
+              + (d.d ? ' stroke-dasharray="' + d.d + '"' : '') + '/></svg>';
+      rows.push('<span>' + svg + d.ko.replace(/\s*\(.*\)/,'') + '</span>');
     });
   }
   if (!rows.length) return '';
