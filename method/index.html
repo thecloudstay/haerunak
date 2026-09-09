@@ -76,6 +76,8 @@
   <nav>
     <a href="../species/">어종 도감</a>
     <a href="../spot/">포인트</a>
+    <a href="../tide/">지역 물때</a>
+    <a href="../calendar/">물때달력</a>
     <a href="../partner/">채널 제휴</a>
     <a href="../business/">업체 등록</a>
     <a class="app" href="../index.html">오늘 어디 갈까</a>
@@ -317,7 +319,7 @@
       <code class="eq">ρ = 물가 전진 속도 ÷ 사람 걸음 속도</code>
       <p><strong>ρ가 1을 넘으면 물이 들기 시작한 뒤에 걸어 나와서는 늦습니다.</strong>
          서해 뻘은 조차가 7m를 넘으면 ρ가 1을 넘습니다. 인천·강화 대조가 여기에 해당합니다.
-         전국 259곳 중 18곳이 이 구간이며, 모두 경기·인천 서해 뻘입니다.</p>
+         초기 분석 259곳(현재 <span data-stat="points">604</span>곳) 중 18곳이 이 구간이며, 모두 경기·인천 서해 뻘입니다.</p>
       <p>쓰는 값은 바닥질별로 이렇습니다 — 뻘 경사 0.0009 · 걸음 2,000 m/h,
          혼합 0.0022 · 2,600 m/h, 모래 0.0040 · 3,200 m/h, 자갈·암반 0.0200 · 1,600 m/h.</p>
       <div class="honest2">
@@ -379,5 +381,6 @@
   <p class="fine">해루낚이 내는 점수는 참고용이며 안전 판단은 현장에서 직접 하셔야 합니다.</p>
   <p class="fine">유튜브·블로그 채널 운영자시라면 <a href="../partner/">채널 제휴 안내</a>를 보세요. 문의 <a href="mailto:thecloudstay@gmail.com">thecloudstay@gmail.com</a></p>
 </footer>
+<script>(function(){try{fetch("/data/stats.json").then(function(r){return r.json();}).then(function(j){document.querySelectorAll("[data-stat]").forEach(function(e){var k=e.getAttribute("data-stat");if(j[k]!=null)e.textContent=j[k];});});}catch(e){}})();/*hrnStats*/</script>
 </body>
 </html>

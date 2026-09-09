@@ -119,6 +119,8 @@
   <nav>
     <a href="../species/">어종 도감</a>
     <a href="../spot/">포인트</a>
+    <a href="../tide/">지역 물때</a>
+    <a href="../calendar/">물때달력</a>
     <a href="../method/">계산 근거</a>
     <a href="../business/">업체 등록</a>
     <a href="stats/">정산 조회</a>
@@ -133,7 +135,7 @@
   <p class="lead">
     해루낚은 물때·수중시야·조류·바람·수온·금어기를 종합해
     <strong>오늘 어디 가서 뭘 잡을지 결론만</strong> 내주는 서비스입니다.
-    전국 260곳을 분석합니다. 채널에 링크 하나 거시면 됩니다.
+    전국 <span data-stat="points">604</span>곳을 분석합니다. 채널에 링크 하나 거시면 됩니다.
   </p>
 
   <section>
@@ -326,5 +328,6 @@
   <p class="fine">배분 비율과 정산 방식은 사전 통보 후 조정될 수 있습니다.</p>
   <p class="fine">제휴 문의 <a href="mailto:thecloudstay@gmail.com">thecloudstay@gmail.com</a></p>
 </footer>
+<script>(function(){try{fetch("/data/stats.json").then(function(r){return r.json();}).then(function(j){document.querySelectorAll("[data-stat]").forEach(function(e){var k=e.getAttribute("data-stat");if(j[k]!=null)e.textContent=j[k];});});}catch(e){}})();/*hrnStats*/</script>
 </body>
 </html>

@@ -56,6 +56,8 @@ th.sun{color:var(--sun)}th.sat{color:var(--sat)}
 td{border:1px solid var(--line2);vertical-align:top;height:112px;padding:7px 8px;position:relative;background:#fff}
 td.wsun{background:#fdf4f3}td.wsat{background:#f3f8fe}
 td.off{background:#f7f9fa}
+td.hol{background:#fdf4f3}
+.holn{display:block;font-size:10px;font-weight:800;color:var(--sun);margin-top:2px;line-height:1.2}
 td.rec{background:var(--recbg)}
 td.rec:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--rec)}
 td.today{box-shadow:inset 0 0 0 2px var(--brand)}
@@ -87,10 +89,11 @@ td.rec .mul{color:#b07400}
   td{border:1px solid #b7bfc4;height:112px}
   td.rec{background:#fff8e6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   td.rec:before{background:#e39a00;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .dn.sun{color:#c00}.dn.sat{color:#06c}.mul{color:#0a7}
+  .dn.sun{color:#c00}.dn.sat{color:#06c}.mul{color:#0a7}.holn{color:#c00}
+  td.hol{background:#fff}
   .ti .h b{color:#06c}.ti .l b{color:#c60}.moon{color:#333}.rstar{color:#d98a00}
 }
-@media(max-width:640px){td{height:auto;min-height:66px}.ti{font-size:9.2px}.moon{display:none}.top h1{font-size:20px}}
+@media(max-width:640px){td{height:auto;min-height:66px}.ti{font-size:9.2px}.moon{display:none}.top h1{font-size:20px}.holn{font-size:8.5px}}
 </style>
 </head>
 <body>
@@ -120,6 +123,7 @@ td.rec .mul{color:#b07400}
     <span class="k"><b style="color:#1565c0">▲</b> 만조 시각·조위(cm)</span>
     <span class="k"><b style="color:#c25e00">▼</b> 간조 시각·조위(cm)</span>
     <span class="k">🌑 달 모양(물때 참고)</span>
+    <span class="k"><b style="color:#d3453b">빨간 날짜</b> 일요일·공휴일(대체공휴일 포함)</span>
   </div>
   <p class="foot"><b>왜 6~9물인가?</b> 물때가 사리(대조)에 가까울수록 밀물·썰물의 높이차(조차)가 커져 갯벌이 더 넓고 오래 드러납니다. 낙지·바지락·박하지 채집은 이 시기 간조 전후 1~2시간이 황금 타이밍입니다. · <b>물때</b>는 자체 조석계산 기준입니다(공식 예보 연동 준비 중). 실제 출조 전 현장 물때를 한 번 더 확인하세요. · 기상·바람은 <a href="/" style="color:#0b7a5a">해루낚 지도</a>에서. · 무단 재판매 금지, 개인·동호회 이용은 자유입니다.</p>
   <a class="back" href="/">← 해루낚으로 돌아가기</a>
@@ -169,12 +173,36 @@ function calcTide_(p, y, mo, d){
 }
 
 var REGIONS = [{"n":"영흥도","r":"인천 옹진","la":37.2593,"lo":126.4658,"mr":5.8,"hi":4.6},{"n":"대부도 남서","r":"경기 안산","la":37.25196,"lo":126.56321,"mr":6.01,"hi":4.7},{"n":"제부도","r":"경기 화성","la":37.17825,"lo":126.62067,"mr":6.08,"hi":4.8},{"n":"무의도","r":"인천 중구","la":37.3728,"lo":126.4012,"mr":5.87,"hi":4.5},{"n":"을왕리·용유","r":"인천 중구","la":37.447,"lo":126.372,"mr":5.87,"hi":4.5},{"n":"인천 송도","r":"인천 연수","la":37.37428,"lo":126.62472,"mr":6.08,"hi":4.6},{"n":"강화 외포","r":"인천 강화","la":37.70054,"lo":126.37502,"mr":5.4,"hi":5},{"n":"석모도","r":"인천 강화","la":37.66131,"lo":126.3266,"mr":5.54,"hi":5},{"n":"대산","r":"충남 서산","la":37.01111,"lo":126.35653,"mr":5.13,"hi":4.4},{"n":"태안","r":"충남 태안","la":36.72993,"lo":126.27938,"mr":4.46,"hi":4.6},{"n":"만리포","r":"충남 태안","la":36.78531,"lo":126.1338,"mr":4.19,"hi":4.5},{"n":"안면암","r":"충남 태안","la":36.53,"lo":126.38,"mr":4.46,"hi":4.8},{"n":"무창포","r":"충남 보령","la":36.24792,"lo":126.5378,"mr":4.46,"hi":5},{"n":"위도","r":"전북 부안","la":35.62157,"lo":126.30366,"mr":3.92,"hi":5.2},{"n":"격포항","r":"전북 부안","la":35.61781,"lo":126.46444,"mr":4.19,"hi":5.4},{"n":"영광","r":"전남 영광","la":35.38,"lo":126.42,"mr":4.39,"hi":5.8},{"n":"목포","r":"전남 목포","la":34.76853,"lo":126.38239,"mr":2.97,"hi":6.2},{"n":"오이도 갯벌","r":"경기 시흥","la":37.3459,"lo":126.6864,"mr":6.08,"hi":4.6},{"n":"왜목마을해수욕장","r":"충남 당진","la":37.0532,"lo":126.5175,"mr":5.67,"hi":4.7},{"n":"대천해수욕장 남부","r":"충남 보령","la":36.2911,"lo":126.5183,"mr":4.46,"hi":5},{"n":"춘장대해수욕장","r":"충남 서천","la":36.2229,"lo":126.5091,"mr":4.46,"hi":5}];
+/* 한국 공휴일 — 관공서의 공휴일에 관한 규정 + 대체공휴일. 설·추석·부처님오신날은 음력이라 해마다 적어 둔다. */
+var HOL={
+ '2025-01-01':'신정','2025-01-28':'설날 연휴','2025-01-29':'설날','2025-01-30':'설날 연휴','2025-03-01':'삼일절','2025-03-03':'대체공휴일','2025-05-05':'어린이날·부처님오신날','2025-05-06':'대체공휴일','2025-06-03':'대통령선거','2025-06-06':'현충일','2025-08-15':'광복절','2025-10-03':'개천절','2025-10-05':'추석 연휴','2025-10-06':'추석','2025-10-07':'추석 연휴','2025-10-08':'대체공휴일','2025-10-09':'한글날','2025-12-25':'성탄절',
+ '2026-01-01':'신정','2026-02-16':'설날 연휴','2026-02-17':'설날','2026-02-18':'설날 연휴','2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일','2026-06-03':'지방선거','2026-06-06':'현충일','2026-08-15':'광복절','2026-08-17':'대체공휴일','2026-09-24':'추석 연휴','2026-09-25':'추석','2026-09-26':'추석 연휴','2026-09-28':'대체공휴일','2026-10-03':'개천절','2026-10-05':'대체공휴일','2026-10-09':'한글날','2026-12-25':'성탄절',
+ '2027-01-01':'신정','2027-02-05':'설날 연휴','2027-02-06':'설날','2027-02-07':'설날 연휴','2027-02-08':'대체공휴일','2027-02-09':'대체공휴일','2027-03-01':'삼일절','2027-05-05':'어린이날','2027-05-13':'부처님오신날','2027-06-06':'현충일','2027-08-15':'광복절','2027-08-16':'대체공휴일','2027-09-14':'추석 연휴','2027-09-15':'추석','2027-09-16':'추석 연휴','2027-10-03':'개천절','2027-10-04':'대체공휴일','2027-10-09':'한글날','2027-10-11':'대체공휴일','2027-12-25':'성탄절','2027-12-27':'대체공휴일',
+ '2028-01-01':'신정','2028-01-25':'설날 연휴','2028-01-26':'설날','2028-01-27':'설날 연휴','2028-03-01':'삼일절','2028-05-02':'부처님오신날','2028-05-05':'어린이날','2028-06-06':'현충일','2028-08-15':'광복절','2028-10-02':'추석 연휴','2028-10-03':'추석·개천절','2028-10-04':'추석 연휴','2028-10-05':'대체공휴일','2028-10-09':'한글날','2028-12-25':'성탄절'
+};
+function holOf_(y,m,d){ return HOL[y+'-'+(m<10?'0':'')+m+'-'+(d<10?'0':'')+d] || ''; }
 var hm=function(h){var m=Math.round(((h%24)+24)%24*60);return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);};
 var moonIco=function(ld){var pp=(ld-1)/29.53;if(pp<.04||pp>.96)return '\u{1F311}';if(pp<.21)return '\u{1F312}';if(pp<.29)return '\u{1F313}';if(pp<.46)return '\u{1F314}';if(pp<.54)return '\u{1F315}';if(pp<.71)return '\u{1F316}';if(pp<.79)return '\u{1F317}';return '\u{1F318}';};
 var now=new Date(Date.now()+9*36e5);
 var curY=now.getUTCFullYear(), curM=now.getUTCMonth()+1;
 var regSel=document.getElementById('reg');
 REGIONS.forEach(function(r,i){var o=document.createElement('option');o.value=i;o.textContent=r.n+' ('+r.r+')';regSel.appendChild(o);});
+/* 공유 링크로 들어오면 그 달·그 지역을 그대로 연다 — ?ym=2026-10&reg=영흥도 (없으면 이번 달) */
+(function(){
+  try {
+    var q=new URLSearchParams(location.search);
+    var ym=q.get('ym'); if(ym&&/^\d{4}-\d{1,2}$/.test(ym)){ var a=ym.split('-'); var y=+a[0], m=+a[1]; if(m>=1&&m<=12&&y>2000&&y<2100){ curY=y; curM=m; } }
+    var rg=q.get('reg');
+    if(rg){ var idx=-1; REGIONS.forEach(function(r,i){ if(idx<0&&(r.n===rg||r.n.indexOf(rg)===0)) idx=i; }); if(idx>=0) regSel.value=idx; }
+  } catch(e){}
+})();
+function syncUrl_(){
+  try {
+    var p=REGIONS[+regSel.value];
+    var u='?ym='+curY+'-'+(curM<10?'0':'')+curM+'&reg='+encodeURIComponent(p.n);
+    history.replaceState(null,'',u);
+  } catch(e){}
+}
 
 // 추천일 클러스터를 "3~6일, 18~21일" 형태로 요약
 function summarizeRec(recDays){
@@ -214,12 +242,14 @@ function render(){
     var fH=hi.map(function(e){return '<div class="h">'+hm(e.t)+' <b>'+e.lv+'</b></div>';}).join('');
     var fL=lo.map(function(e){return '<div class="l">'+hm(e.t)+' <b>'+e.lv+'</b></div>';}).join('');
     var cls=[];
-    if(dow===0)cls.push('wsun'); else if(dow===6)cls.push('wsat');
+    var hol=holOf_(curY,curM,dnum);
+    if(hol)cls.push('hol'); else if(dow===0)cls.push('wsun'); else if(dow===6)cls.push('wsat');
     if(isRec)cls.push('rec');
     if(curY===tY&&curM===tM&&dnum===tD)cls.push('today');
     td.className=cls.join(' ');
-    td.innerHTML='<span class="dn'+(dow===0?' sun':dow===6?' sat':'')+'">'+dnum+'</span>'
+    td.innerHTML='<span class="dn'+((dow===0||hol)?' sun':dow===6?' sat':'')+'">'+dnum+'</span>'
       +'<span class="mul">'+mt.name+'</span>'+(isRec?'<span class="rstar">★</span>':'')
+      +(hol?'<span class="holn">'+hol+'</span>':'')
       +'<span class="moon">'+moonIco(ld)+'</span>'
       +'<div class="ti">'+fH+fL+'</div>';
     row.appendChild(td);
@@ -232,6 +262,7 @@ function render(){
   } else {
     rd.innerHTML='<span class="none">이번 달 추천일 없음</span>';
   }
+  syncUrl_();
 }
 document.getElementById('prev').onclick=function(){curM--;if(curM<1){curM=12;curY--;}render();};
 document.getElementById('next').onclick=function(){curM++;if(curM>12){curM=1;curY++;}render();};
@@ -240,8 +271,9 @@ document.getElementById('dl').onclick=function(){window.print();};
 function shToast(msg){var t=document.createElement('div');t.className='sh-toast';t.textContent=msg;document.body.appendChild(t);requestAnimationFrame(function(){t.classList.add('on');});setTimeout(function(){t.classList.remove('on');setTimeout(function(){t.remove();},300);},1800);}
 document.getElementById('sh').onclick=function(){
   var p=REGIONS[+regSel.value];
-  var url='https://haerunak.com/calendar/';
-  var title='해루낚 물때달력';
+  /* 링크에 달·지역을 실어 보낸다 — 받은 사람이 같은 달력을 보게 */
+  var url='https://haerunak.com/calendar/?ym='+curY+'-'+(curM<10?'0':'')+curM+'&reg='+encodeURIComponent(p.n);
+  var title='해루낚 물때달력 — '+p.n+' '+curY+'년 '+curM+'월';
   var text=p.n+' '+curY+'년 '+curM+'월 물때달력 — 해루질 추천일(★) 한눈에. 무료 다운로드';
   if(navigator.share){
     navigator.share({title:title,text:text,url:url}).catch(function(){});

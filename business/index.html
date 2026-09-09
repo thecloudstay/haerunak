@@ -85,6 +85,8 @@
   <nav>
     <a href="../species/">어종 도감</a>
     <a href="../spot/">포인트</a>
+    <a href="../tide/">지역 물때</a>
+    <a href="../calendar/">물때달력</a>
     <a href="../method/">계산 근거</a>
     <a href="stats/">실적 조회</a>
     <a class="app" href="../index.html">오늘 어디 갈까</a>
@@ -96,7 +98,7 @@
   <span class="tag">업체 등록 안내</span>
   <h1>출조 직전에 <em>그 자리를 보고 있는 손님</em>에게 바로 붙습니다</h1>
   <p class="lead">
-    해루낚은 오늘 어디 가서 뭘 잡을지 결론만 내주는 서비스입니다. 전국 259곳을 분석합니다.
+    해루낚은 오늘 어디 가서 뭘 잡을지 결론만 내주는 서비스입니다. 전국 <span data-stat="points">604</span>곳을 분석합니다.
     손님은 <strong>나가기 직전에</strong> 그 자리 화면을 봅니다.
     그 화면 안에 배·숙소·낚시점 자리가 있습니다. <strong>등록은 무료입니다.</strong>
   </p>
@@ -115,7 +117,7 @@
       <div><em>🍜</em><div><b>근처 식당</b>
         <p>새벽 영업이나 잡은 것 손질해 주는 곳이면 특히 반응이 좋습니다.</p></div></div>
     </div>
-    <p class="cap">전국 어디든 받습니다. 다만 <strong>등록된 지점 259곳 근처</strong>여야 화면에 붙습니다.</p>
+    <p class="cap">전국 어디든 받습니다. 다만 <strong>등록된 지점 <span data-stat="points">604</span>곳 근처</strong>여야 화면에 붙습니다.</p>
   </section>
 
   <section>
@@ -208,5 +210,6 @@
   <p class="fine">유튜브·블로그 채널 운영자시라면 <a href="../partner/">채널 제휴 안내</a>를 보세요.</p>
   <p class="fine">업체 문의 <a href="mailto:thecloudstay@gmail.com">thecloudstay@gmail.com</a></p>
 </footer>
+<script>(function(){try{fetch("/data/stats.json").then(function(r){return r.json();}).then(function(j){document.querySelectorAll("[data-stat]").forEach(function(e){var k=e.getAttribute("data-stat");if(j[k]!=null)e.textContent=j[k];});});}catch(e){}})();/*hrnStats*/</script>
 </body>
 </html>

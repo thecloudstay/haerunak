@@ -4,7 +4,7 @@
 
 ### https://haerunak.com
 
-전국 **259개 정밀 포인트**(도서 165곳)와 바다타임 색인 1,571곳을 대상으로
+전국 **604개 정밀 포인트**(도서 288곳)와 바다타임 색인 1,571곳을 대상으로
 조석·수중시야·조류·솔루나·수온·기압·풍향(맞바람)·금어기를 종합해
 오늘의 해루질·낚시 매력도를 0~100점으로 낸다.
 
@@ -15,8 +15,8 @@
 | | 주소 | 무엇 |
 |---|---|---|
 | 앱 | [haerunak.com](https://haerunak.com) | 오늘 어디서 뭘 잡을지 지도로 |
-| 어종 도감 | [/species/](https://haerunak.com/species/) | 66종의 제철·금어기·채비·잡히는 자리 |
-| 포인트 | [/spot/](https://haerunak.com/spot/) | 260곳의 지형·대상물·배편·세부 자리 |
+| 어종 도감 | [/species/](https://haerunak.com/species/) | 153종의 제철·금어기·채비·잡히는 자리 |
+| 포인트 | [/spot/](https://haerunak.com/spot/) | 604곳의 지형·대상물·배편·세부 자리 |
 | 채널 제휴 | [/partner/](https://haerunak.com/partner/) | 유튜브·블로그 채널 제휴 조건과 배분 비율 |
 | 정산 조회 | [/partner/stats/](https://haerunak.com/partner/stats/) | 채널 코드로 그달 유입·정산 확인 (검색 제외) |
 

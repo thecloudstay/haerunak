@@ -50,6 +50,8 @@ table.dt td.hot{color:#fca5a5;font-weight:700}
 <header class="top">
   <a class="brand" href="../index.html">해루낚</a>
   <nav>
+    <a href="../tide/">지역 물때</a>
+    <a href="../calendar/">물때달력</a>
     <a href="../method/">계산 근거</a>
     <a href="../spot/">지점</a>
     <a class="app" href="../index.html">앱 열기</a>
@@ -59,7 +61,7 @@ table.dt td.hot{color:#fca5a5;font-weight:700}
 <article class="page">
   <p class="kicker">공공기관 제공용</p>
   <h1>갯벌 고립 위험지점 자료</h1>
-  <p class="gov-lead">전국 259개 갯벌·갯바위 지점의 고립 위험도를 물리 모형으로 계산합니다.
+  <p class="gov-lead">전국 <span data-stat="points">604</span>개 갯벌·갯바위 지점의 고립 위험도를 물리 모형으로 계산합니다.
     그중 <b>18곳</b>은 중간 물때에 <b>물가가 사람 걸음보다 빠릅니다.</b>
     관할 기관에 <b>대가 없이</b> 드립니다.</p>
 
@@ -94,13 +96,13 @@ table.dt td.hot{color:#fca5a5;font-weight:700}
     </table></div>
     <p>대조(사리) 기준입니다. <b>18곳이 전부 경기·인천 서해 뻘</b>이며,
       실제 갯벌 고립사고 다발 지역과 겹칩니다.</p>
-    <p class="cap">전체 259곳 등급 분포 — 매우 높음 18 · 높음 21 · 보통 20 · 낮음 200</p>
+    <p class="cap">초기 분석 259곳 기준 등급 분포(현재 <span data-stat="points">604</span>곳으로 확대) — 매우 높음 18 · 높음 21 · 보통 20 · 낮음 200</p>
   </section>
 
   <section>
     <h2>드릴 수 있는 것</h2>
     <div class="give">
-      <div><b>259곳 위험등급 자료</b>
+      <div><b><span data-stat="points">604</span>곳 위험등급 자료</b>
         <p>지점별 ρ 값, 물가 전진 속도, 노출 폭, 산식과 상수 일체. 파일로 드립니다.</p></div>
       <div><b>지점별 진입·퇴로 시각</b>
         <p>그날 물때에 맞춰 들어갈 수 있는 시각과 늦어도 나와야 하는 시각. 매일 갱신됩니다.</p></div>
@@ -146,5 +148,6 @@ table.dt td.hot{color:#fca5a5;font-weight:700}
   <p class="fine">이 페이지의 수치는 조석·지형 기반 추정치이며 실측이 아닙니다. 현장 판단을 대체하지 않습니다.</p>
   <p class="fine">연안사고 통계 출처 — 해양경찰청</p>
 </footer>
+<script>(function(){try{fetch("/data/stats.json").then(function(r){return r.json();}).then(function(j){document.querySelectorAll("[data-stat]").forEach(function(e){var k=e.getAttribute("data-stat");if(j[k]!=null)e.textContent=j[k];});});}catch(e){}})();/*hrnStats*/</script>
 </body>
 </html>
