@@ -9,8 +9,9 @@
  * 출력
  *   data/cur/<YYYY-MM-DD>/<HH>.json = { "t":"2026-09-08 14:00", "sp":10, "g":[[위도,경도,유속cm/s,유향deg],...] }
  *       ← 전국 격자(자동 간격, 대략 10km) 시각별 유향·유속. 오늘·내일 24시간씩.
- *   data/cur/pt/<YYYY-MM-DD>.json = { "<포인트번호>":[{"t":"02:30","k":"전류","v":12,"d":128},...], ... }
+ *   data/cur/pt/<YYYY-MM-DD>/<포인트번호>.json = [{"t":"02:30","k":"전류","v":12,"d":128},...]
  *       ← 포인트마다 그날의 최강창조·최강낙조·전류(물 멈춤) 시각. 해루질 진입·퇴로 판단용.
+ *          (포인트별 파일로 쪼개 상세 화면이 그 자리 것 1KB만 받게 한다)
  *
  * 호출 수: 격자 2일×24시간×상자 수(5) = 240회 + 포인트 613회 ≈ 850회/일 (한도 2만).
  */
@@ -97,14 +98,13 @@ async function fetchPoint(ds, p) {
   let points = [];
   try { points = JSON.parse(fs.readFileSync('data/points-min.json', 'utf8')); } catch (e) { console.log('data/points-min.json 없음 — 포인트 조류 건너뜀'); }
   for (const ds of days) {
-    const out = {};
+    fs.mkdirSync('data/cur/pt/' + ds, { recursive: true });
     let ok = 0, fail = 0;
     for (const p of points) {
-      try { const ev = await fetchPoint(ds, p); if (ev.length) { out[p.i] = ev; ok++; } }
+      try { const ev = await fetchPoint(ds, p); if (ev.length) { fs.writeFileSync('data/cur/pt/' + ds + '/' + p.i + '.json', JSON.stringify(ev)); ok++; } }
       catch (e) { fail++; if (fail < 5) console.log('  포인트 실패', p.i, e.message); }
       await sleep(60);
     }
-    if (ok) fs.writeFileSync('data/cur/pt/' + ds + '.json', JSON.stringify(out));
     console.log('포인트 조류', ds, '성공', ok, '실패', fail);
   }
 
@@ -115,6 +115,6 @@ async function fetchPoint(ds, p) {
   }
   for (const f of fs.readdirSync('data/cur/pt')) {
     const ds = f.replace('.json', '');
-    if (/^\d{4}-\d{2}-\d{2}$/.test(ds) && !keep.has(ds)) fs.rmSync('data/cur/pt/' + f, { force: true });
+    if (/^\d{4}-\d{2}-\d{2}$/.test(ds) && !keep.has(ds)) fs.rmSync('data/cur/pt/' + f, { recursive: true, force: true });
   }
 })().catch(e => { console.error('조류 갱신 오류', e); process.exit(1); });
