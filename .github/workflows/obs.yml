@@ -1,0 +1,35 @@
+# 해루낚 — 국립해양조사원 실측(조위·수온·파고)을 세 시간마다 받아 둔다.
+# 시크릿 DATA_GO_KEY 가 있을 때만 실제로 동작한다.
+name: 실측 자료 갱신
+
+on:
+  schedule:
+    - cron: '10 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: obs
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 실측 받아서 data/obs.json 만들기
+        env:
+          DATA_GO_KEY: ${{ secrets.DATA_GO_KEY }}
+        run: node scripts/fetch-obs.js
+      - name: 바뀌었으면 저장
+        run: |
+          git config user.name  "haerunak-bot"
+          git config user.email "bot@haerunak"
+          git add -A data/obs.json || true
+          git diff --cached --quiet || git commit -m "실측 자료 갱신 $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push || true

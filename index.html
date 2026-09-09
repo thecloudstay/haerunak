@@ -1046,6 +1046,12 @@ body.sheet-off .ticker{display:none}
 .sheet-back[hidden]{display:none}
 .sheet-back:active{transform:scale(.95)}
 
+.obs-box{border-color:rgba(46,230,168,.28)}
+.obs-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;color:var(--txt);margin-top:4px}
+.obs-row b{font-weight:800;color:var(--acc)}
+.obs-row i{color:var(--mut2);font-style:normal}
+.obs-src{margin-top:6px;font-size:10.5px;color:var(--mut2)}
+
 /* ── 바텀시트 ────────────────────────── */
 .sheet{
   position:fixed;z-index:22;left:0;right:0;bottom:0;
@@ -4691,6 +4697,44 @@ function ferryInfo_(){
   };
 }
 
+/** 실측 관측값 — data/obs.json 에서 그 자리와 가장 가까운 관측소 값을 꺼낸다.
+ *  예보가 아니라 「지금 실제로 이랬다」는 값이라, 저기압·강풍으로 예보가 어긋난 날을 잡아낸다.
+ *  자료가 없으면(키 미설정·수집 실패) null 을 돌려주고 화면은 지금 그대로 돈다. */
+function obsNear_(p){
+  var j = remoteJson_('obs');
+  if (!j || !j.s) return null;
+  var st = null;
+  try { st = (remoteJson_('tide-stations') || {}).stations; } catch(e){}
+  if (!st){
+    try { st = TIDE_STATIONS; } catch(e){ st = null; }
+  }
+  if (!st || !st.length) return null;
+  var best = null, bd = 1e9;
+  for (var i = 0; i < st.length; i++){
+    var s = st[i];
+    if (!j.s[s.code]) continue;
+    var d = Math.pow(s.la - p.la, 2) + Math.pow((s.lo - p.lo) * 0.79, 2);
+    if (d < bd){ bd = d; best = s; }
+  }
+  if (!best) return null;
+  var km = Math.round(Math.sqrt(bd) * 111);
+  if (km > 60) return null;                 // 60km 넘게 떨어진 관측소 값은 그 자리 얘기가 아니다
+  var v = j.s[best.code] || {};
+  var wave = null;
+  (j.wave || []).forEach(function(w){
+    var d2 = Math.pow(w.la - p.la, 2) + Math.pow((w.lo - p.lo) * 0.79, 2);
+    if (d2 < 1.0 && (!wave || d2 < wave._d)){ wave = { h: w.h, p: w.p, n: w.n, _d: d2 }; }
+  });
+  return {
+    obs: best.name, km: km, at: j.at || v.at || null,
+    lv: v.lv != null ? v.lv : null,          // 조위 cm
+    tw: v.tw != null ? v.tw : null,          // 수온 ℃
+    ws: v.ws != null ? v.ws : null,          // 풍속 m/s
+    wv: wave ? wave.h : null,                // 파고 m
+    wvn: wave ? wave.n : null
+  };
+}
+
 
 /* ══ Spots.gs ══ */
 /**
@@ -6486,6 +6530,7 @@ function apiPoint(id, ds, want, days){
     spots: spotsOf_(p.i),
     zones: (typeof zonesNear_ === 'function') ? zonesNear_(p.la, p.lo, 2.5) : [],
     protect: (typeof protectNear_ === 'function') ? protectNear_(p) : [],
+    obs: (typeof obsNear_ === 'function') ? obsNear_(p) : null,
     partners: (typeof apiPartners === 'function') ? apiPartners(p.i) : [],
     ad: (typeof pickAd_ === 'function')
       ? pickAd_(p.r || '', ds, 'haeru', (an.meta.banned.haeru || []).concat(an.meta.banned.fish || []).map(function(x){ return x.n; }))
@@ -6782,6 +6827,28 @@ calcTide_ = function(p, y, mo, d){
   return _calcTideOrig(p, y, mo, d);
 };
 
+/* ══ 실측 관측값 — data/obs.json (수집 작업이 세 시간마다 갱신) ══
+   예보가 아니라 지금 실제 값이라, 저기압·강풍으로 예보가 어긋난 날을 잡아낸다. */
+obsNear_ = function(p){
+  var j = (typeof REMOTE !== 'undefined') ? REMOTE['obs'] : null;
+  if (!j || !j.s || !TIDE_ST || !TIDE_ST.length) return null;
+  var best = null, bd = 1e9;
+  TIDE_ST.forEach(function(st){
+    if (!j.s[st.code]) return;
+    var d = tideKm_(p.la, p.lo, st.la, st.lo);
+    if (d < bd){ bd = d; best = st; }
+  });
+  if (!best || bd > 60) return null;
+  var v = j.s[best.code] || {}, wave = null;
+  (j.wave || []).forEach(function(w){
+    var d2 = tideKm_(p.la, p.lo, w.la, w.lo);
+    if (d2 < 110 && (!wave || d2 < wave._d)) wave = { h:w.h, p:w.p, n:w.n, _d:d2 };
+  });
+  return { obs: best.name, km: Math.round(bd), at: j.at || v.at || null,
+           lv: v.lv != null ? v.lv : null, tw: v.tw != null ? v.tw : null,
+           ws: v.ws != null ? v.ws : null, wv: wave ? wave.h : null, wvn: wave ? wave.n : null };
+};
+
 /* ══ 조황 기록 — 이 기기 저장 (백엔드판은 시트 공동 저장) ══ */
 function catchAll_(){ try { return JSON.parse(localStorage.getItem('hrn_catch')||'[]'); } catch(e){ return []; } }
 apiCatchSave=function(e){
@@ -6822,7 +6889,7 @@ var REMOTE={"points-extra":{"_설명":"지점 추가·수정 파일. 같은 번�
 remoteJson_=function(name){ return REMOTE[name]||null; };
 function ensureRemote(){
   if (ensureRemote._p) return ensureRemote._p;
-  ensureRemote._p = Promise.all(['ban-extra','spots-extra','points-extra','partners','ads','gear','monetize','rigs','zones','protect'].map(function(n){
+  ensureRemote._p = Promise.all(['ban-extra','spots-extra','points-extra','partners','ads','gear','monetize','rigs','zones','protect','obs'].map(function(n){
     return fetch('data/'+n+'.json').then(function(r){ return r.ok?r.json():null; })
       .then(function(j){ if(j) REMOTE[n]=j; }).catch(function(){});
   }));
@@ -8472,6 +8539,21 @@ function renderDetail(d){
 
   /* 이 자리 일대 인명사고 이력 — 안전 경고 (사고 데이터가 로드돼 있을 때) */
   (function(){
+    /* 실측 — 예보 옆에 「지금 실제로 이랬다」를 붙인다. 자료가 없으면 줄 자체가 없다. */
+    if (d.obs && (d.obs.lv != null || d.obs.tw != null || d.obs.wv != null)){
+      var o = d.obs, ob = el('div','sec obs-box'); ob.setAttribute('data-rk','15');
+      var bits = [];
+      if (o.lv != null) bits.push('<b>조위 ' + o.lv + 'cm</b>');
+      if (o.tw != null) bits.push('<b>수온 ' + o.tw.toFixed(1) + '℃</b>');
+      if (o.ws != null) bits.push('바람 ' + o.ws.toFixed(1) + 'm/s');
+      if (o.wv != null) bits.push('파고 ' + o.wv.toFixed(1) + 'm');
+      ob.innerHTML = '<div class="sec-t">지금 실제 바다 <small>실측</small></div>'
+        + '<div class="obs-row">' + bits.join('<i>·</i>') + '</div>'
+        + '<div class="obs-src">국립해양조사원 ' + o.obs + ' 관측소 · ' + o.km + 'km'
+        + (o.at ? ' · ' + o.at : '') + '</div>';
+      b.appendChild(ob);
+    }
+
     var slot = el('div',''); slot.setAttribute('data-rk','52');   /* 인명사고 이력은 중간 아래(7일 전망 뒤)로 */
     b.appendChild(slot);
     var show = function(data){

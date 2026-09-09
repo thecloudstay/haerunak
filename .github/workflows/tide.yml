@@ -19,9 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: 물때 받아서 data/tide 만들기
         env:
-          KHOA_KEY: ${{ secrets.KHOA_KEY }}
+          DATA_GO_KEY: ${{ secrets.DATA_GO_KEY }}
         run: node scripts/fetch-tide.js
       - name: 바뀌었으면 저장
         run: |
