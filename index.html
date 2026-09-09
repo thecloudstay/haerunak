@@ -5096,6 +5096,43 @@ function tideStageFit_(pref, st){
   }
 }
 
+/* 대상어가 좋아하는 물때에 맞춰 시간창 후보를 만든다.
+   창을 먼저 정해 놓고 「어종이 물때에 안 맞는다」고 깎던 것을 뒤집는 부분이다.
+   숭어 훌치기는 물이 차오르는 동안이 자리다 — 만조를 지나면 그날은 끝난다. */
+function prefWindows_(events, pref){
+  var out = [];
+  var ev = (events || []).slice().sort(function(a, b){ return a.t - b.t; });
+  for (var i = 0; i < ev.length; i++){
+    var e = ev[i], nx = ev[i+1];
+    if (pref === 'flood' && e.k === 'H')      out.push([e.t - 2.8, e.t - 0.2]);   // 만조 앞 들물
+    else if (pref === 'ebb' && e.k === 'H')   out.push([e.t + 0.4, e.t + 3.0]);   // 만조 뒤 날물
+    else if (pref === 'high' && e.k === 'H')  out.push([e.t - 1.5, e.t + 1.5]);
+    else if (pref === 'low'  && e.k === 'L')  out.push([e.t - 1.5, e.t + 1.5]);
+    else if (pref === 'move' && nx){ var m = (e.t + nx.t) / 2; out.push([m - 1.4, m + 1.4]); }
+  }
+  return out.filter(function(w){ return w[1] > 0.5 && w[0] < 23.5; })
+            .map(function(w){ return [Math.max(0, w[0]), Math.min(24, w[1])]; });
+}
+/* 후보 창 가운데 여명·황혼 피딩타임과 가장 잘 겹치는 것을 고른다.
+   겹치는 게 없으면 해 떠 있는 시간에 가까운 창을 고른다 — 밤새 서 있으라 할 수는 없다. */
+function pickWindow_(cands, dawn, dusk, sunrise, sunset){
+  if (!cands || !cands.length) return null;
+  var feed = [];
+  if (dawn !== null && sunrise !== null) feed.push([dawn, sunrise + 1.2]);
+  if (sunset !== null && dusk !== null)  feed.push([sunset - 1.2, dusk]);
+  var best = null, bs = -1;
+  cands.forEach(function(w){
+    var ov = 0;
+    feed.forEach(function(f){ ov = Math.max(ov, Math.min(w[1], f[1]) - Math.max(w[0], f[0])); });
+    ov = Math.max(0, ov);
+    var mid = (w[0] + w[1]) / 2;
+    var day = (sunrise !== null && sunset !== null && mid > sunrise - 1 && mid < sunset + 1.5) ? 0.6 : 0;
+    var sc = ov + day;
+    if (sc > bs){ bs = sc; best = { from: w[0], to: w[1], ov: ov }; }
+  });
+  return best;
+}
+
 function flowFit_(p, tide, from, to){
   var best = 0, sum = 0, n = 0;
   for (var t = from; t <= to; t += 0.25){
@@ -5273,7 +5310,16 @@ function analyze_(p, ds, tide, wxRec, want){
   }
 
   /* ── 낚시 ───────────────────────────────── */
+  var fAll0    = speciesOf_(p, 'fish');
+  var fSeason0 = rankTargets_(inSeason_(fAll0, mo, SEASON_FX), p, mo, 'fish');
+  var fPref0   = fSeason0.length ? FISH_TIDE[fSeason0[0].n] : null;
   var fo   = feedOverlap_(ev, tw.rise, tw.set, sun.rise, sun.set);
+  /* 제철 1순위 어종이 특정 물때에만 되는 고기라면(숭어 들물처럼) 그 물때로 창을 옮긴다.
+     그래야 「비추천」이 아니라 「몇 시에 가면 된다」가 나온다. */
+  if (fPref0 && fPref0 !== 'any'){
+    var pw = pickWindow_(prefWindows_(ev, fPref0), tw.rise, tw.set, sun.rise, sun.set);
+    if (pw) fo = { ov: pw.ov, from: pw.from, to: pw.to, ev: fo.ev, pref: 1 };
+  }
   var fMid = (fo.from + fo.to)/2;
   var fWx  = wxAt_(wxRec, ((fMid % 24) + 24) % 24);
   var sol  = solunar_(y, mo, d, p.la, p.lo, age);
@@ -5285,6 +5331,9 @@ function analyze_(p, ds, tide, wxRec, want){
   var fSky  = skyRisk_(fWx.code, fWx.vism, fWx.rain, fWx.snow);
   var fBite = rainBite_(fWx.rain, fWx.cloud);   // 약한 비·흐림은 오히려 가점
   var sFeed = 28 * clamp01_(0.30 + (fo.ov > 0 ? fo.ov/3.2*0.40 : 0) + solV*0.30 + fBite*0.16);
+  /* 대상어 물때에 맞춰 창을 옮긴 경우, 그 창이 여명·황혼을 비켜 갔다고 두 번 깎지 않는다.
+     숭어 훌치기는 한낮 들물에도 되는 낚시다 — 피딩타임만으로 재면 그런 자리를 놓친다. */
+  if (fo.pref) sFeed = Math.max(sFeed, 28 * 0.46);
   var sFlow = 18 * (p.mr > 0.4 ? (0.6*flow.fit + 0.4*band_(relRange, 0.5, 0.92, 0.42)) : 0.68);
   // 바람은 방향까지 본다 — 등바람은 체감을 깎고, 알맞은 맞바람은 활성 가점
   var we = windEffect_(p, fWx.wind, fWx.wdir);
@@ -5294,8 +5343,8 @@ function analyze_(p, ds, tide, wxRec, want){
                   + 0.10*we.bonus
                   + 0.14*band_(fChil === null ? fWx.feel : fChil, 4, 30, 10));
 
-  var fAll = speciesOf_(p, 'fish');
-  var fSeason = rankTargets_(inSeason_(fAll, mo, SEASON_FX), p, mo, 'fish');
+  var fAll = fAll0;
+  var fSeason = fSeason0;
   var fTherm = 0, fBestName = null;
   fSeason.forEach(function(t){
     var v = thermalFit_(t.n, fWx.sst) * (0.6 + t.v*0.1333);
