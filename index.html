@@ -1052,6 +1052,24 @@ body.sheet-off .ticker{display:none}
 .obs-row i{color:var(--mut2);font-style:normal}
 .obs-src{margin-top:6px;font-size:10.5px;color:var(--mut2)}
 
+.legend{
+  background:rgba(8,24,37,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border:1px solid rgba(140,200,235,.28);border-radius:12px;
+  padding:7px 9px;margin:0 12px 12px 0;max-width:160px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:10.5px;line-height:1.5;color:#cadeeb;
+}
+.leg-t{display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:10.5px;color:#8ba6b8}
+.leg-x{-webkit-appearance:none;appearance:none;border:0;background:transparent;color:#8ba6b8;
+  font-size:14px;line-height:1;cursor:pointer;padding:0 2px}
+.leg-b{margin-top:5px;display:flex;flex-direction:column;gap:1px;max-height:46vh;overflow-y:auto}
+.leg-b::-webkit-scrollbar{width:0}
+.leg-b b{font-size:9.5px;font-weight:800;color:#8ba6b8;margin-top:5px}
+.leg-b b:first-child{margin-top:0}
+.leg-b span{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.leg-b i{flex:0 0 auto;width:11px;height:11px;border-radius:3px}
+.leg-b i.ln{height:3.5px;border-radius:2px}
+@media (max-width:520px){ .legend{max-width:132px;font-size:10px;margin-bottom:calc(158px + var(--safeB))} }
+
 /* ── 바텀시트 ────────────────────────── */
 .sheet{
   position:fixed;z-index:22;left:0;right:0;bottom:0;
@@ -2068,7 +2086,6 @@ body.map-kakao .dchip span{color:#b5cad8}
   <button class="fchip fl" data-fl="mud" title="펄갯벌 — 낙지·가무락·칠게">펄</button>
   <button class="fchip fl" data-fl="sand" title="모래갯벌 — 맛조개·동죽·백합">모래</button>
   <button class="fchip fl" data-fl="mix" title="혼합갯벌 — 바지락·굴·박하지">펄+모래</button>
-  <button class="fchip fl" data-fl="rock" title="갯바위·돌밭 — 굴·홍합·고둥, 낚시">갯바위</button>
 </div>
 
 <!-- 어종 지정 표시 -->
@@ -7274,12 +7291,14 @@ eoCtl.onAdd = function(){
       if (CL_ON) toast(map.getZoom() < CL_MINZ ? '지도를 확대하면 해안 재질이 색으로 나옵니다'
                                                : '노란색 모래 · 갈색 뻘 · 회청색 암반 · 주황색 방파제');
       clVis_();
+      try { legDraw_(); } catch(err){}
       try { localStorage.setItem('hrn_cl', CL_ON ? '1' : '0'); } catch(err){}
     } else if (t && t.id === 'flBtn'){
       FLAT_ON = !FLAT_ON;
       t.className = 'basebtn fl' + (FLAT_ON ? ' on' : '');
       if (FLAT_ON) toast('물 빠지면 드러나는 갯벌 — 갈색 펄, 노란색 모래');
       flatVis_();
+      try { legDraw_(); } catch(err){}
       try { localStorage.setItem('hrn_flat', FLAT_ON ? '1' : '0'); } catch(err){}
     } else if (t && t.id === 'eoBtn'){
       EO_ON = !EO_ON;
@@ -7555,9 +7574,9 @@ map.on('moveend zoomend', clVis_);
  * 자료는 72KB 한 장이라 처음 켤 때 한 번만 받는다. */
 var FLAT_LAYER = L.layerGroup(), FLAT_ON = true, FLAT_DATA = null, FLAT_MINZ = 8;
 var FLAT_COL = {
-  mud:  { d:'#8a6f52', l:'#6b5a4a', ko:'펄갯벌',  t:'낙지·가무락·칠게가 붙는 바닥' },
-  sand: { d:'#e6d3a3', l:'#c9a961', ko:'모래갯벌', t:'맛조개·동죽·백합이 나오는 바닥' },
-  mix:  { d:'#b99a72', l:'#9a7d55', ko:'혼합갯벌', t:'바지락·굴·박하지가 섞여 나온다' }
+  mud:  { d:'#7d5f3f', l:'#5c4a33', ko:'펄갯벌',  t:'낙지·가무락·칠게가 붙는 바닥' },
+  sand: { d:'#f0dca8', l:'#c9a961', ko:'모래갯벌', t:'맛조개·동죽·백합이 나오는 바닥' },
+  mix:  { d:'#b8926a', l:'#977450', ko:'혼합갯벌', t:'바지락·굴·박하지가 섞여 나온다' }
 };
 function flatPop_(f){
   var c = FLAT_COL[f] || FLAT_COL.mix;
@@ -10590,6 +10609,56 @@ function curToggle_(){
   if (!CURL.on){ if (CURL.layer) CURL.layer.clearLayers(); if (btn){ btn.classList.remove('on'); btn.textContent = '조류'; } return; }
   curDraw_();
 }
+/* ══════════════ 범례 — 색이 무슨 뜻인지 지도 위에서 바로 ══════════════
+   갯벌·해안 재질은 색으로 말하는 겹이라, 색표가 없으면 절반만 전달된다. */
+var LEG_OPEN = true;
+try { LEG_OPEN = localStorage.getItem('hrn_leg') !== '0'; } catch(e){}
+function legHtml_(){
+  var bright = (typeof brightMap_ === 'function') ? brightMap_() : false;
+  var rows = [];
+  if (typeof FLAT_ON !== 'undefined' && FLAT_ON && map.getZoom() >= FLAT_MINZ){
+    rows.push('<b>물 빠지면 드러나는 갯벌</b>');
+    ['mud','mix','sand'].forEach(function(k){
+      var c = FLAT_COL[k]; if (!c) return;
+      rows.push('<span><i style="background:' + (bright ? c.l : c.d) + '"></i>' + c.ko + '</span>');
+    });
+  }
+  if (typeof CL_ON !== 'undefined' && CL_ON && map.getZoom() >= CL_MINZ){
+    rows.push('<b>해안 재질</b>');
+    ['mud','mudsand','sand','sandgv','gravel','rock','cliff','art','flat'].forEach(function(k){
+      var d = CL_KIND[k]; if (!d) return;
+      rows.push('<span><i class="ln" style="background:' + d.c + '"></i>' + d.ko.replace(/\s*\(.*\)/,'') + '</span>');
+    });
+  }
+  if (!rows.length) return '';
+  return '<div class="leg-t">범례<button class="leg-x" id="legX" type="button" aria-label="접기">' + (LEG_OPEN ? '−' : '+') + '</button></div>'
+       + (LEG_OPEN ? '<div class="leg-b">' + rows.join('') + '</div>' : '');
+}
+var legCtl = L.control({ position: 'bottomright' });
+legCtl.onAdd = function(){
+  var d = L.DomUtil.create('div', 'legend');
+  d.id = 'legend';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(e){
+    if (e.target && e.target.id === 'legX'){
+      LEG_OPEN = !LEG_OPEN;
+      try { localStorage.setItem('hrn_leg', LEG_OPEN ? '1' : '0'); } catch(err){}
+      legDraw_();
+    }
+  });
+  return d;
+};
+legCtl.addTo(map);
+function legDraw_(){
+  var d = document.getElementById('legend');
+  if (!d) return;
+  var h = legHtml_();
+  d.innerHTML = h;
+  d.style.display = h ? '' : 'none';
+}
+map.on('zoomend moveend', legDraw_);
+setTimeout(legDraw_, 600);
+
 /* 지도 왼쪽 아래 — 어장·갯골 토글 옆에 바람·조류 단추 */
 var wdCtl = L.control({position:'bottomleft'});
 wdCtl.onAdd = function(){
