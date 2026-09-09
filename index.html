@@ -895,13 +895,13 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .cur-arrow{background:none;border:0;pointer-events:none}
 .cur-arrow svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
 .cur-spd{position:absolute;left:50%;top:100%;transform:translate(-50%,-3px);font-size:9px;font-weight:800;letter-spacing:-.2px;text-shadow:0 1px 2px rgba(0,0,0,.7),0 0 3px rgba(0,0,0,.5)}
-.dt-cur{margin:0 0 10px;padding:8px 12px;border-radius:11px;background:rgba(255,255,255,.045);border:1px solid var(--line);font-size:12.5px;line-height:1.5;color:#cfe3ef;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.dt-cur{margin:16px 0 0;padding:8px 12px;border-radius:11px;background:rgba(255,255,255,.045);border:1px solid var(--line);font-size:12.5px;line-height:1.5;color:#cfe3ef;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
 .dt-cur[hidden]{display:none}
 .dt-cur b{color:var(--acc);font-weight:800}
 .dt-cur .dt-cur-l{font-size:10.5px;color:var(--mut2);font-weight:700}
 .dt-cur em{font-style:normal;color:var(--corl);font-weight:700}
 /* 군 통제 경고 */
-.mil-box{border-color:rgba(255,176,138,.4);background:linear-gradient(135deg,rgba(255,176,138,.12),rgba(255,127,90,.05))}
+.mil-box{margin-top:16px;border-color:rgba(255,176,138,.4);background:linear-gradient(135deg,rgba(255,176,138,.12),rgba(255,127,90,.05))}
 .mil-box.mil2{border-color:rgba(224,86,58,.5);background:linear-gradient(135deg,rgba(224,86,58,.16),rgba(255,127,90,.06))}
 .row-isl.row-mil{background:rgba(255,127,90,.16);color:var(--corl)}
 .row-isl.row-kd{background:rgba(255,255,255,.08);color:var(--mut)}
@@ -909,7 +909,7 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .dt-head .kd-F{color:var(--acc2)}
 .dt-head .kd-B{color:var(--mut)}
 .row-isl.row-prot{background:rgba(224,86,58,.2);color:#ffb08a}
-.prot-box{border-color:rgba(224,86,58,.5)}
+.prot-box{margin-top:16px;border-color:rgba(224,86,58,.5)}
 .prot-box .zn-row b{color:#ffb08a}
 
 /* ── 상단 ─────────────────────────────── */
@@ -1055,7 +1055,7 @@ body.sheet-off .ticker{display:none}
 .sheet-back[hidden]{display:none}
 .sheet-back:active{transform:scale(.95)}
 
-.obs-box{border-color:rgba(46,230,168,.28)}
+.obs-box{border-color:rgba(46,230,168,.28);margin-top:22px}
 .obs-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;color:var(--txt);margin-top:4px}
 .obs-row b{font-weight:800;color:var(--acc)}
 .obs-row i{color:var(--mut2);font-style:normal}
@@ -1193,8 +1193,8 @@ body.sheet-off .ticker{display:none}
 .zn-box .zn-km{color:var(--mut);font-size:12px;margin-left:4px}
 .zn-box .zn-p{color:#ffb08a;font-size:12.5px}
 .zn-box .zn-est{color:#ffb08a;font-size:12px}
-.sec{margin:18px 0 0}
-.sec-t{font-size:11.5px;font-weight:800;color:var(--mut);letter-spacing:.4px;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.sec{margin:26px 0 0}
+.sec-t{font-size:11.5px;font-weight:800;color:var(--mut);letter-spacing:.4px;margin-bottom:11px;display:flex;align-items:center;gap:6px}
 .sec-t::after{content:'';flex:1;height:1px;background:var(--line)}
 
 /* 조석 그래프 */
@@ -1978,13 +1978,13 @@ body.map-kakao .dchip span{color:#b5cad8}
 .dt-daynav .dnav-mid{flex:1;text-align:center;line-height:1.3}
 .dt-daynav .dnav-mid b{font-size:15px;color:var(--acc)}
 .dt-daynav .dnav-mid span{display:block;font-size:11.5px;color:var(--mut)}
-.dt-mtbtn{width:100%;-webkit-appearance:none;appearance:none;cursor:pointer;margin-bottom:14px;
+.dt-mtbtn{width:100%;-webkit-appearance:none;appearance:none;cursor:pointer;margin:22px 0 12px;
   border:1px solid rgba(31,196,192,.35);border-radius:13px;padding:12px;
   background:linear-gradient(100deg,rgba(31,196,192,.14),rgba(46,230,168,.1));
   color:#a4e9d4;font-family:inherit;font-size:13.5px;font-weight:800}
 .dt-mtbtn:hover{background:linear-gradient(100deg,rgba(31,196,192,.22),rgba(46,230,168,.16));color:#fff}
 /* 상세 패널 — 물때달력 유도 링크 */
-.dt-calbtn{display:block;text-align:center;text-decoration:none;margin:-4px 0 14px;
+.dt-calbtn{display:block;text-align:center;text-decoration:none;margin:0 0 6px;
   border:1px solid rgba(255,127,90,.4);border-radius:13px;padding:11px;
   background:linear-gradient(100deg,rgba(255,127,90,.16),rgba(255,127,90,.09));
   color:#ffb08a;font-size:13px;font-weight:800}
@@ -5432,19 +5432,16 @@ function analyze_(p, ds, tide, wxRec, want){
   var hWindow = lowT === null ? null : [lowT - 1.5, lowT + 1.5];
   var fWindow = [fo.from, fo.to];
 
-  /* ── 접경지역 군 통제 — 야간 물때는 못 들어간다 ─────────
-     강화 북부·서해5도는 철책 통문이 일몰 후 닫힌다. 밤 간조를 아무리 좋게 매겨도 헛걸음이다. */
+  /* ── 접경지역 군 통제 ─────────
+     강화 북부·서해5도는 철책 통문이 일몰 후 닫힌다. 여기는 실제로 못 들어가므로 점수를 낮춘다.
+     그 밖의 지역은 야간 해루질이 정상적인 활동이므로 깎지 않는다 — 해루질은 원래 밤에 한다. */
   var hPre = '', fPre = '';
   if (typeof milOf_ === 'function'){
     var milLv = milOf_(p);
-    var nightBan0 = /충남 태안|제주/.test(String(p.r || ''));
-    if ((milLv > 0 || nightBan0) && sun.rise !== null && sun.set !== null){
+    if (milLv > 0 && sun.rise !== null && sun.set !== null){
       var night_ = function(t){ return t !== null && t !== undefined && (t < sun.rise - 0.5 || t > sun.set + 0.5); };
       var hMid = hWindow ? (hWindow[0] + hWindow[1]) / 2 : null;
       var fMid = fWindow ? (fWindow[0] + fWindow[1]) / 2 : null;
-      /* 지자체 야간 갯벌 출입·채취 금지 고시(태안·제주) — 군 통제와 같은 이유로 밤 물때는 헛걸음 */
-      var nightBan = /충남 태안|제주/.test(String(p.r || ''));
-      if (nightBan && night_(hMid)){ hScore = Math.min(hScore, 30); hPre = '야간 출입 금지 지역이라 이 물때는 못 씁니다. '; hWarn.unshift('야간 갯벌 출입·채취 금지 지역 — 이 물때는 일몰 뒤라 과태료 대상입니다. 낮 간조인 날을 고르세요'); }
       if (milLv >= 2){
         if (night_(hMid)){ hScore = Math.min(hScore, 28); hPre = '군 통제로 밤에는 못 들어갑니다. '; hWarn.unshift('군 통제 — 이 물때는 일몰 뒤라 통문이 닫혀 들어갈 수 없습니다. 낮 간조인 날을 고르세요'); }
         if (night_(fMid)){ fScore = Math.min(fScore, 32); fPre = '군 통제로 야간 낚시가 안 됩니다. '; fWarn.unshift('군 통제 — 야간 낚시 금지 구역, 이 시간대 출입 불가'); }
@@ -8498,13 +8495,14 @@ function renderDetail(d){
     next.onclick = function(){ goDay(1); };
     bar.appendChild(prev); bar.appendChild(mid); bar.appendChild(next);
     b.appendChild(bar);
-    var mtb = el('button','dt-mtbtn', '📋 이 자리 15일 물때표 (만조·간조·물흐름·해달)'); mtb.setAttribute('data-rk','13');
+    var mtb = el('button','dt-mtbtn', '📋 이 자리 15일 물때표 (만조·간조·물흐름·해달)'); mtb.setAttribute('data-rk','43');
     mtb.onclick = function(){ openMultae(d.point.i, d.point.n); };
     b.appendChild(mtb);
-    /* 조류 — 국립해양조사원 예측이 받아져 있으면 이 자리의 최강창조·낙조·전류(물 멈춤) 시각을 보여준다.
-       해루질은 전류 앞뒤가 물살이 약해 안전하고, 최강류 때는 갯골 건너기가 위험하다. */
+    /* 조류 — 낚시에서만 쓴다. 물흐름이 곧 입질 시간이기 때문이다.
+       해루질은 걸어 들어가 줍는 일이라 유속·유향이 판단에 끼어들 자리가 없다. */
     (function(){
-      var box = el('div','dt-cur'); box.hidden = true; box.setAttribute('data-rk','12'); b.appendChild(box);
+      if (S.mode !== 'fish') return;
+      var box = el('div','dt-cur'); box.hidden = true; box.setAttribute('data-rk','34'); b.appendChild(box);
       fetch('data/cur/pt/' + S.ds + '/' + d.point.i + '.json', {cache:'default'})
         .then(function(r){ if(!r.ok) throw 0; return r.json(); })
         .then(function(j){
@@ -8520,7 +8518,7 @@ function renderDetail(d){
         }).catch(function(){});
     })();
     var calb = document.createElement('a');
-    calb.className = 'dt-calbtn'; calb.href = 'calendar/'; calb.setAttribute('data-rk','14');
+    calb.className = 'dt-calbtn'; calb.href = 'calendar/'; calb.setAttribute('data-rk','44');
     calb.innerHTML = '📅 한 달 물때달력 무료 인쇄 · <b>해루질 추천일(★)</b>';
     b.appendChild(calb);
   })();
@@ -8561,7 +8559,7 @@ function renderDetail(d){
     }).join('');
     var pb = el('div','dt-verdict bad zn-box prot-box',
         '<b>🛡 보호·제한구역 — 채취·낚시 전에 확인</b> 경계는 대략적입니다. 현장 팻말과 관리청 고시가 우선입니다.' + ph);
-    pb.setAttribute('data-rk','53');   /* 보호구역 안내 — 중간 아래로 */
+    pb.setAttribute('data-rk','82');   /* 보호구역 — 경고 묶음 */
     b.appendChild(pb);
   }
 
@@ -8570,7 +8568,7 @@ function renderDetail(d){
     var mb = el('div','dt-verdict bad mil-box' + (d.point.mil >= 2 ? ' mil2' : ''),
         '<b>' + (d.point.mil >= 2 ? '🪖 접경지역 — 군 통제(야간 출입 금지)' : '🪖 군 통제 해안 — 통문 시간 확인') + '</b> '
       + (d.point.milNote || ''));
-    mb.setAttribute('data-rk','54');   /* 군 통제 안내 — 중간 아래로 */
+    mb.setAttribute('data-rk','83');   /* 군 통제 — 경고 묶음 */
     b.appendChild(mb);
   }
 
@@ -8578,7 +8576,7 @@ function renderDetail(d){
   (function(){
     /* 실측 — 예보 옆에 「지금 실제로 이랬다」를 붙인다. 자료가 없으면 줄 자체가 없다. */
     if (d.obs && (d.obs.lv != null || d.obs.tw != null || d.obs.wv != null)){
-      var o = d.obs, ob = el('div','sec obs-box'); ob.setAttribute('data-rk','15');
+      var o = d.obs, ob = el('div','sec obs-box'); ob.setAttribute('data-rk','12');
       var bits = [];
       if (o.lv != null) bits.push('<b>조위 ' + o.lv + 'cm</b>');
       if (o.tw != null) bits.push('<b>수온 ' + o.tw.toFixed(1) + '℃</b>');
@@ -8591,7 +8589,7 @@ function renderDetail(d){
       b.appendChild(ob);
     }
 
-    var slot = el('div',''); slot.setAttribute('data-rk','52');   /* 인명사고 이력은 중간 아래(7일 전망 뒤)로 */
+    var slot = el('div',''); slot.setAttribute('data-rk','84');   /* 인명사고 이력 — 경고 묶음 */
     b.appendChild(slot);
     var show = function(data){
       if (!data || !data.cells) return;
@@ -8741,7 +8739,7 @@ function renderDetail(d){
 
   /* 어종 지정 결과 */
   if (d.want && d.want.has){
-    var wb = el('div','sec'); wb.setAttribute('data-rk','23');
+    var wb = el('div','sec'); wb.setAttribute('data-rk','80');
     wb.appendChild(el('div','sec-t', S.want + ' 기준'));
     wb.appendChild(el('div','dt-verdict' + (d.want.ban && d.want.ban.banned ? ' bad' : ''),
       d.want.reason + (d.want.thermal != null ? ' · 수온 적합도 ' + d.want.thermal + '%' : '')));
@@ -9217,15 +9215,23 @@ function renderDetail(d){
 /* 상세 화면 순서 — 사람들이 먼저 찾는 것부터: 0 물때 → 1 어종 → 2 시야 → 3 들어가고 나오기 → 4 앞으로 7일 → 나머지.
    머리·날짜줄·한 줄 결론·안전 경고는 짧으니 맨 위에 그대로 둔다. */
 var DT_ORDER = [
-  ['물때 ·',10],['만조 · 간조',11],
-  ['노릴 어종',20],['채집물',20],['금지체장',21],['잡으면 안 되는',22],
-  ['수중 시야',30],
-  ['언제 들어가고',40],['파도가 어디까지',41],
-  ['앞으로 7일',50],
-  ['세부 포인트',60],['드러나는 갯벌',61],['바다와 하늘',62],['들어가는 길',63],
-  ['준비물',64],['채비와 미끼',64],['조류와 달',65],['점수를 이렇게',66],['근거와 주의',67],
-  ['잡는 법 영상',70],['조건 맞춤 장비',71],['이 근처',72],['같은 날',74],['실제 조황',75],['확인할 것',76]
+  /* ── 언제 가나 — 가장 먼저 알고 싶은 것 ── */
+  ['물때 ·',10],['만조 · 간조',11],['지금 실제 바다',12],
+  ['언제 들어가고',13],['드러나는 갯벌',14],['파도가 어디까지',15],
+  /* ── 무엇을 잡나 ── */
+  ['노릴 어종',20],['채집물',20],
+  /* ── 어디로 어떻게 ── */
+  ['세부 포인트',30],['들어가는 길',31],['수중 시야',32],['바다와 하늘',33],['조류와 달',34],
+  /* ── 앞날과 기록 ── */
+  ['앞으로 7일',40],['실제 조황',41],['같은 날',42],
+  /* ── 준비물 ── */
+  ['준비물',50],['채비와 미끼',50],
+  /* ── 규정과 경고 — 정보를 다 본 뒤 ── */
+  ['금지체장',80],['잡으면 안 되는',81],['확인할 것',85],['점수를 이렇게',86],['근거와 주의',87],
+  /* ── 홍보·제휴 — 맨 아래 ── */
+  ['잡는 법 영상',90],['조건 맞춤 장비',91],['이 근처',92]
 ];
+
 function orderDetail_(b){
   var kids = Array.prototype.slice.call(b.children);
   function rank(n){
@@ -9234,7 +9240,7 @@ function orderDetail_(b){
     var c = n.className || '';
     if (/dt-head/.test(c)) return 0;
     if (/dt-verdict/.test(c) && !/sec/.test(c)) return 2;
-    if (/adcard/.test(c)) return 73;
+    if (/adcard/.test(c)) return 95;
     if (/dt-actions/.test(c)) return 99;
     var t = n.querySelector && n.querySelector('.sec-t');
     if (t){
