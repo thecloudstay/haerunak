@@ -33,6 +33,7 @@ jobs:
             git config user.email "bot@haerunak.com"
             git add -A data/tide
             git commit -m "물때 자료 갱신 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase --autostash origin main || true
             git push
           else
             echo "바뀐 것 없음(KHOA_KEY 미설정이면 정상)"

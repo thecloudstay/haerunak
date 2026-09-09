@@ -38,6 +38,7 @@ jobs:
             git config user.email "bot@haerunak.com"
             git add -A data/wx
             git commit -m "기상 자료 갱신 $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase --autostash origin main || true
             git push
           else
             echo "바뀐 것 없음"

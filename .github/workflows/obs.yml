@@ -32,4 +32,5 @@ jobs:
           git config user.email "bot@haerunak"
           git add -A data/obs.json || true
           git diff --cached --quiet || git commit -m "실측 자료 갱신 $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git push || true
+          git pull --rebase --autostash origin main || true
+            git push || true
