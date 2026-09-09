@@ -8008,6 +8008,7 @@ function renderDetail(d){
         .then(function(r){ if(!r.ok) throw 0; return r.json(); })
         .then(function(j){
           var ev = j && j[String(d.point.i)];
+          if (ev) ev = ev.filter(function(e){ return e && e.k; });   /* 사건만 (옛 자료엔 10분 시계열이 섞여 있음) */
           if (!ev || !ev.length) return;
           var ord = {'전류':0,'최강창조':1,'최강낙조':2};
           var html = '<b>🌊 조류(국립해양조사원 예측)</b><div class="dt-cur-row">'

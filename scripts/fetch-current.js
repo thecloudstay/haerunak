@@ -75,7 +75,7 @@ async function fetchPoint(ds, p) {
     const t = String(r.obs_date || '').slice(11, 16);
     const k = String(r.type || '').replace('최강창조류', '최강창조').replace('최강낙조류', '최강낙조');
     return { t: t, k: k, v: Math.round(+r.current_speed || 0), d: Math.round(+r.current_dir || 0) };
-  }).filter(x => x.t);
+  }).filter(x => x.t && x.k);   /* 10분 간격 전체 시계열 중 사건(전류·최강창조·최강낙조)만 남긴다 — 파일 크기 3MB→50KB */
 }
 
 (async () => {
