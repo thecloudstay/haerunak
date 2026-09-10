@@ -53,13 +53,27 @@ h1,h2,h3,h4,p{margin:0}
 .leaflet-control-zoom{display:none}
 
 /* 베이스맵 전환 (지도·위성·밝게) — 바텀시트 접힌 높이(148px) 위 */
-.leaflet-bottom.leaflet-left{z-index:650}
+/* 겹 단추들은 아래에서 위로 쌓고, 여는 알약은 언제나 맨 아래에 둔다(엄지에 가깝게) */
+.leaflet-bottom.leaflet-left{z-index:650;display:flex;flex-direction:column;align-items:flex-start}
 .leaflet-bottom.leaflet-left .leaflet-control.basesw{
-  margin:0 0 calc(162px + var(--safeB)) 12px;
-}
-/* 어장 토글은 베이스맵 전환 위에 얹는다 */
-.leaflet-bottom.leaflet-left .leaflet-control.eosw{
+  order:1;                 /* 배경(지도·위성·밝게) — 맨 위 */
   margin:0 0 8px 12px;
+}
+.leaflet-bottom.leaflet-left .leaflet-control.eosw{
+  order:2;                 /* 지형 겹 */
+  margin:0 0 8px 12px;
+}
+.leaflet-bottom.leaflet-left .leaflet-control.wdsw{
+  order:3;                 /* 바다(바람·조류) */
+  margin:0 0 8px 12px;
+}
+.leaflet-bottom.leaflet-left .leaflet-control.laysw{
+  order:99;
+  margin:0 0 calc(162px + var(--safeB)) 12px;   /* 추천 목록 판을 피해 그 위에 */
+}
+/* 목록을 닫아 지도만 볼 때는 알약도 아래로 내려온다 — 「추천 목록」 단추 바로 위 */
+body.sheet-off .leaflet-bottom.leaflet-left .leaflet-control.laysw{
+  margin-bottom:calc(64px + var(--safeB));
 }
 .eosw .basebtn.on{
   background:linear-gradient(100deg,#ff7f5a,#e0563a);color:#241302;
@@ -104,6 +118,44 @@ h1,h2,h3,h4,p{margin:0}
   letter-spacing:-.2px;transition:background .16s,color .16s;
 }
 .basebtn:hover{color:#fff;background:rgba(255,255,255,.09)}
+
+/* ── 겹 접기 ───────────────────────────
+   배경·지형·바다 단추 세 줄은 평소 접혀 있고, 알약 하나만 지도 위에 남는다.
+   지도를 최대한 넓게 쓰는 것이 목적이다. */
+.leaflet-bottom.leaflet-left .basesw:not(.laysw){
+  transform-origin:0 100%;
+  transition:opacity .18s ease, transform .18s var(--sp);
+}
+body:not(.lay-open) .leaflet-bottom.leaflet-left .basesw:not(.laysw){
+  display:none;
+}
+body.lay-open .leaflet-bottom.leaflet-left .basesw:not(.laysw){
+  animation:layIn .2s var(--sp) both;
+}
+@keyframes layIn{ from{opacity:0;transform:translateY(6px) scale(.97)} to{opacity:1;transform:none} }
+.laysw{ padding:3px; }
+.laytog{
+  display:flex;align-items:center;gap:7px;padding:8px 12px;
+}
+.laytog .lay-i{ width:13px;height:12px;position:relative;display:inline-block;flex:0 0 auto }
+.laytog .lay-i::before,.laytog .lay-i::after{
+  content:'';position:absolute;left:0;right:0;height:4px;
+  border:1.4px solid currentColor;border-radius:2px;transform:skewX(-20deg);
+}
+.laytog .lay-i::before{ top:0 }
+.laytog .lay-i::after{ bottom:0;opacity:.55 }
+.laytog .lay-n{
+  min-width:16px;height:16px;padding:0 4px;border-radius:8px;
+  background:rgba(46,230,168,.18);color:var(--acc);
+  font-size:10px;font-weight:800;line-height:16px;text-align:center;
+}
+.laytog.on{
+  background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;
+  box-shadow:0 2px 9px rgba(46,230,168,.4);
+}
+@media (prefers-reduced-motion:reduce){
+  body.lay-open .leaflet-bottom.leaflet-left .basesw:not(.laysw){ animation:none }
+}
 .basebtn.on{
   background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c;font-weight:800;
   box-shadow:0 2px 9px rgba(46,230,168,.4);
@@ -1249,9 +1301,11 @@ body.has-ticker .pick.hasWant ~ .pick-restore, body.has-ticker .pick-restore.has
   .sheet-head{padding-top:14px}
   .sorts{flex-wrap:wrap;row-gap:6px}
   /* 지도 단추들 — 왼쪽 판을 피해서 오른쪽으로 */
-  .leaflet-bottom.leaflet-left .leaflet-control.basesw{margin:0 0 12px 424px}
+  .leaflet-bottom.leaflet-left .leaflet-control.basesw{margin:0 0 8px 424px}
   .leaflet-bottom.leaflet-left .leaflet-control.eosw{margin:0 0 8px 424px}
   .leaflet-bottom.leaflet-left .leaflet-control.wdsw{margin:0 0 8px 424px}
+  .leaflet-bottom.leaflet-left .leaflet-control.laysw{margin:0 0 12px 424px}
+  body.sheet-off .leaflet-bottom.leaflet-left .leaflet-control.laysw{margin-bottom:12px;margin-left:12px}
   /* 속보줄 켜진 상태의 세로 위치 — 기본 규칙이 더 세서 여기서 다시 잡는다 */
   body.has-ticker .datestrip{top:calc(46px + var(--safeT))}
   body.has-ticker .seg{top:calc(104px + var(--safeT))}
@@ -10092,8 +10146,8 @@ function curToggle_(){
 }
 /* ══════════════ 범례 — 색이 무슨 뜻인지 지도 위에서 바로 ══════════════
    갯벌·해안 재질은 색으로 말하는 겹이라, 색표가 없으면 절반만 전달된다. */
-var LEG_OPEN = true;
-try { LEG_OPEN = localStorage.getItem('hrn_leg') !== '0'; } catch(e){}
+var LEG_OPEN = !PHONE;                     // 휴대폰에서는 지도를 넓게 — 기본은 접어 둔다
+try { var lv = localStorage.getItem('hrn_leg'); if (lv === '1') LEG_OPEN = true; else if (lv === '0') LEG_OPEN = false; } catch(e){}
 function legHtml_(){
   var bright = (typeof brightMap_ === 'function') ? brightMap_() : false;
   var rows = [];
@@ -10154,6 +10208,56 @@ wdCtl.onAdd = function(){
   return d;
 };
 wdCtl.addTo(map);
+
+/* ══════════════ 겹 단추 접기 ══════════════
+ * 지도 왼쪽 아래에 배경·지형·바다 단추가 세 줄로 쌓여 휴대폰에서는 지도의 아래 절반을
+ * 가렸다. 평소에는 알약 하나로 접어 두고, 누르면 세 줄이 펼쳐진다.
+ * 펼친 상태는 저장돼 다음에도 그대로다. 지도가 주인공이고 단추는 손님이다. */
+var LAY_OPEN = !PHONE;                     // 휴대폰은 접어 두고, 넓은 화면은 펼쳐 둔다
+try { var lay = localStorage.getItem('hrn_lay'); if (lay === '1') LAY_OPEN = true; else if (lay === '0') LAY_OPEN = false; } catch(e){}
+
+function layCount_(){
+  var n = 0;
+  if (FLAT_ON) n++;
+  if (CL_ON) n++;
+  if (EO_ON) n++;
+  if (GG_ON) n++;
+  if (RK_ON) n++;
+  if (AC_ON) n++;
+  try { if (WINDL && WINDL.on) n++; } catch(e){}
+  try { if (CURL && CURL.on) n++; } catch(e){}
+  return n;
+}
+function layApply_(){
+  document.body.classList.toggle('lay-open', LAY_OPEN);
+  var b = document.getElementById('layTog');
+  if (!b) return;
+  b.classList.toggle('on', LAY_OPEN);
+  b.setAttribute('aria-expanded', LAY_OPEN ? 'true' : 'false');
+  b.innerHTML = '<i class="lay-i" aria-hidden="true"></i><span>겹</span>'
+              + (LAY_OPEN ? '' : '<b class="lay-n">' + layCount_() + '</b>');
+}
+var layCtl = L.control({position:'bottomleft'});
+layCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw laysw');
+  d.innerHTML = '<button class="basebtn laytog" id="layTog" type="button"'
+              + ' aria-label="지도에 겹쳐 볼 것 고르기" aria-expanded="false"></button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(){
+    LAY_OPEN = !LAY_OPEN;
+    try { localStorage.setItem('hrn_lay', LAY_OPEN ? '1' : '0'); } catch(e){}
+    layApply_();
+  });
+  return d;
+};
+layCtl.addTo(map);
+layApply_();
+/* 겹을 켜고 끌 때마다 알약의 숫자를 고쳐 준다 — 접어 둬도 몇 개가 켜졌는지 보인다 */
+document.addEventListener('click', function(e){
+  var t = e.target;
+  if (t && t.closest && t.closest('.basesw')) setTimeout(layApply_, 0);
+}, true);
+
 window.__icons = { wind: windArrowIcon_, cur: curArrowIcon_ };   // 견본 확인용
 
 })();
