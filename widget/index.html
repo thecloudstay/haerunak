@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>오늘 물때 — 해루낚</title>
+<meta name="description" content="오늘 만조·간조를 한 화면에. 위젯·바로가기용 가벼운 물때판입니다.">
+<meta name="theme-color" content="#071823">
+<link rel="icon" type="image/svg+xml" href="../icon.svg">
+<style>
+:root{
+  --bg:#071823; --card:#0c2433; --line:rgba(140,200,235,.18);
+  --txt:#e8f2f8; --mut:#8ba6b8; --acc:#2ee6a8; --acc2:#7fd8cf; --hi:#7fd8cf; --lo:#ff9f7a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--txt);
+  font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  -webkit-text-size-adjust:100%;
+  display:flex;flex-direction:column;
+  padding:14px 14px calc(14px + env(safe-area-inset-bottom));
+  gap:11px;
+}
+.top{display:flex;align-items:center;gap:8px}
+.spot{
+  flex:1 1 auto;min-width:0;appearance:none;-webkit-appearance:none;
+  background:var(--card);border:1px solid var(--line);border-radius:11px;
+  color:var(--txt);font:inherit;font-size:14px;font-weight:700;padding:8px 10px;
+}
+.geo{
+  flex:0 0 auto;appearance:none;-webkit-appearance:none;border:1px solid var(--line);
+  background:var(--card);color:var(--acc);border-radius:11px;padding:8px 11px;
+  font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;
+}
+.geo:active{background:rgba(46,230,168,.16)}
+.now{
+  background:linear-gradient(150deg,#0e2c3d,#0a2130);
+  border:1px solid var(--line);border-radius:16px;padding:13px 15px;
+}
+.now-k{font-size:12px;font-weight:800;color:var(--mut);letter-spacing:-.2px}
+.now-v{display:flex;align-items:baseline;gap:9px;margin-top:3px;flex-wrap:wrap}
+.now-t{font-size:33px;font-weight:800;letter-spacing:-1.2px;font-variant-numeric:tabular-nums;line-height:1.05}
+.now-l{font-size:14px;font-weight:800;color:var(--mut);font-variant-numeric:tabular-nums}
+.now-r{margin-top:5px;font-size:13px;font-weight:700;color:var(--acc)}
+.hi .now-t{color:var(--hi)} .lo .now-t{color:var(--lo)}
+.meta{display:flex;gap:7px;flex-wrap:wrap}
+.tag{
+  background:var(--card);border:1px solid var(--line);border-radius:9px;
+  padding:5px 9px;font-size:12px;font-weight:700;color:var(--mut);
+}
+.tag b{color:var(--txt);font-weight:800}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{
+  display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 12px;
+}
+.row.past{opacity:.42}
+.row-k{font-size:12.5px;font-weight:800}
+.row.h .row-k{color:var(--hi)} .row.l .row-k{color:var(--lo)}
+.row-t{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.row-v{font-size:13px;font-weight:800;color:var(--mut);font-variant-numeric:tabular-nums}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:4px}
+.open{
+  color:var(--acc);font-size:12.5px;font-weight:800;text-decoration:none;
+  border:1px solid rgba(46,230,168,.3);border-radius:10px;padding:7px 11px;
+}
+.src{font-size:10.5px;color:var(--mut);line-height:1.45;text-align:right}
+.msg{padding:18px 4px;color:var(--mut);font-size:13px;font-weight:700}
+@media (min-height:620px){ .now-t{font-size:38px} }
+@media (max-height:380px){
+  .now{padding:10px 12px}.now-t{font-size:27px}
+  .row{padding:7px 11px}.row-t{font-size:15px}
+  .foot{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <select class="spot" id="spot" aria-label="관측소 고르기"></select>
+  <button class="geo" id="geo" type="button">내 위치</button>
+</div>
+
+<div id="main"><p class="msg">물때를 불러오는 중…</p></div>
+
+<div class="foot">
+  <a class="open" id="open" href="../">해루낚 열기</a>
+  <span class="src">물때 국립해양조사원 공식 예보<br>해루낚 haerunak.com</span>
+</div>
+
+<script>
+/* 오늘 물때만 보여 주는 가벼운 판. 지도도 계산 엔진도 싣지 않는다 —
+   위젯 앱 안이나 홈 화면 바로가기로 열어도 곧바로 뜨게 하려는 것이 목적이다. */
+var SYN = 29.530588853;
+var MULTTAE = ['7물','8물','9물','10물','11물','12물','13물','조금','무시','1물','2물','3물','4물','5물','6물'];
+function toJD(d){ return d.getTime()/86400000 + 2440587.5; }
+function moonAge(y,m,d){
+  var dt = new Date(Date.UTC(y, m-1, d, 3, 0, 0));
+  return ((toJD(dt) - 2451550.26) % SYN + SYN) % SYN;
+}
+function multtae(age, west){
+  var ld = Math.round(age) + 1; if (ld > 30) ld = 30;
+  var i = (ld - 1) % 15; if (!west) i = (i + 1) % 15;
+  return MULTTAE[i];
+}
+function kstNow(){
+  var n = new Date();
+  return new Date(n.getTime() + (n.getTimezoneOffset() + 540) * 60000);
+}
+function ds(d){
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+function hhmm(h){
+  var t = Math.round(h * 60), hh = Math.floor(t/60) % 24, mm = t % 60;
+  return ('0'+hh).slice(-2) + ':' + ('0'+mm).slice(-2);
+}
+function dist(a,b,c,d){
+  var R=6371, r=Math.PI/180;
+  var x=(c-a)*r, y=(d-b)*r;
+  var h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+
+var ST = [], CODE = null, TIDE = null, TIMER = 0;
+var KEY = 'hrn_wg_st';
+
+function pick(code){
+  CODE = code;
+  try { localStorage.setItem(KEY, code); } catch(e){}
+  document.getElementById('spot').value = code;
+  draw();
+}
+function stName(code){
+  for (var i=0;i<ST.length;i++) if (ST[i].code === code) return ST[i].name;
+  return '';
+}
+/* 서해 관측소인지 — 물때 표기가 한 물 다르다. 경도 127도 서쪽이면 서해로 본다 */
+function isWest(code){
+  for (var i=0;i<ST.length;i++) if (ST[i].code === code) return ST[i].lo < 127.3 && ST[i].la > 33.6;
+  return true;
+}
+
+function draw(){
+  var m = document.getElementById('main');
+  if (!TIDE || !CODE){ m.innerHTML = '<p class="msg">물때를 불러오는 중…</p>'; return; }
+  var ev = TIDE[CODE];
+  if (!ev || !ev.length){ m.innerHTML = '<p class="msg">이 관측소는 오늘 자료가 없습니다. 다른 곳을 골라 보세요.</p>'; return; }
+
+  var now = kstNow();
+  var h = now.getHours() + now.getMinutes()/60;
+  var age = moonAge(now.getFullYear(), now.getMonth()+1, now.getDate());
+  var mul = multtae(age, isWest(CODE));
+
+  var nxt = null;
+  for (var i=0;i<ev.length;i++){ if (ev[i].t > h){ nxt = ev[i]; break; } }
+
+  var html = '';
+  if (nxt){
+    var left = (nxt.t - h) * 60;
+    var lh = Math.floor(left/60), lm = Math.round(left%60);
+    if (lm === 60){ lh++; lm = 0; }
+    html += '<div class="now ' + (nxt.k === 'H' ? 'hi' : 'lo') + '">'
+         +   '<div class="now-k">다음 ' + (nxt.k === 'H' ? '만조' : '간조') + '</div>'
+         +   '<div class="now-v"><span class="now-t">' + hhmm(nxt.t) + '</span>'
+         +     '<span class="now-l">' + nxt.lv + 'cm</span></div>'
+         +   '<div class="now-r">' + (lh ? lh + '시간 ' : '') + lm + '분 뒤</div>'
+         + '</div>';
+  } else {
+    html += '<div class="now"><div class="now-k">오늘 물때는 끝났습니다</div>'
+         +  '<div class="now-r" style="margin-top:6px">내일 물때는 자정이 지나면 바뀝니다</div></div>';
+  }
+
+  html += '<div class="meta">'
+       +    '<span class="tag">물때 <b>' + mul + '</b></span>'
+       +    '<span class="tag">' + (now.getMonth()+1) + '월 ' + now.getDate() + '일</span>'
+       +    '<span class="tag">기준 <b>' + esc(stName(CODE)) + '</b></span>'
+       +  '</div>';
+
+  html += '<div class="rows">';
+  for (var j=0;j<ev.length;j++){
+    var e = ev[j];
+    html += '<div class="row ' + (e.k === 'H' ? 'h' : 'l') + (e.t <= h ? ' past' : '') + '">'
+         +    '<span class="row-k">' + (e.k === 'H' ? '만조' : '간조') + '</span>'
+         +    '<span class="row-t">' + hhmm(e.t) + '</span>'
+         +    '<span class="row-v">' + e.lv + 'cm</span>'
+         +  '</div>';
+  }
+  html += '</div>';
+
+  m.innerHTML = html;
+  document.getElementById('open').href = '../?mt=1';
+}
+
+function loadTide(){
+  var d = ds(kstNow());
+  fetch('../data/tide/' + d + '.json', {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      TIDE = j;
+      if (!j){ document.getElementById('main').innerHTML = '<p class="msg">오늘 물때 자료를 받지 못했습니다.</p>'; return; }
+      draw();
+    })
+    .catch(function(){ document.getElementById('main').innerHTML = '<p class="msg">연결이 닿지 않습니다.</p>'; });
+}
+
+fetch('../data/tide-stations.json').then(function(r){ return r.json(); }).then(function(j){
+  ST = (j && j.stations) || [];
+  var sel = document.getElementById('spot');
+  ST.slice().sort(function(a,b){ return a.name.localeCompare(b.name,'ko'); }).forEach(function(s){
+    var o = document.createElement('option');
+    o.value = s.code; o.textContent = s.name;
+    sel.appendChild(o);
+  });
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch(e){}
+  var q = (location.search.match(/[?&]st=([A-Za-z0-9_]+)/) || [])[1];
+  CODE = q || saved || (ST[0] && ST[0].code);
+  sel.value = CODE;
+  sel.onchange = function(){ pick(sel.value); };
+  loadTide();
+});
+
+document.getElementById('geo').onclick = function(){
+  if (!navigator.geolocation){ return; }
+  var b = this; b.textContent = '찾는 중';
+  navigator.geolocation.getCurrentPosition(function(p){
+    var best = null, bd = 1e9;
+    ST.forEach(function(s){
+      var d = dist(p.coords.latitude, p.coords.longitude, s.la, s.lo);
+      if (d < bd){ bd = d; best = s; }
+    });
+    b.textContent = '내 위치';
+    if (best) pick(best.code);
+  }, function(){ b.textContent = '내 위치'; }, {enableHighAccuracy:false, timeout:8000, maximumAge:600000});
+};
+
+/* 남은 시간을 1분마다 고쳐 그리고, 30분마다 자료를 다시 받는다 */
+setInterval(draw, 60000);
+setInterval(loadTide, 1800000);
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) loadTide(); });
+</script>
+</body>
+</html>
