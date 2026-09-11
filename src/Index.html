@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<!-- 지도 판 스타일은 우리 쪽에 둔다. 남의 망을 하나 더 거치면 휴대폰에서 첫 그림이 그만큼 늦다. -->
+<link rel="stylesheet" href="leaflet.css">
+<!-- 글꼴은 그림을 막지 않게 나중에 물린다 — 없으면 기기 기본 글꼴로 먼저 보이고 이어서 바뀐다 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"></noscript>
+<?!= include('Style') ?>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="해루낚">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="mask-icon" href="icon.svg" color="#2ee6a8">
+<meta name="naver-site-verification" content="91e427302481f46851e378e769ad02f7d8660b2d">
+</head>
+<body>
+
+<div id="map" aria-label="포인트 지도"></div>
+<div class="vignette"></div>
+
+<!-- 상단 바 -->
+<header class="topbar glass">
+  <div class="brand">
+    <span class="logo">해루낚</span>
+    <span class="tagline" id="tagline">오늘 어디서 뭘 잡지</span>
+  </div>
+  <button class="icon-btn icon-mt" id="btnTide" title="오늘 물때표" aria-label="오늘 물때표 바로 보기">
+    <svg viewBox="0 0 24 24"><rect x="3.3" y="3.8" width="17.4" height="16.4" rx="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3.5 8.7h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6.2 16.4c1.3-1.6 2.6-1.6 3.9 0s2.6 1.6 3.9 0 2.6-1.6 3.8 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.4 12.3h2.1M13.5 12.3h2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </button>
+  <button class="icon-btn" id="btnGeo" title="내 위치" aria-label="내 위치 기준 추천">
+    <svg viewBox="0 0 24 24"><path d="M12 2.6v3.2M12 18.2v3.2M2.6 12h3.2M18.2 12h3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="6.1" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg>
+  </button>
+  <button class="icon-btn" id="btnSearch" title="찾기" aria-label="찾기">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+  </button>
+  <button class="icon-btn" id="btnReload" title="새로고침" aria-label="새로고침">
+    <svg viewBox="0 0 24 24"><path d="M20 11A8 8 0 1 0 18.5 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</header>
+
+<!-- 날짜 스트립 -->
+<nav class="datestrip" id="datestrip"></nav>
+
+<!-- 모드 토글 -->
+<div class="seg glass" id="seg">
+  <button class="seg-btn active" data-mode="haeru"><span>🔦</span>해루질</button>
+  <button class="seg-btn" data-mode="fish"><span>🎣</span>낚시</button>
+  <div class="seg-pill"></div>
+</div>
+
+<!-- 접근 방식 필터 -->
+<div class="filters" id="filters">
+  <button class="fchip on" data-f="all">전체</button>
+  <button class="fchip" data-f="land">육지</button>
+  <button class="fchip" data-f="isl">섬 전체</button>
+  <button class="fchip" data-f="car">차로 가는 섬</button>
+</div>
+
+<!-- 어종 지정 표시 -->
+<div class="wantbar" id="wantbar" hidden>
+  <span class="wantbar-t" id="wantbarT"></span>
+  <button class="wantbar-x" id="wantbarX">해제</button>
+</div>
+
+<!-- 원픽 복귀 칩 -->
+<button class="pick-restore glass" id="pickRestore" hidden>★ 오늘의 원픽</button>
+
+<!-- 오늘의 원픽 -->
+<section class="pick" id="pick" hidden>
+  <div class="pick-inner glass">
+    <div class="pick-top">
+      <div class="pick-badge">오늘의 원픽</div>
+      <div class="pick-btns">
+        <button class="pick-min" id="pickMin" aria-label="접기">
+          <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="pick-min" id="pickClose" aria-label="닫기">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="pick-main">
+      <div class="ring" id="pickRing"><span id="pickScore">--</span></div>
+      <div class="pick-txt">
+        <h2 id="pickName">불러오는 중</h2>
+        <p id="pickVerdict" class="pick-verdict">전국 포인트를 분석하고 있습니다…</p>
+        <div class="chips" id="pickChips"></div>
+      </div>
+    </div>
+    <button class="pick-cta" id="pickCta">자세히 보기</button>
+  </div>
+</section>
+
+<!-- 바텀시트 -->
+<!-- 속보 줄 — 제보·위판 역산·오늘의 1위가 한 줄로 흐른다 -->
+<div class="ticker" id="ticker" hidden>
+  <span class="tk-badge">속보</span>
+  <div class="tk-win"><div class="tk-track" id="tkTrack"></div></div>
+</div>
+
+<button class="sheet-back glass" id="sheetBack" hidden>
+  <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+  <span>추천 목록</span>
+</button>
+
+<section class="sheet glass" id="sheet">
+  <div class="handle" id="handle"><i></i></div>
+  <div class="sheet-head">
+    <button class="sheet-x" id="sheetX" aria-label="목록 닫고 지도 보기" title="지도만 보기">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    </button>
+    <h3 id="sheetTitle">추천 순위</h3>
+    <div class="sorts" id="sorts">
+      <button class="sort active" data-sort="score">추천순</button>
+      <button class="sort sort-haeru" data-sort="vis">시야 좋은 순</button>
+      <button class="sort" data-sort="near">가까운 순</button>
+      <button class="sort" data-sort="time">시간 빠른 순</button>
+    </div>
+    <div class="rads" id="rads" hidden>
+      <span class="rads-t">반경</span>
+      <button class="rad" data-rad="30">30km</button>
+      <button class="rad on" data-rad="60">60km</button>
+      <button class="rad" data-rad="100">100km</button>
+      <button class="rad" data-rad="0">전국</button>
+      <button class="rad rad-off" id="radOff">해제</button>
+    </div>
+  </div>
+  <div class="list" id="list"></div>
+  <div class="sheet-foot" id="sheetFoot"></div>
+</section>
+
+<!-- 찾기 -->
+<div class="finder" id="finder" hidden>
+  <div class="detail-scrim" id="finderScrim"></div>
+  <div class="finder-panel glass">
+    <div class="handle" id="finderHandle"><i></i></div>
+    <div class="finder-head">
+      <h3>무엇을 잡으러 가시나요</h3>
+      <p>대상을 고르면 그걸 노릴 수 있는 자리만 추려서 순위를 다시 냅니다</p>
+      <div class="seg mini" id="fseg">
+        <button class="seg-btn active" data-fmode="haeru">해루질</button>
+        <button class="seg-btn" data-fmode="fish">낚시</button>
+        <div class="seg-pill"></div>
+      </div>
+    </div>
+    <div class="want-q">
+      <input id="wantQ" type="search" placeholder="잡을 것 찾기 — 낙지, 바지락, 우럭…" autocomplete="off">
+      <button class="want-qx" id="wantQX" type="button" hidden aria-label="지우기">✕</button>
+    </div>
+    <div class="finder-body" id="finderBody"></div>
+    <div class="finder-search">
+      <input id="spotQ" type="search" placeholder="지점 이름으로 찾기 — 영흥도, 몽산포…" autocomplete="off">
+      <div class="spotres" id="spotRes"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 상세 -->
+<div class="detail" id="detail" hidden>
+  <div class="detail-scrim" id="detailScrim"></div>
+  <div class="detail-panel glass" id="detailPanel">
+    <div class="handle" id="detailHandle"><i></i></div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast" hidden></div>
+
+<!-- 초기 로딩 -->
+<div class="boot" id="boot">
+  <div class="boot-wave"><i></i><i></i><i></i></div>
+  <p>전국 <b id="bootCount">120</b>개 포인트<br>물때·바다·달을 읽는 중</p>
+</div>
+
+<!--LEAFLET-->
+<!-- 지도 라이브러리 — 우리 쪽 사본을 먼저 쓴다. 같은 곳에서 받으니 연결을 새로 트지 않아
+     휴대폰에서 빠르고, 남의 망이 느린 날에도 지도가 늦게 뜨지 않는다.
+     사본이 없을 때만 바깥에서 받는다. -->
+<script src="leaflet.js"></script>
+<script>window.L||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"><\/script>');</script>
+<!--/LEAFLET-->
+<script>window.BOOT = <?!= BOOT ?>;</script>
+<?!= include('Script') ?>
+</body>
+</html>

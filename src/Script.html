@@ -1,0 +1,3877 @@
+<script>
+(function(){
+'use strict';
+
+/* ══════════════ 상태 ══════════════ */
+/* 빌드 시점이 아니라 방문자의 실제 오늘(한국시)로 맞춘다 — 정적판은 BOOT.today가 빌드 날짜로 굳는다 */
+try {
+  var _kst = new Date(Date.now() + 9*36e5).toISOString().slice(0,10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(_kst)) BOOT.today = _kst;
+} catch(e){}
+var S = {
+  ds: BOOT.today, mode: 'haeru', rows: [], sort: 'score', filter: 'all', want: null,
+  fmode: 'haeru', sel: null, me: null, markers: {}, loading: false, cur: null,
+  near: false, rad: 60, meMk: null
+};
+var $ = function(id){ return document.getElementById(id); };
+var el = function(t, c, h){ var e = document.createElement(t); if(c) e.className = c; if(h!=null) e.innerHTML = h; return e; };
+var WD = ['일','월','화','수','목','금','토'];
+var MODE_NAME = { haeru:'해루질', fish:'낚시' };
+
+function toast(msg, ms){
+  var t = $('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.hidden = true; }, ms||2400);
+}
+function hm(min){
+  if (min === null || min === undefined) return '--:--';
+  var m = ((min % 1440) + 1440) % 1440;
+  return ('0'+Math.floor(m/60)).slice(-2) + ':' + ('0'+(m%60)).slice(-2);
+}
+function hmH(h){ return hm(Math.round(h*60)); }
+function dstr(d){
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+function parseDs(ds){ var a = ds.split('-'); return new Date(+a[0], +a[1]-1, +a[2]); }
+function dist(a, b, c, d){
+  var R = 6371, r = Math.PI/180;
+  var x = (c-a)*r, y = (d-b)*r;
+  var h = Math.sin(x/2)*Math.sin(x/2) + Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+
+/* ══════════════ 휴대폰 판별 ══════════════
+ * 휴대폰은 화면도 좁고 자료도 데이터 요금으로 받는다. 무거운 겹은 기본으로 접어 두고,
+ * 필요한 사람만 단추로 켠다. 켠 선택은 저장돼 다음에도 그대로 열린다. */
+var PHONE = (function(){
+  try { return matchMedia('(max-width: 820px)').matches || navigator.maxTouchPoints > 1; }
+  catch(e){ return false; }
+})();
+
+/* ══════════════ 지도 ══════════════ */
+var map = L.map('map', {
+  center: [36.35, 127.3], zoom: 7, zoomControl: false,
+  attributionControl: true, minZoom: 6, maxZoom: 19
+});
+try { window._hrnMap = map; } catch(e){}   // 점검용 — 자동 화면검사가 지도를 움직일 때 쓴다
+
+/* ══════════════ 카카오맵 배경 연동 ══════════════
+ * data/kakao.json 에 {"key":"자바스크립트키"} 가 있으면 카카오맵을 배경으로 깐다.
+ * 라이브러리(핀·어장·갯골 그리기)는 그대로 두고, 카카오맵 화면을 밑에 동기화하는
+ * 방식이라 기존 기능이 전혀 안 바뀐다. 키가 없거나 로딩이 실패하면 조용히
+ * 지금의 오픈스트리트맵으로 돈다. */
+var KAKAO = { on:false, map:null, div:null, off:19, want:'ROADMAP' };
+function kl_(z){ return Math.max(1, Math.min(14, KAKAO.off - z)); }
+function kSync_(){
+  if (!KAKAO.on) return;
+  var c = map.getCenter();
+  try {
+    KAKAO.map.setLevel(kl_(map.getZoom()));
+    KAKAO.map.setCenter(new kakao.maps.LatLng(c.lat, c.lng));
+    kAlign_();
+  } catch(e){}
+}
+/* 드래그하는 동안(move)은 초당 수십 번 불린다. 그때마다 카카오 지도의 단계·중심을 다시 넣으면
+   배경이 매 프레임 재배치돼 휴대폰이 버틴다. 손가락이 움직이는 동안에는 화면 변환(translate)만
+   손보고, 단계·중심·정합은 손을 뗀 뒤(moveend·zoomend) 한 번만 한다. */
+var KRAF = 0;
+function kSyncLite_(){
+  if (!KAKAO.on || KRAF) return;
+  KRAF = requestAnimationFrame(function(){
+    KRAF = 0;
+    try { kAlign_(true); } catch(e){}
+  });
+}
+/* 카카오 배경을 라이브러리(Leaflet) 좌표계에 정합시킨다.
+   ── 중심 정렬(translate)만으로는 부족하다. 카카오(EPSG:5181 TM)와 Leaflet(EPSG:3857 웹메르카토르)은
+      위도에 따라 축척(해상도)이 달라서, 중심은 맞아도 확대·가장자리로 갈수록 핀이 지형과 어긋난다.
+      그래서 두 지도의 「경도 1도당 화면 픽셀폭」을 재서 그 비율만큼 카카오 배경을 scale 로 맞춘다. */
+function kAlign_(light){
+  try {
+    var c = map.getCenter();
+    var proj = KAKAO.map.getProjection();
+    var kp  = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng));
+    var dLng = 0.02;
+    var kp2 = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng + dLng));
+    var lp0 = map.latLngToContainerPoint([c.lat, c.lng]);
+    var lp1 = map.latLngToContainerPoint([c.lat, c.lng + dLng]);
+    var kpx = Math.abs(kp2.x - kp.x), lpx = Math.abs(lp1.x - lp0.x);
+    var s = (kpx > 0.5 && lpx > 0.5) ? (lpx / kpx) : 1;   // 카카오를 Leaflet 축척에 맞추는 배율
+    if (!isFinite(s) || s <= 0) s = 1;
+    /* 단계 자가보정 — 배율이 0.71 미만/1.41 초과면 카카오 확대단계가 한 단계 어긋난 것(초기 레이아웃 전 보정 실패 등).
+       배경을 반으로 줄여 검은 여백이 생기는 대신, 단계를 옮기고 다시 잰다. */
+    var tries = light ? 2 : 0;                 // 드래그 중에는 자가보정 고리를 돌지 않는다
+    while ((s < 0.71 || s > 1.41) && tries < 2){
+      KAKAO.off += (s < 0.71) ? 1 : -1;
+      KAKAO.map.setLevel(kl_(map.getZoom()));
+      KAKAO.map.setCenter(new kakao.maps.LatLng(c.lat, c.lng));
+      proj = KAKAO.map.getProjection();
+      kp  = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng));
+      kp2 = proj.containerPointFromCoords(new kakao.maps.LatLng(c.lat, c.lng + dLng));
+      kpx = Math.abs(kp2.x - kp.x);
+      s = (kpx > 0.5 && lpx > 0.5) ? (lpx / kpx) : 1;
+      if (!isFinite(s) || s <= 0) s = 1;
+      tries++;
+    }
+    s = Math.max(0.5, Math.min(2, s));
+    var dx = KAKAO.div.clientWidth/2 - kp.x, dy = KAKAO.div.clientHeight/2 - kp.y;
+    /* 회전 보정 — 카카오(TM, 중앙자오선 127°E)는 자오선이 127°로 수렴하지만 웹메르카토르는 자오선이 수직이라
+       127°에서 멀어질수록(동해안·포항·울산) 배경이 핀 대비 미세하게 기울어진다. 자오선수렴각
+       γ = (경도−127)·sin(위도) 만큼 배경을 돌려 맞춘다. 실측: 포항 화면귀퉁이 잔차 19px→2px. */
+    var g = (c.lng - 127) * Math.sin(c.lat * Math.PI / 180);
+    if (!isFinite(g)) g = 0;
+    g = Math.max(-3, Math.min(3, g));
+    KAKAO.div.style.transformOrigin = '50% 50%';
+    KAKAO.div.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + s.toFixed(4) + ') rotate(' + g.toFixed(4) + 'deg)';
+  } catch(e){}
+}
+function kSetType_(t){
+  if (!KAKAO.on) return;
+  KAKAO.want = t;
+  try { KAKAO.map.setMapTypeId(kakao.maps.MapTypeId[t]); } catch(e){}
+}
+function kakaoShow_(show){
+  if (!KAKAO.div) return;
+  KAKAO.div.style.display = show ? 'block' : 'none';
+  var mc = document.querySelector('.leaflet-container');
+  if (mc) mc.style.background = show ? 'transparent' : '';
+  document.body.classList.toggle('map-kakao', !!show);
+  if (show){
+    // 라이브러리 타일·내장 해안선은 걷는다 — 카카오가 배경이다
+    Object.keys(LIVE).forEach(function(k){ if (LIVE[k] && map.hasLayer(LIVE[k])) map.removeLayer(LIVE[k]); });
+    if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
+    coastVis_(false);
+    kSync_();
+  }
+}
+function kakaoInit_(){
+  var mapEl = document.getElementById('map');
+  var d = document.createElement('div');
+  d.id = 'kmap';
+  /* 4% 여유(블리드) — 축척·회전 보정으로 배경을 돌리고 키워도 화면 귀퉁이가 비지 않게 */
+  d.style.cssText = 'position:fixed;top:-4%;left:-4%;right:-4%;bottom:-4%;z-index:0;pointer-events:none;';
+  mapEl.parentNode.insertBefore(d, mapEl);
+  KAKAO.div = d;
+  var c = map.getCenter();
+  KAKAO.map = new kakao.maps.Map(d, {
+    center: new kakao.maps.LatLng(c.lat, c.lng), level: 12,
+    draggable: false, scrollwheel: false, disableDoubleClick: true, keyboardShortcuts: false
+  });
+  /* 레벨 보정 — 두 지도의 화면 폭(경도 범위)을 견줘 축척 상수를 맞춘다 */
+  try {
+    KAKAO.map.setLevel(kl_(map.getZoom()));
+    KAKAO.map.setCenter(new kakao.maps.LatLng(c.lat, c.lng));
+    var kb = KAKAO.map.getBounds(), lb = map.getBounds();
+    var kw = kb.getNorthEast().getLng() - kb.getSouthWest().getLng();
+    var lw = lb.getEast() - lb.getWest();
+    if (kw > 0 && lw > 0){
+      var adj = Math.round(Math.log(kw/lw)/Math.log(2));
+      if (adj) KAKAO.off -= adj;
+    }
+  } catch(e){}
+  KAKAO.on = true;
+  map.on('move', kSyncLite_);
+  map.on('zoomend moveend', kSync_);
+  /* 확대 애니메이션 동안은 카카오를 잠깐 숨긴다 — 축척이 어긋난 채 겹쳐 보이지 않게 */
+  map.on('zoomstart', function(){ if (KAKAO.div && !KAKAO.div.hidden) KAKAO.div.style.opacity = '0'; });
+  map.on('zoomend', function(){ if (KAKAO.div){ kSync_(); KAKAO.div.style.opacity = '1'; } });
+  window.addEventListener('resize', function(){ try { KAKAO.map.relayout(); kSync_(); } catch(e){} });
+  kakaoShow_(true);
+  kSetType_('ROADMAP');
+  /* 베이스 버튼을 카카오 모드로: 지도=카카오 일반, 위성=카카오 위성+지명, 어둡게=기존 다크 지도 */
+  var bs = document.querySelectorAll('.basesw:not(.eosw) .basebtn');
+  for (var i = 0; i < bs.length; i++){
+    var b = bs[i], k = b.getAttribute('data-b');
+    if (k === 'lite') b.textContent = '어둡게';
+  }
+  curBase = 'dark';   // '지도' 버튼이 켜진 상태로 통일
+  for (var j = 0; j < bs.length; j++)
+    bs[j].className = 'basebtn' + (bs[j].getAttribute('data-b') === 'dark' ? ' on' : '');
+}
+function kakaoBoot_(){
+  try {
+    fetch('data/kakao.json').then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(cfg){
+        if (!cfg || !cfg.key) return;
+        var s = document.createElement('script');
+        s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(cfg.key) + '&libraries=services&autoload=false';
+        s.onload = function(){ try { kakao.maps.load(kakaoInit_); } catch(e){} };
+        document.head.appendChild(s);
+      }).catch(function(){});
+  } catch(e){}
+}
+kakaoBoot_();
+/* ── 베이스맵 — 키 없이 쓸 수 있는 공급원만 둔다.
+      한 곳이 죽으면 다음 후보로 자동 교체된다. ── */
+var TILE_TAIL = ' | 물때 국립해양조사원 · 기상 Open-Meteo';
+var TILE_SRC = {
+  dark: [
+    /* OSM 을 어둡게 뒤집어 쓴다 — 키가 필요 없고, 한글 지명·도로가 끝까지 나온다 */
+    { u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', a:'지도 OpenStreetMap', mz:19, sd:'abc', cl:'osm-dark' },
+    { u:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+      a:'지도 Esri', mz:16 }
+  ],
+  sat: [
+    { u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      a:'위성 Esri · Maxar', mz:19 }
+  ],
+  lite: [
+    { u:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', a:'지도 OpenStreetMap', mz:19, sd:'abc' },
+    { u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      a:'지도 Esri', mz:19 }
+  ]
+};
+var SATLBL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom:19, maxNativeZoom:19, opacity:.92, className:'basetiles' });
+
+var LIVE = {};          // 현재 붙어 있는 레이어
+
+function makeTile_(kind, idx){
+  var c = TILE_SRC[kind] && TILE_SRC[kind][idx];
+  if (!c) return null;
+  var opt = { attribution: c.a + TILE_TAIL, maxZoom: 19, maxNativeZoom: c.mz,
+              className: 'basetiles' + (c.cl ? ' ' + c.cl : '') };
+  if (c.sd) opt.subdomains = c.sd;
+  var tl = L.tileLayer(c.u, opt);
+  var good = 0, bad = 0;
+  /* 타일이 한 장이라도 오면 내장 약도(해안선)는 걷는다 — 진짜 지도가 기본이다 */
+  tl.on('tileload',  function(){ good++; coastVis_(false); });
+  tl.on('tileerror', function(){
+    bad++;
+    // 한 장도 못 받은 채 연달아 실패하면 그 공급원은 죽은 것으로 본다
+    if (good === 0 && bad >= 5 && !tl._swapped && TILE_SRC[kind][idx + 1]){
+      tl._swapped = true;
+      var nx = makeTile_(kind, idx + 1);
+      if (nx && curBase === kind){
+        if (map.hasLayer(tl)) map.removeLayer(tl);
+        nx.addTo(map); nx.bringToBack();
+        LIVE[kind] = nx;
+      }
+    }
+  });
+  return tl;
+}
+
+function getBase_(kind){
+  if (!LIVE[kind]) LIVE[kind] = makeTile_(kind, 0);
+  return LIVE[kind];
+}
+
+/* 기본은 진짜 지도다 — 바다로드처럼 실제 지형·도로·지명이 그대로 보여야
+   포인트가 어디인지 맞는지 한눈에 확인된다. 내장 해안선(약도)은
+   타일이 오기 전 첫 화면과, 타일 공급이 전부 막힌 환경의 폴백으로만 쓴다. */
+/* 정적판에서는 아래에 실제 약도 겹이 끼워진다. 스프레드시트판에는 없으므로 자리만 잡아 둔다. */
+if (typeof COAST_LAYER === 'undefined'){ var COAST_LAYER = null; }
+
+/* 내장 약도 보이기/걷기 — 타일이 로드되면 걷는다.
+   약도 자료는 필요할 때만 받는다(coastLoad_). 카카오 배경이 뜨는 평소에는 아예 받지 않는다. */
+function coastVis_(show){
+  if (show){
+    if (typeof coastLoad_ === 'function') coastLoad_();
+    if (COAST_LAYER && !map.hasLayer(COAST_LAYER)) COAST_LAYER.addTo(map);
+  } else {
+    if (COAST_LAYER && map.hasLayer(COAST_LAYER)) map.removeLayer(COAST_LAYER);
+  }
+}
+
+var curBase = 'dark';
+getBase_('dark').addTo(map);
+
+function setBase_(k){
+  if (k === curBase) return;
+  if (!TILE_SRC[k]) return;
+  /* 카카오 모드: 지도=카카오 일반, 위성=카카오 위성+지명, 어둡게=기존 다크 지도 */
+  if (typeof KAKAO !== 'undefined' && KAKAO.on){
+    Object.keys(LIVE).forEach(function(kk){ if (LIVE[kk] && map.hasLayer(LIVE[kk])) map.removeLayer(LIVE[kk]); });
+    if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
+    if (k === 'lite'){
+      kakaoShow_(false);
+      var dk = getBase_('dark');
+      dk.addTo(map); dk.bringToBack();
+    } else {
+      kakaoShow_(true);
+      kSetType_(k === 'sat' ? 'HYBRID' : 'ROADMAP');
+    }
+    curBase = k;
+    document.body.className = document.body.className.replace(/\s*map-sat\b/,'') + (k === 'sat' ? ' map-sat' : '');
+    var kb = document.querySelectorAll('.basesw:not(.eosw) .basebtn');
+    for (var i2 = 0; i2 < kb.length; i2++) kb[i2].className = 'basebtn' + (kb[i2].getAttribute('data-b') === k ? ' on' : '');
+    try { localStorage.setItem('hrn_base', k); } catch(e){}
+    return;
+  }
+  var old = LIVE[curBase];
+  if (old && map.hasLayer(old)) map.removeLayer(old);
+  if (map.hasLayer(SATLBL)) map.removeLayer(SATLBL);
+  var nx = getBase_(k);
+  nx.addTo(map); nx.bringToBack();
+  if (k === 'sat') SATLBL.addTo(map);
+  coastVis_(false);
+  curBase = k;
+  document.body.className = document.body.className.replace(/\s*map-sat\b/,'') + (k === 'sat' ? ' map-sat' : '');
+  var bs = document.querySelectorAll('.basebtn');
+  for (var i=0;i<bs.length;i++) bs[i].className = 'basebtn' + (bs[i].getAttribute('data-b') === k ? ' on' : '');
+  try { localStorage.setItem('hrn_base', k); } catch(e){}
+}
+
+var baseCtl = L.control({position:'bottomleft'});
+baseCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw');
+  d.innerHTML = '<button class="basebtn on" data-b="dark" type="button">지도</button>'
+              + '<button class="basebtn" data-b="sat" type="button">위성</button>'
+              + '<button class="basebtn" data-b="lite" type="button">밝게</button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(e){
+    var t = e.target;
+    while (t && t !== d && !(t.className && String(t.className).indexOf('basebtn') >= 0)) t = t.parentNode;
+    if (t && t !== d) setBase_(t.getAttribute('data-b'));
+  });
+  return d;
+};
+baseCtl.addTo(map);
+try { var sv = localStorage.getItem('hrn_base'); if (sv === 'sat' || sv === 'lite') setBase_(sv); } catch(e){}
+
+/* 어장·갯골 켜고 끄기 — 기본은 켬. 어장은 10레벨, 갯골은 12레벨부터 그려진다 */
+var eoCtl = L.control({position:'bottomleft'});
+eoCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw eosw');
+  d.innerHTML = '<button class="basebtn on fl" id="flBtn" type="button">갯벌</button>'
+              + '<button class="basebtn cl" id="clBtn" type="button">해안 재질</button>'
+              + '<button class="basebtn on" id="eoBtn" type="button">어장</button>'
+              + '<button class="basebtn gg' + (GG_ON ? ' on' : '') + '" id="ggBtn" type="button">갯골</button>'
+              + '<button class="basebtn rk' + (RK_ON ? ' on' : '') + '" id="rkBtn" type="button">갯바위</button>'
+              + '<button class="basebtn ac" id="acBtn" type="button">사고</button>'
+              + '<span class="bsep" aria-hidden="true"></span>'
+              + '<button class="basebtn fl3" data-fl="mud" type="button" title="펄갯벌 — 낙지·가무락·칠게">펄</button>'
+              + '<button class="basebtn fl3" data-fl="sand" type="button" title="모래갯벌 — 맛조개·동죽·백합">모래</button>'
+              + '<button class="basebtn fl3" data-fl="mix" type="button" title="혼합갯벌 — 바지락·굴·박하지">펄+모래</button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(e){
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('fl3')){
+      var k = t.dataset.fl;
+      S.floors[k] = !S.floors[k];
+      t.classList.toggle('on', !!S.floors[k]);
+      applyFloor_();
+      try { flatDraw_(); legDraw_(); } catch(err){}
+      if (!S.rows.length) toast('이 지형은 지금 조건에 없습니다');
+      S._moved = false;
+      render();
+      return;
+    }
+    if (t && t.id === 'clBtn'){
+      CL_ON = !CL_ON;
+      t.className = 'basebtn cl' + (CL_ON ? ' on' : '');
+      if (CL_ON) toast(map.getZoom() < CL_MINZ ? '지도를 확대하면 해안 재질이 색으로 나옵니다'
+                                               : '노란색 모래 · 갈색 뻘 · 회청색 암반 · 주황색 방파제');
+      clVis_();
+      try { legDraw_(); } catch(err){}
+      try { localStorage.setItem('hrn_cl', CL_ON ? '1' : '0'); } catch(err){}
+    } else if (t && t.id === 'flBtn'){
+      FLAT_ON = !FLAT_ON;
+      t.className = 'basebtn fl' + (FLAT_ON ? ' on' : '');
+      if (FLAT_ON) toast('물 빠지면 드러나는 갯벌 — 갈색 펄, 노란색 모래');
+      flatVis_();
+      try { legDraw_(); } catch(err){}
+      try { localStorage.setItem('hrn_flat', FLAT_ON ? '1' : '0'); } catch(err){}
+    } else if (t && t.id === 'eoBtn'){
+      EO_ON = !EO_ON;
+      t.className = 'basebtn' + (EO_ON ? ' on' : '');
+      if (EO_ON && map.getZoom() < EO_MINZ) toast('지도를 확대하면 어장 구역이 보입니다');
+      eoVis_();
+      try { localStorage.setItem('hrn_eo', EO_ON ? '1' : '0'); } catch(err){}
+    } else if (t && t.id === 'ggBtn'){
+      GG_ON = !GG_ON;
+      t.className = 'basebtn gg' + (GG_ON ? ' on' : '');
+      if (GG_ON && map.getZoom() < GG_MINZ) toast('지도를 확대하면 갯골(물길)이 보입니다');
+      ggVis_();
+      try { localStorage.setItem('hrn_gg', GG_ON ? '1' : '0'); } catch(err){}
+    } else if (t && t.id === 'rkBtn'){
+      RK_ON = !RK_ON;
+      t.className = 'basebtn rk' + (RK_ON ? ' on' : '');
+      if (RK_ON && map.getZoom() < RK_MINZ) toast('지도를 확대하면 갯바위가 보입니다');
+      rkVis_();
+      try { localStorage.setItem('hrn_rk', RK_ON ? '1' : '0'); } catch(err){}
+    } else if (t && t.id === 'acBtn'){
+      AC_ON = !AC_ON;
+      t.className = 'basebtn ac' + (AC_ON ? ' on' : '');
+      if (AC_ON) toast('붉을수록 인명사고 잦은 구역입니다 — 안전 참고');
+      acVis_();
+      try { localStorage.setItem('hrn_ac', AC_ON ? '1' : '0'); } catch(err){}
+    }
+  });
+  try { if (localStorage.getItem('hrn_cl') === '1'){ CL_ON = true; d.querySelector('#clBtn').className = 'basebtn cl on'; clVis_(); } } catch(e){}
+  try { if (localStorage.getItem('hrn_flat') === '0'){ FLAT_ON = false; d.querySelector('#flBtn').className = 'basebtn fl'; } } catch(e){}
+  try { if (localStorage.getItem('hrn_eo') === '0'){ EO_ON = false; d.querySelector('#eoBtn').className = 'basebtn'; } } catch(e){}
+  try { if (localStorage.getItem('hrn_gg') === '1'){ GG_ON = true; d.querySelector('#ggBtn').className = 'basebtn gg on'; ggVis_(); } } catch(e){}
+  try { var rkv = localStorage.getItem('hrn_rk');
+        if (rkv === '0' && RK_ON){ RK_ON = false; d.querySelector('#rkBtn').className = 'basebtn rk'; }
+        else if (rkv === '1' && !RK_ON){ RK_ON = true; d.querySelector('#rkBtn').className = 'basebtn rk on'; rkVis_(); } } catch(e){}
+  try { if (localStorage.getItem('hrn_ac') === '1'){ AC_ON = true; d.querySelector('#acBtn').className = 'basebtn ac on'; acVis_(); } } catch(e){}
+  return d;
+};
+eoCtl.addTo(map);
+
+/* 핀 — 원은 좌표 위에 뜨고, 꼬리 끝과 흰 점이 실제 좌표를 가리킨다.
+   iconAnchor 의 세로값 = 원 높이 + 꼬리 + 점까지의 거리 */
+var PIN_TAIL = 13, PIN_TAIL_SM = 10;
+function pinIcon(r, isTop, small){
+  var w = small ? 26 : 38, tail = small ? PIN_TAIL_SM : PIN_TAIL;
+  return L.divIcon({
+    className: '',
+    html: '<div class="pin '+(tideOnly_()?'pin-tide':'pin-'+r.grade)+(small?' sm':'')+(isTop&&!tideOnly_()?' pin-top':'')+'" style="position:relative">'
+        + (tideOnly_() ? '≈' : r.score) + (isTop && !tideOnly_() ? '<i class="halo"></i>' : '') + '</div>',
+    iconSize: [w, w + tail],
+    iconAnchor: [w/2, w + tail]
+  });
+}
+function drawPins(){
+  Object.keys(S.markers).forEach(function(k){ map.removeLayer(S.markers[k]); });
+  S.markers = {};
+  var z = map.getZoom();
+  var placed = [];                       // 큰 핀이 이미 차지한 화면 좌표
+  /* 낮은 배율에서는 자리 다툼에서 밀린 핀을 아예 생략한다 — 첫 화면이 깔끔해야 한다.
+     rows 는 점수순이라 남는 핀이 곧 그 동네 1등이고, 확대하면 다 나온다. */
+  var MIN  = z >= 11 ? 0 : (z >= 9 ? 40 : 52);
+  var HIDE = z < 10;                     // 겹침 시 생략(저배율) / 작게 표시(고배율)
+  var fv = favs();
+  /* 화면 밖 핀은 아예 만들지 않는다. 예전엔 전국 600곳을 매번 다시 만들며 서로 겹치는지까지
+     견줘서, 확대할 때마다 휴대폰이 1초 가까이 멈췄다. */
+  var vb = map.getBounds().pad(0.35);
+  S.rows.forEach(function(r, idx){
+    if (idx > 0 && !vb.contains([r.la, r.lo])) return;
+    var pt = map.latLngToLayerPoint([r.la, r.lo]);
+    var small = false;
+    for (var k=0;k<placed.length;k++){
+      var dx = placed[k].x - pt.x, dy = placed[k].y - pt.y;
+      if (dx*dx + dy*dy < MIN*MIN){ small = true; break; }
+    }
+    if (small && HIDE && fv.indexOf(r.i) < 0) return;   // 즐겨찾기는 항상 보인다
+    if (!small) placed.push(pt);
+    var m = L.marker([r.la, r.lo], { icon: pinIcon(r, idx === 0, small), zIndexOffset: 1000 - idx });
+    m.on('click', function(){ openDetail(r.i); });
+    m.addTo(map);
+    S.markers[r.i] = m;
+  });
+}
+var PIN_T = 0;
+map.on('zoomend moveend', function(){
+  /* 화면 밖 핀을 생략하므로 옮긴 뒤에도 다시 그려야 새 자리 핀이 나온다. 연달아 부르지 않게 묶는다. */
+  clearTimeout(PIN_T);
+  PIN_T = setTimeout(function(){ if (S.rows.length) drawPins(); }, 120);
+});
+
+/* ══════════════ 해경 출입통제구역 오버레이 ══════════════
+ * 연안사고예방법 제10조 출입통제 장소 — 위반 시 100만원 이하 과태료(제25조).
+ * 공고 좌표(poly)는 붉은 다각형, 위치가 대략적인 곳(est)은 점선 원으로 그린다. */
+var ZONE_LAYER = L.layerGroup().addTo(map);
+var ZONE_STYLE = { color:'#e0563a', weight:1.6, opacity:.85, fillColor:'#e0563a', fillOpacity:.16 };
+var ZONE_STYLE_EST = { color:'#ff7f5a', weight:1.4, opacity:.7, dashArray:'5 4', fillColor:'#e0563a', fillOpacity:.08 };
+var ZONE_STYLE_KK = { color:'#e0563a', weight:1.8, opacity:.9, fillColor:'#e0563a', fillOpacity:.18 };
+var ZONE_STYLE_KE = { color:'#ff7f5a', weight:1.6, opacity:.8, dashArray:'5 4', fillColor:'#e0563a', fillOpacity:.1 };
+function zonePopup_(z){
+  return '<div style="max-width:230px;line-height:1.5">'
+    + '<b style="color:#e0563a">⛔ 출입통제구역</b><br><b>' + z.n + '</b>'
+    + '<br><span style="color:#666">' + (z.g || '') + '</span>'
+    + (z.period ? '<br>통제: ' + z.period : '')
+    + (z.why ? '<br>사유: ' + z.why : '')
+    + '<br><b style="color:#e0563a">위반 시 100만원 이하 과태료</b> <span style="color:#888">(연안사고예방법)</span>'
+    + (z.est ? '<br><span style="color:#ffb08a">※ 표시 위치는 대략적입니다 — 현장 안내판을 확인하세요</span>' : '')
+    + '</div>';
+}
+function drawZones_(list){
+  ZONE_LAYER.clearLayers();
+  (list || []).forEach(function(z){
+    if (!z || !z.la || !z.lo) return;
+    var zs  = brightMap_() ? ZONE_STYLE_KK : ZONE_STYLE;
+    var zse = brightMap_() ? ZONE_STYLE_KE : ZONE_STYLE_EST;
+    var sh = (z.poly && z.poly.length >= 3)
+      ? L.polygon(z.poly, zs)
+      : L.circle([z.la, z.lo], Object.assign({ radius: 400 }, z.est ? zse : zs));
+    sh.bindTooltip('⛔ ' + z.n, { direction:'top', opacity:.9 });
+    sh.bindPopup(zonePopup_(z));
+    sh.addTo(ZONE_LAYER);
+  });
+}
+function loadZones_(){
+  if (loadZones_._done) return; loadZones_._done = true;
+  try {
+    google.script.run.withSuccessHandler(function(zs){
+      if (zs && zs.length) drawZones_(zs);
+    }).apiZones();
+  } catch(e){}
+}
+
+/* ══════════════ 어장 오버레이 — 국립해양조사원 어장정보도 2025 ══════════════
+ * 면허어장 지적 1만4천여 개. 해루질꾼에게 제일 중요한 건 마을어업 구역이다 —
+ * 어촌계가 관리하는 수역이라 조개·해조류를 캐면 수산업법 위반(어업권 침해)이 된다.
+ * 전국 4MB 를 0.5도 격자 54조각으로 쪼개 두고, 확대했을 때 보이는 조각만 받는다. */
+var EO_RENDER = L.canvas({ padding: .3 });          // 폴리곤이 많아 캔버스로 그린다
+var EO_LAYER  = L.featureGroup().addTo(map);
+var EO_ON = true, EO_MINZ = PHONE ? 11 : 10;
+var EO_IDX = null, EO_CELL = {};                     // 셀 캐시: 'y|x' → 도형 배열|'loading'
+var EO_STYLE = {
+  M: { c:'#ff7f5a', fo:.20 },   // 마을어업 — 경고색
+  P: { c:'#1fc4c0', fo:.12 },   // 패류양식
+  H: { c:'#2ee6a8', fo:.12 },   // 해조류양식
+  Y: { c:'#b5cad8', fo:.12 },   // 기타 양식
+  J: { c:'#1fc4c0', fo:.12 }    // 정치망
+};
+/* 밝은 지도(카카오) 위에서는 더 진한 색을 쓴다 */
+var EO_STYLE_K = {
+  M: { c:'#e0563a', fo:.24 },
+  P: { c:'#0fb98a', fo:.16 },
+  H: { c:'#0fb98a', fo:.16 },
+  Y: { c:'#8ba6b8', fo:.16 },
+  J: { c:'#0fb98a', fo:.16 }
+};
+function brightMap_(){ return document.body.classList.contains('map-kakao'); }
+function eoStyleOf_(k){ return (brightMap_() ? EO_STYLE_K : EO_STYLE)[k] || EO_STYLE.Y; }
+var EO_NAME = { M:'마을어업 (어촌계 관리수역)', P:'패류 양식장', H:'해조류 양식장', Y:'양식장', J:'정치망 어장' };
+function eoPopup_(f){
+  var s = '<div style="max-width:230px;line-height:1.5">'
+    + '<b style="color:' + eoStyleOf_(f.k).c + '">■ ' + EO_NAME[f.k] + '</b>';
+  if (f.f) s += '<br>품목: ' + f.f;
+  if (f.a) s += '<br>' + f.a;
+  if (f.ha) s += '<br>면적 ' + f.ha + 'ha';
+  if (f.e)  s += ' · 면허 ~' + f.e;
+  if (f.k === 'M')
+    s += '<br><b style="color:#ffa38a">여기서 조개·해조류를 캐면 안 됩니다</b>'
+       + '<br><span style="color:#888">어촌계 면허 수역 — 수산업법 위반(어업권 침해) 소지</span>';
+  else if (f.k === 'J')
+    s += '<br><span style="color:#888">그물이 설치된 수역입니다 — 가까이 가지 마세요</span>';
+  else
+    s += '<br><span style="color:#888">면허 양식장입니다 — 시설물·양식물에 손대면 안 됩니다</span>';
+  s += '<br><span style="color:#667">출처 국립해양조사원 어장정보도</span></div>';
+  return s;
+}
+function eoDrawCell_(key){
+  var feats = EO_CELL[key];
+  if (!feats || feats === 'loading' || feats._drawn) return;
+  feats._drawn = true;
+  feats.forEach(function(f){
+    (f.p || []).forEach(function(ring){
+      var st = eoStyleOf_(f.k);
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color: st.c, weight: brightMap_() ? 1.2 : 1,
+                                 opacity: brightMap_() ? .75 : .55, fillColor: st.c, fillOpacity: st.fo });
+      pg._eo = f;
+      pg.addTo(EO_LAYER);
+    });
+  });
+}
+function eoRefresh_(){
+  if (!EO_ON || map.getZoom() < EO_MINZ){ return; }
+  var load = function(){
+    if (!EO_IDX || !EO_IDX.cells) return;
+    var b = map.getBounds();
+    EO_IDX.cells.forEach(function(c){
+      if (c.y > b.getNorth() || c.y + .5 < b.getSouth()) return;
+      if (c.x > b.getEast()  || c.x + .5 < b.getWest())  return;
+      var key = c.y + '|' + c.x;
+      if (EO_CELL[key]){ eoDrawCell_(key); return; }
+      EO_CELL[key] = 'loading';
+      fetch('data/eo/' + c.f).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j){ EO_CELL[key] = j; eoDrawCell_(key); } else delete EO_CELL[key]; })
+        .catch(function(){ delete EO_CELL[key]; });
+    });
+  };
+  if (EO_IDX){ load(); return; }
+  if (EO_IDX === 'loading') return;
+  EO_IDX = 'loading';
+  fetch('data/eo/index.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ EO_IDX = j || {cells:[]}; load(); })
+    .catch(function(){ EO_IDX = {cells:[]}; });
+}
+function eoVis_(){
+  var show = EO_ON && map.getZoom() >= EO_MINZ;
+  if (show){ if (!map.hasLayer(EO_LAYER)) EO_LAYER.addTo(map); eoRefresh_(); }
+  else { if (map.hasLayer(EO_LAYER)) map.removeLayer(EO_LAYER); }
+}
+map.on('moveend zoomend', eoVis_);
+
+/* ══════════════ 해안선 재질 — 모래·자갈·암반·뻘·절벽·방파제 ══════════════
+ * 국립해양조사원 배포용 해안선은 구간마다 재질이 붙어 있다(CSLN_KND).
+ * 「여기 바닥이 뭔가」는 뭘 잡을지, 뭘 신고 갈지를 결정한다 — 색으로 바로 읽히게 그린다.
+ * 0.25도 조각으로 나눠 보이는 데만 받는다. */
+var CL_LAYER = L.featureGroup(), CL_ON = false, CL_MINZ = 11, CL_IDX = null, CL_CELL = {};
+var CL_KIND = {
+  mud:    { c:'#8a6a45', w:4.2, d:null,      ko:'뻘 해안',   t:'낙지·가무락·칠게 — 발이 깊이 빠진다' },
+  mudsand:{ c:'#c2a06d', w:4,   d:'12 5',    ko:'뻘+모래 해안', t:'바지락·백합·낙지가 섞여 나온다' },
+  sand:   { c:'#f2dfa6', w:4,   d:null,      ko:'모래 해안', t:'맛조개·동죽·백합 — 갯벌화가 편하다' },
+  sandgv: { c:'#e0c98f', w:3.6, d:'9 4 2 4', ko:'모래+자갈 해안', t:'고둥·게, 물가에 미역·톳' },
+  gravel: { c:'#9fb3c2', w:3.6, d:'2 5',     ko:'자갈 해안', t:'고둥·거북손 — 미끄러우니 조심' },
+  rock:   { c:'#5b7a90', w:4.2, d:null,      ko:'암반 해안', t:'굴·홍합·거북손, 갯바위 낚시 자리' },
+  cliff:  { c:'#6d8ba1', w:5,   d:'3 3',     ko:'절벽 해안', t:'접근 자체가 위험 — 위에서 내려가지 말 것' },
+  art:    { c:'#d8dde2', w:3.4, d:'7 6',     ko:'인공 해안(방파제·부두)', t:'낚시 자리 — 해루질 바닥은 아니다' },
+  flat:   { c:'#7d919f', w:2.4, d:'1 6',     ko:'평탄 해안', t:'재질이 안 잡힌 곳 — 앞바다 갯벌 색을 함께 보세요' }
+};
+function clPop_(k){
+  var d = CL_KIND[k] || CL_KIND.flat;
+  return '<div style="max-width:220px;line-height:1.5"><b style="color:' + d.c + '">— ' + d.ko + '</b>'
+    + '<br>' + d.t + '<br><span style="color:#888">출처 국립해양조사원 배포용 해안선</span></div>';
+}
+function clDrawCell_(key){
+  var fs = CL_CELL[key];
+  if (!fs || fs === 'loading' || fs._drawn) return;
+  fs._drawn = true;
+  var bright = brightMap_();
+  fs.forEach(function(it){
+    var d = CL_KIND[it[0]] || CL_KIND.flat;
+    var ln = L.polyline(it[1], { renderer: EO_RENDER, color: d.c, weight: d.w,
+                                 dashArray: d.d || null,
+                                 opacity: bright ? 1 : .88, lineCap: d.d ? 'butt' : 'round', lineJoin:'round' });
+    ln._cl = it[0];
+    ln.addTo(CL_LAYER);
+  });
+}
+function clRefresh_(){
+  if (!CL_ON || map.getZoom() < CL_MINZ) return;
+  var load = function(){
+    if (!CL_IDX || !CL_IDX.cells) return;
+    var b = map.getBounds(), G = CL_IDX.grid || .25;
+    CL_IDX.cells.forEach(function(c){
+      if (c.y > b.getNorth() || c.y + G < b.getSouth()) return;
+      if (c.x > b.getEast()  || c.x + G < b.getWest())  return;
+      var key = c.y + '|' + c.x;
+      if (CL_CELL[key]){ clDrawCell_(key); return; }
+      CL_CELL[key] = 'loading';
+      fetch('data/cl/' + c.f).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j){ CL_CELL[key] = j; clDrawCell_(key); } else delete CL_CELL[key]; })
+        .catch(function(){ delete CL_CELL[key]; });
+    });
+  };
+  if (CL_IDX && CL_IDX !== 'loading'){ load(); return; }
+  if (CL_IDX === 'loading') return;
+  CL_IDX = 'loading';
+  fetch('data/cl/index.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ CL_IDX = j || {cells:[]}; load(); })
+    .catch(function(){ CL_IDX = {cells:[]}; });
+}
+function clVis_(){
+  var show = CL_ON && map.getZoom() >= CL_MINZ;
+  if (show){ if (!map.hasLayer(CL_LAYER)) CL_LAYER.addTo(map); clRefresh_(); }
+  else { if (map.hasLayer(CL_LAYER)) map.removeLayer(CL_LAYER); }
+}
+map.on('moveend zoomend', clVis_);
+
+/* ══════════════ 갯벌 범위 — 지형을 점이 아니라 면으로 ══════════════
+ * 핀 하나로는 「여기 갯벌」만 알 뿐, 어디까지 드러나고 어떤 바닥인지 알 수 없다.
+ * 국립해양조사원 조간대(간석지) 면을 250m 격자로 눌러, 펄·모래·혼합을 색으로 칠한다.
+ * 자료는 72KB 한 장이라 처음 켤 때 한 번만 받는다. */
+var FLAT_LAYER = L.featureGroup(), FLAT_ON = true, FLAT_DATA = null, FLAT_MINZ = PHONE ? 9 : 8;
+var FLAT_COL = {
+  mud:  { d:'#6f5133', l:'#4f3f2b', ko:'펄갯벌',  t:'낙지·가무락·칠게가 붙는 바닥' },
+  sand: { d:'#f5e3a8', l:'#c9a54e', ko:'모래갯벌', t:'맛조개·동죽·백합이 나오는 바닥' },
+  mix:  { d:'#c08f57', l:'#a17342', ko:'혼합갯벌', t:'바지락·굴·박하지가 섞여 나온다' }
+};
+function flatPop_(f){
+  var c = FLAT_COL[f] || FLAT_COL.mix;
+  return '<div style="max-width:220px;line-height:1.5"><b style="color:' + c.l + '">▨ ' + c.ko + '</b>'
+    + '<br>' + c.t
+    + '<br><span style="color:#888">물이 빠지면 드러나는 구역 · 출처 국립해양조사원 조간대 자료</span></div>';
+}
+function flatDraw_(){
+  FLAT_LAYER.clearLayers();
+  if (!FLAT_DATA || !FLAT_DATA.r) return;
+  var G = FLAT_DATA.g || .0025, bright = brightMap_();
+  var on = Object.keys(S.floors || {}).filter(function(k){ return S.floors[k]; });
+  var b = map.getBounds(), z = map.getZoom();
+  /* 화면 밖 여유폭. 예전엔 낮은 배율에서 1.2도(화면의 몇 배)까지 그려서 사각형 수천 개가
+     매번 새로 만들어졌다. 화면 한 뼘만 더 그리면 끊김 없이 충분하다. */
+  var pad = z >= 11 ? .12 : (z >= 9 ? .25 : .45);
+  var s0 = b.getSouth()-pad, n0 = b.getNorth()+pad, w0 = b.getWest()-pad, e0 = b.getEast()+pad;
+  Object.keys(FLAT_DATA.r).forEach(function(f){
+    var c = FLAT_COL[f] || FLAT_COL.mix;
+    /* 지형 칩을 켰으면 고른 지형만 진하게, 나머지는 흐리게 깔아 견줄 수 있게 한다 */
+    var dim = on.length && on.indexOf(f) < 0;
+    var col = bright ? c.l : c.d;
+    FLAT_DATA.r[f].forEach(function(q){
+      var y = q[0]*G, x = q[1]*G, w = q[2]*G;
+      if (y > n0 || y+G < s0 || x > e0 || x+w < w0) return;
+      var pg = L.rectangle([[y, x],[y+G, x+w]], {
+        renderer: EO_RENDER,
+        stroke: !dim, color: col, weight: 1, opacity: dim ? 0 : (bright ? .5 : .38),
+        fillColor: col, fillOpacity: dim ? .1 : (bright ? .5 : .42)
+      });
+      pg._ft = f;                        // 설명창은 눌렀을 때 만든다 (사각형이 1만 개다)
+      pg.addTo(FLAT_LAYER);
+    });
+  });
+}
+FLAT_LAYER.on('click', function(e){
+  var l = e.layer || e.target;
+  if (!l || !l._ft) return;
+  L.popup().setLatLng(e.latlng).setContent(flatPop_(l._ft)).openOn(map);
+});
+function flatVis_(){
+  var show = FLAT_ON && map.getZoom() >= FLAT_MINZ;
+  if (!show){ if (map.hasLayer(FLAT_LAYER)) map.removeLayer(FLAT_LAYER); return; }
+  if (!map.hasLayer(FLAT_LAYER)){ FLAT_LAYER.addTo(map); try { FLAT_LAYER.eachLayer(function(l){ if(l.bringToBack) l.bringToBack(); }); } catch(e){} }
+  if (FLAT_DATA === 'loading') return;
+  if (!FLAT_DATA){
+    FLAT_DATA = 'loading';
+    fetch('data/flat.json').then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ FLAT_DATA = j || {r:{}}; flatDraw_(); })
+      .catch(function(){ FLAT_DATA = {r:{}}; });
+    return;
+  }
+  flatDraw_();
+}
+map.on('moveend zoomend', flatVis_);
+setTimeout(function(){ try { flatVis_(); } catch(e){} }, 400);   /* 첫 화면에도 갯벌이 깔리게 */
+
+/* ══════════════ 갯골 오버레이 — 개방해 갯골(상세) 4만6천여 개 ══════════════
+ * 갯벌 고립사고의 주범. 밀물 때 갯골부터 물이 차서 퇴로가 끊긴다.
+ * 12레벨 이상 확대했을 때 보이는 0.25도 조각만 받는다. */
+var GG_LAYER = L.featureGroup();
+var GG_ON = false, GG_MINZ = 13;   // 자료가 12MB로 가장 무겁다 — 기본은 접어 두고 단추로 켠다
+var GG_IDX = null, GG_CELL = {};
+var GG_POP = '<div style="max-width:210px;line-height:1.5"><b style="color:#a4e9d4">〰 갯골(물길)</b>'
+  + '<br>밀물 때 이곳부터 물이 찹니다 — <b style="color:#ffa38a">갯골 건너편에 있으면 퇴로가 끊깁니다</b>.'
+  + '<br><span style="color:#888">들어가기 전에 돌아올 길에 갯골이 없는지 확인하세요 · 출처 국립해양조사원</span></div>';
+function ggDrawCell_(key){
+  var feats = GG_CELL[key];
+  if (!feats || feats === 'loading' || feats._drawn) return;
+  feats._drawn = true;
+  feats.forEach(function(rings){
+    rings.forEach(function(ring){
+      var gc = brightMap_() ? '#0fb98a' : '#1fc4c0';
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color: gc, weight: brightMap_() ? 1.2 : 1,
+                                 opacity: brightMap_() ? .8 : .65, fillColor: gc,
+                                 fillOpacity: brightMap_() ? .28 : .22 });
+      pg._gg = 1;
+      pg.addTo(GG_LAYER);
+    });
+  });
+}
+function ggRefresh_(){
+  if (!GG_ON || map.getZoom() < GG_MINZ) return;
+  var load = function(){
+    if (!GG_IDX || !GG_IDX.cells) return;
+    var b = map.getBounds(), G = GG_IDX.grid || .25;
+    GG_IDX.cells.forEach(function(c){
+      if (c.y > b.getNorth() || c.y + G < b.getSouth()) return;
+      if (c.x > b.getEast()  || c.x + G < b.getWest())  return;
+      var key = c.y + '|' + c.x;
+      if (GG_CELL[key]){ ggDrawCell_(key); return; }
+      GG_CELL[key] = 'loading';
+      fetch('data/gg/' + c.f).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j){ GG_CELL[key] = j; ggDrawCell_(key); } else delete GG_CELL[key]; })
+        .catch(function(){ delete GG_CELL[key]; });
+    });
+  };
+  if (GG_IDX && GG_IDX !== 'loading'){ load(); return; }
+  if (GG_IDX === 'loading') return;
+  GG_IDX = 'loading';
+  fetch('data/gg/index.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ GG_IDX = j || {cells:[]}; load(); })
+    .catch(function(){ GG_IDX = {cells:[]}; });
+}
+function ggVis_(){
+  var show = GG_ON && map.getZoom() >= GG_MINZ;
+  if (show){ if (!map.hasLayer(GG_LAYER)) GG_LAYER.addTo(map); ggRefresh_(); }
+  else { if (map.hasLayer(GG_LAYER)) map.removeLayer(GG_LAYER); }
+}
+map.on('moveend zoomend', ggVis_);
+
+/* ══════════════ 갯바위 오버레이 — 개방해 갯바위 9,959개 (낚시 지형) ══════════════ */
+var RK_LAYER = L.featureGroup();
+var RK_ON = !PHONE, RK_MINZ = 11;
+var RK_IDX = null, RK_CELL = {};
+var RK_POP = '<div style="max-width:200px;line-height:1.5"><b style="color:#ffb08a">▲ 갯바위</b>'
+  + '<br>파도가 만든 자연 바위 지대 — 우럭·놀래미·감성돔이 붙는 자리입니다.'
+  + '<br><span style="color:#ffa38a">미끄럼·너울 주의, 구명조끼 필수</span>'
+  + '<br><span style="color:#667">출처 국립해양조사원</span></div>';
+function rkDrawCell_(key){
+  var feats = RK_CELL[key];
+  if (!feats || feats === 'loading' || feats._drawn) return;
+  feats._drawn = true;
+  feats.forEach(function(rings){
+    rings.forEach(function(ring){
+      var rc = brightMap_() ? '#e0563a' : '#ffb08a';
+      var pg = L.polygon(ring, { renderer: EO_RENDER, color: rc, weight: 1.5,
+                                 opacity: .85, fillColor: rc,
+                                 fillOpacity: brightMap_() ? .38 : .28 });
+      pg._rk = 1;
+      pg.addTo(RK_LAYER);
+    });
+  });
+}
+function rkRefresh_(){
+  if (!RK_ON || map.getZoom() < RK_MINZ) return;
+  var load = function(){
+    if (!RK_IDX || !RK_IDX.cells) return;
+    var b = map.getBounds(), G = RK_IDX.grid || .25;
+    RK_IDX.cells.forEach(function(c){
+      if (c.y > b.getNorth() || c.y + G < b.getSouth()) return;
+      if (c.x > b.getEast()  || c.x + G < b.getWest())  return;
+      var key = c.y + '|' + c.x;
+      if (RK_CELL[key]){ rkDrawCell_(key); return; }
+      RK_CELL[key] = 'loading';
+      fetch('data/rk/' + c.f).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j){ RK_CELL[key] = j; rkDrawCell_(key); } else delete RK_CELL[key]; })
+        .catch(function(){ delete RK_CELL[key]; });
+    });
+  };
+  if (RK_IDX && RK_IDX !== 'loading'){ load(); return; }
+  if (RK_IDX === 'loading') return;
+  RK_IDX = 'loading';
+  fetch('data/rk/index.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ RK_IDX = j || {cells:[]}; load(); })
+    .catch(function(){ RK_IDX = {cells:[]}; });
+}
+function rkVis_(){
+  var show = RK_ON && map.getZoom() >= RK_MINZ;
+  if (show){ if (!map.hasLayer(RK_LAYER)) RK_LAYER.addTo(map); rkRefresh_(); }
+  else { if (map.hasLayer(RK_LAYER)) map.removeLayer(RK_LAYER); }
+}
+map.on('moveend zoomend', rkVis_);
+
+
+/* 설명창은 도형마다 미리 만들지 않는다 — 수만 개가 되면 그것만으로 휴대폰이 멈춘다.
+   겹 하나에 클릭 처리 하나를 달고, 눌린 도형이 무엇인지 보고 그때 만든다. */
+function popOnce_(layer, get){
+  layer.on('click', function(e){
+    var l = e.layer || e.target, html = get(l);
+    if (!html) return;
+    L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+  });
+}
+popOnce_(EO_LAYER, function(l){ return l._eo ? eoPopup_(l._eo) : ''; });
+popOnce_(CL_LAYER, function(l){ return l._cl ? clPop_(l._cl) : ''; });
+popOnce_(GG_LAYER, function(l){ return l._gg ? GG_POP : ''; });
+popOnce_(RK_LAYER, function(l){ return l._rk ? RK_POP : ''; });
+
+/* ══════════════ 연안 인명사고 히트맵 — 개방해 인명사고(2025) 2만여 건 ══════════════
+ * 안전 정보이자 B2G·보험 상품의 근거. 위험도 = 건수 + 사망·실종 가중. 기본은 꺼둔다(원하면 켜기). */
+var AC_LAYER = L.layerGroup();
+var AC_ON = false, AC_LOADED = false, AC_DATA = null;
+function acRisk_(c){ return c.n + (c.d + c.m) * 4; }        // 사망·실종은 4배 가중
+function acColor_(r){ return r >= 40 ? '#e0563a' : r >= 18 ? '#e0563a' : r >= 8 ? '#ff7f5a' : '#ffb08a'; }
+function acDraw_(){
+  AC_LAYER.clearLayers();
+  if (!AC_DATA) return;
+  var z = map.getZoom();
+  AC_DATA.cells.forEach(function(c){
+    var r = acRisk_(c);
+    if (z < 9 && r < 8) return;                 // 낮은 배율에선 위험한 곳만
+    var rad = Math.min(1400, 300 + r * 22);
+    var col = acColor_(r);
+    var pg = L.circle([c.la, c.lo], { radius: rad, renderer: EO_RENDER,
+      color: col, weight: 0, fillColor: col, fillOpacity: .22 });
+    pg.bindPopup('<div style="line-height:1.5"><b style="color:#e0563a">⚠ 연안 인명사고 다발</b>'
+      + '<br>이 2km 구역 누적 <b>' + c.n + '건</b>'
+      + (c.d ? ' · 사망 <b style="color:#e0563a">' + c.d + '명</b>' : '')
+      + (c.m ? ' · 실종 <b style="color:#e0563a">' + c.m + '명</b>' : '')
+      + '<br>주 유형: ' + c.t
+      + '<br><span style="color:#888">출처 국립해양조사원 인명사고(2025)</span></div>');
+    pg.addTo(AC_LAYER);
+  });
+}
+function acVis_(){
+  if (AC_ON){
+    if (!map.hasLayer(AC_LAYER)) AC_LAYER.addTo(map);
+    if (!AC_LOADED){
+      AC_LOADED = true;
+      fetch('data/accidents.json').then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ AC_DATA = j; acDraw_(); }).catch(function(){});
+    } else acDraw_();
+  } else { if (map.hasLayer(AC_LAYER)) map.removeLayer(AC_LAYER); }
+}
+map.on('moveend zoomend', function(){ if (AC_ON) acDraw_(); });
+
+/* ══════════════ 낚시금지·제한구역 — 낚시 관리 및 육성법 ══════════════ */
+var NF_LAYER = L.layerGroup().addTo(map);
+function nfPopup_(z){
+  return '<div style="max-width:220px;line-height:1.5">'
+    + '<b style="color:#ff7f5a">🚫 낚시' + z.t + '구역</b><br><b>' + (z.n || '') + '</b>'
+    + (z.a ? '<br><span style="color:#666">' + z.a + '</span>' : '')
+    + '<br>낚시 관리 및 육성법에 따른 ' + z.t + ' 구역입니다'
+    + (z.t === '금지' ? ' — <b style="color:#ffa38a">여기서 낚시하면 과태료</b>' : '')
+    + '<br><span style="color:#667">출처 국립해양조사원</span></div>';
+}
+function loadNofish_(){
+  if (loadNofish_._done) return; loadNofish_._done = true;
+  fetch('data/nofish.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if (!j || !j.list) return;
+      j.list.forEach(function(z){
+        (z.p || []).forEach(function(ring){
+          var fc = brightMap_() ? '#e0563a' : '#ff7f5a';
+          var pg = L.polygon(ring, { renderer: EO_RENDER, color: fc, weight: 1.4,
+                                     opacity: .85, fillColor: fc, fillOpacity: brightMap_() ? .2 : .18 });
+          pg.bindTooltip('🚫 낚시' + z.t + (z.n ? ' · ' + z.n : ''), { direction:'top', opacity:.9 });
+          pg.bindPopup(nfPopup_(z));
+          pg.addTo(NF_LAYER);
+        });
+      });
+    }).catch(function(){});
+}
+
+/* ══════════════ 데이터 ══════════════ */
+
+/* ══════════════ 주소로 바로 들어오기 ══════════════
+ * 유튜버가 "영흥도 편" 영상에 링크를 걸면 그 지점이 바로 열려야 한다.
+ * 홈으로만 보내면 사용자가 직접 찾아야 하고, 대부분 거기서 이탈한다.
+ *   ?spot=151        지점 상세 바로 열기
+ *   ?sp=낙지         그 대상을 노릴 수 있는 자리만 추려서 보기
+ *   ?d=2026-08-30    날짜 지정
+ *   ?ref=haeru_tv    레퍼럴 코드 (기존)
+ * 해시 형태도 받는다: #/spot/151 · #/species/낙지
+ */
+function parseRoute_(){
+  var q = {};
+  (location.search || '').replace(/^\?/, '').split('&').forEach(function(kv){
+    if (!kv) return;
+    var i = kv.indexOf('=');
+    var k = i < 0 ? kv : kv.slice(0, i);
+    var v = i < 0 ? '' : kv.slice(i + 1).replace(/\+/g, ' ');
+    try { q[k] = decodeURIComponent(v); } catch(e){ q[k] = v; }
+  });
+  var h = (location.hash || '').replace(/^#\/?/, '');
+  if (h){
+    var seg = h.split('/');
+    try {
+      if (seg[0] === 'spot' && seg[1]) q.spot = decodeURIComponent(seg[1]);
+      if ((seg[0] === 'species' || seg[0] === 'sp') && seg[1]) q.sp = decodeURIComponent(seg[1]);
+    } catch(e){}
+  }
+  return q;
+}
+
+/* 주소를 지금 보고 있는 화면에 맞춘다 — 뒤로가기로 상세가 닫히게 한다 */
+function pushRoute_(kind, val){
+  if (!window.history || !history.pushState) return;
+  var ref = '';
+  try { var rj = JSON.parse(localStorage.getItem('hrn_ref') || 'null'); if (rj && rj.c) ref = rj.c; } catch(e){}
+  var qs = [];
+  if (kind === 'spot' && val) qs.push('spot=' + encodeURIComponent(val));
+  if (kind === 'sp' && val)   qs.push('sp=' + encodeURIComponent(val));
+  if (S.ds && S.ds !== todayStr_()) qs.push('d=' + S.ds);
+  if (ref) qs.push('ref=' + encodeURIComponent(ref));
+  var url = location.pathname + (qs.length ? '?' + qs.join('&') : '');
+  try { history.pushState({ k: kind, v: val }, '', url); } catch(e){}
+}
+
+/* 지금 화면의 공유 주소 */
+function shareUrl_(kind, val){
+  var ref = '';
+  try { var rj = JSON.parse(localStorage.getItem('hrn_ref') || 'null'); if (rj && rj.c) ref = rj.c; } catch(e){}
+  var qs = [];
+  if (kind === 'spot' && val) qs.push('spot=' + encodeURIComponent(val));
+  if (kind === 'sp' && val)   qs.push('sp=' + encodeURIComponent(val));
+  if (ref) qs.push('ref=' + encodeURIComponent(ref));
+  return location.origin + location.pathname + (qs.length ? '?' + qs.join('&') : '');
+}
+
+/* 첫 로딩이 끝난 뒤 주소대로 화면을 연다 */
+function applyRoute_(){
+  var q = parseRoute_();
+  if (q.sp && !S.want){
+    S.want = q.sp;
+    if (typeof renderWant === 'function') try { renderWant(); } catch(e){}
+  }
+  if (q.spot){
+    var id = parseInt(q.spot, 10);
+    if (!isNaN(id)) setTimeout(function(){ openDetail(id); }, 260);
+  }
+}
+
+function load(){
+  if (S.loading) return;
+  S.loading = true;
+  $('btnReload').classList.add('spin');
+  renderSkeleton();
+  google.script.run
+    .withSuccessHandler(function(res){
+      S.loading = false;
+      $('btnReload').classList.remove('spin');
+      $('boot').classList.add('hide');
+      if (!res || !res.rows){ toast('데이터를 불러오지 못했습니다'); return; }
+      if (res.empty || !res.rows.length){
+        S.rowsAll = []; S.rows = []; render();
+        toast(res.msg || '조건에 맞는 자리가 없습니다', 3200);
+        return;
+      }
+      S.rowsAll = res.rows;
+      applyFloor_();
+      S.shown = res.shown; S.total = res.total;
+      S.gen = res.generated;
+      render();
+      loadZones_();
+      loadNofish_();
+      if (FEED === null) loadFeed_(); else buildTicker_();
+      if (!S._routed){ S._routed = true; applyRoute_(); }
+    })
+    .withFailureHandler(function(e){
+      S.loading = false;
+      $('btnReload').classList.remove('spin');
+      $('boot').classList.add('hide');
+      toast('오류: ' + (e && e.message ? e.message : '불러오기 실패'));
+    })
+    .apiBoard(S.ds, S.mode, {
+      want: S.want,
+      isl: S.filter === 'isl' || S.filter === 'car' ? true : (S.filter === 'land' ? false : null),
+      car: S.filter === 'car'
+    });
+}
+
+/* ══════════════ 렌더 ══════════════ */
+/* 시야를 그 바다 기준으로 읽어 준다.
+   서해에서 1.2m 는 아주 맑은 날이고, 제주에서 1.2m 는 흙탕물이다.
+   미터만 보여주면 서해 사람은 늘 「나쁨」만 보게 된다. */
+var VIS_BAND_UI = { W:[0.10, 2.0], S:[0.20, 5.0], E:[0.60, 12], J:[0.60, 12] };
+var SEA_KO = { W:'서해', S:'남해', E:'동해', J:'제주' };
+function visLabel_(v, sea, q, word){
+  var m = (v >= 1) ? (v.toFixed(1) + 'm') : (Math.round(v*100) + 'cm');
+  if (word) return '시야 ' + m + ' · ' + (SEA_KO[sea] || '') + ' 기준 ' + word;
+  var b = VIS_BAND_UI[sea];
+  if (!b) return '시야 ' + m;
+  var q2 = (Math.log(v) - Math.log(b[0])) / (Math.log(b[1]) - Math.log(b[0]));
+  var w = q2 >= 0.80 ? '최상' : q2 >= 0.60 ? '맑음' : q2 >= 0.38 ? '보통' : q2 >= 0.18 ? '탁함' : '거의 안 보임';
+  return '시야 ' + m + ' · ' + (SEA_KO[sea] || '') + ' 기준 ' + w;
+}
+function visQ_(v, sea){
+  if (v == null) return -1;
+  var b = VIS_BAND_UI[sea] || VIS_BAND_UI.S;
+  return Math.max(0, Math.min(1, (Math.log(v) - Math.log(b[0])) / (Math.log(b[1]) - Math.log(b[0]))));
+}
+
+function sorted(){
+  var a = S.rows.slice();
+  if (S.sort === 'near' && S.me){
+    a.forEach(function(r){ r._d = dist(S.me[0], S.me[1], r.la, r.lo); });
+    a.sort(function(x,y){ return x._d - y._d; });
+  } else if (S.sort === 'time'){
+    a.sort(function(x,y){
+      var xa = x.win ? x.win[0] : 99999, ya = y.win ? y.win[0] : 99999;
+      return xa - ya;
+    });
+  } else if (S.sort === 'vis'){
+    /* 미터로 줄을 세우면 늘 동해·제주가 위에 온다. 서해 사람에게는 쓸모가 없다.
+       「그 바다치고 오늘이 맑은 날인가」로 세운다. 시야를 못 낸 자리는 뒤로. */
+    a.sort(function(x,y){
+      var xq = (x.visQ != null) ? x.visQ : visQ_(x.vis, x.s);
+      var yq = (y.visQ != null) ? y.visQ : visQ_(y.vis, y.s);
+      return (yq - xq) || (y.raw - x.raw);
+    });
+  } else if (S.near && S.me){
+    /* 내 위치 모드의 추천순 — 거리로 최대 6점까지 깎아, 가까우면서 좋은 자리가 위로 온다 */
+    var sp = S.rad || 150;
+    a.sort(function(x,y){
+      return (y.raw - 6*Math.min(1,(y._d||0)/sp)) - (x.raw - 6*Math.min(1,(x._d||0)/sp));
+    });
+  } else {
+    a.sort(function(x,y){ return y.raw - x.raw; });
+  }
+  var f = favs();
+  if (f.length){
+    a.sort(function(x,y){ return (f.indexOf(y.i) >= 0 ? 1 : 0) - (f.indexOf(x.i) >= 0 ? 1 : 0); });
+  }
+  return a;
+}
+
+function syncPick(){
+  var open = $('sheet').classList.contains('open');
+  $('pick').classList.toggle('fade', open);
+  if (!pickClosed()) $('pickRestore').hidden = true;
+  else $('pickRestore').style.opacity = open ? '0' : '1';
+}
+
+/* ══════════ 속보 줄 ══════════
+   한 번에 한 건만 보여준다. 10분에 한 건씩, 하루 단위로 섞은 순서로
+   번갈아 나온다. 20건이면 한 바퀴가 약 3시간 20분 — 하루 종일 같은 줄이
+   붙어 있지 않고, 그렇다고 정신없이 흐르지도 않는다.
+   ① 제보  ② 위판 역산(항구에서 많이 잡히면 그 앞바다에 있다)  ③ 기사
+   자료가 하나도 없으면 오늘의 1~3위가 대신 돈다.                        */
+var FEED = null;
+
+function kmBetween_(la1, lo1, la2, lo2){
+  var R = 6371, d2r = Math.PI/180;
+  var dLa = (la2-la1)*d2r, dLo = (lo2-lo1)*d2r;
+  var a = Math.sin(dLa/2)*Math.sin(dLa/2)
+        + Math.cos(la1*d2r)*Math.cos(la2*d2r)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/** 위판 한 건 → 근처 지점 추천 문장 */
+function tickFromCatch_(c){
+  if (!c || !c.항구) return null;
+  var near = [];
+  if (c.la != null && c.lo != null && typeof POINTS !== 'undefined'){
+    var best = null, bd = 1e9;
+    for (var i = 0; i < POINTS.length; i++){
+      var d = kmBetween_(c.la, c.lo, POINTS[i].la, POINTS[i].lo);
+      if (d < bd){ bd = d; best = POINTS[i]; }
+    }
+    if (best && bd <= 40) near = [best];
+  }
+  var t = c.항구 + ' 위판에 ' + c.품목 + (c.양 ? ' ' + c.양 : '');
+  if (near.length)
+    return { tag:'위판', cls:'t-gi', text: t + ' — 근처 ' + near[0].n + ' 앞바다에 붙었다는 뜻', i: near[0].i };
+  return { tag:'위판', cls:'t-gi', text: t + ' — 그 앞바다가 살아 있습니다', i: null };
+}
+
+function tickerPool_(){
+  var pool = [];
+  if (FEED && FEED.제보) FEED.제보.forEach(function(r){
+    if (r && r.글) pool.push({ tag:'제보', cls:'t-bo',
+      text: (r.지점 ? r.지점 + ' · ' : '') + r.글, i: r.번호 || null });
+  });
+  if (FEED && FEED.위판) FEED.위판.forEach(function(c){
+    var t = tickFromCatch_(c); if (t) pool.push(t);
+  });
+  if (FEED && FEED.기사) FEED.기사.forEach(function(a){
+    if (a && a.제목) pool.push({ tag:'기사', cls:'t-gi',
+      text: '「' + a.제목 + '」' + (a.출처 ? ' — ' + a.출처 : ''),
+      i: a.번호 || null, url: a.url || null });
+  });
+  if (!pool.length && S.rows && S.rows.length){
+    S.rows.slice().sort(function(x,y){ return y.raw - x.raw; }).slice(0,3)
+      .forEach(function(r, k){
+        pool.push({ tag:(k+1)+'위', cls:'t-nu', text: r.n + ' ' + r.score + '점 — ' + (r.verdict||''), i: r.i });
+      });
+  }
+  return pool;
+}
+
+/** 하루 단위 고정 셔플 — 같은 날엔 누구나 같은 순서를 본다 */
+function dayShuffle_(arr){
+  var d = new Date(), seed = d.getFullYear()*372 + (d.getMonth()+1)*31 + d.getDate();
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--){
+    seed = (seed * 9301 + 49297) % 233280;
+    var j = Math.floor(seed / 233280 * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+var TK_SLOT_MIN = 10;
+function tickerShow_(){
+  var tk = $('ticker'), tr = $('tkTrack');
+  if (!tk || !tr) return;
+  var pool = dayShuffle_(tickerPool_());
+  if (!pool.length){ tk.hidden = true; document.body.classList.remove('has-ticker'); return; }
+  tk.hidden = false; document.body.classList.add('has-ticker');
+
+  var now = new Date();
+  var slot = Math.floor((now.getHours()*60 + now.getMinutes()) / TK_SLOT_MIN);
+  if (window.__tkSlot != null) slot = window.__tkSlot;      // 검증용
+  var it = pool[slot % pool.length];
+  if (tk._key === it.text) return;                          // 같은 건이면 그대로
+  tk._key = it.text;
+
+  var sp = el('span','tk-it' + ((it.i != null || it.url) ? ' go' : ''),
+    '<i class="tk-tag ' + it.cls + '">' + it.tag + '</i>' + it.text);
+  if (it.i != null) sp.onclick = function(){ openDetail(it.i); };
+  else if (it.url) sp.onclick = function(){ try { window.open(it.url, '_blank', 'noopener'); } catch(e){} };
+
+  tr.innerHTML = ''; tr.classList.add('still'); tr.appendChild(sp);
+  if (!NOMO){
+    sp.classList.add('tk-in');
+    /* 줄보다 길면 천천히 한 번 갔다 온다 — 목록 전체가 흐르는 게 아니라 이 한 건만 */
+    nextFrame_(function(){
+      var over = tr.scrollWidth - tr.parentNode.clientWidth;
+      if (over > 8){
+        tr.style.setProperty('--ov', over + 'px');
+        tr.style.animationDuration = Math.max(10, Math.round(over / 22)) + 's';
+        tr.classList.add('pong');
+      } else { tr.classList.remove('pong'); }
+    });
+  }
+}
+
+function buildTicker_(){
+  tickerShow_();
+  var tk = $('ticker');
+  if (tk && !tk._clock) tk._clock = setInterval(tickerShow_, 30000);   // 슬롯이 바뀌었나 30초마다 본다
+}
+
+function loadFeed_(){
+  try {
+    fetch('data/feed.json', { cache:'default' })
+      .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+      .then(function(j){ FEED = j; buildTicker_(); })
+      .catch(function(){ buildTicker_(); });
+  } catch(e){ buildTicker_(); }
+}
+
+function render(){
+  drawPins();
+  renderPick();
+  renderList();
+  /* 바람 오버레이가 켜져 있으면 날짜·데이터 갱신에 맞춰 다시 그린다 */
+  try { if (typeof WINDL !== 'undefined' && WINDL.on && typeof ensureWeather === 'function'){ ensureWeather(S.ds).then(function(){ windDraw_(); }).catch(function(){ windDraw_(); }); } } catch(e){}
+  try { if (typeof CURL !== 'undefined' && CURL.on) curDraw_(); } catch(e){}
+  $('tagline').textContent = tideOnly_()
+    ? '물때만 · 점수는 7일 이내 제공'
+    : (S.near
+        ? '내 주변 ' + (S.rad ? S.rad + 'km · ' : '') + S.rows.length + '곳'
+        : MODE_NAME[S.mode] + ' · ' + S.rows.length + '곳'
+          + (S.total && S.rows.length < S.total ? ' / ' + S.total : '') + ' 분석');
+  $('wantbar').hidden = !S.want;
+  $('pick').classList.toggle('hasWant', !!S.want);
+  if (S.want) $('wantbarT').textContent = S.want + ' 기준으로 순위를 냈습니다';
+  syncPick();
+  $('sheetFoot').innerHTML = (S.gen || '') + ' 기준 · 물때·조류 국립해양조사원 · 기상 Open-Meteo · 점수는 참고용이며 안전 판단은 직접 하세요'
+    + '<br><a href="calendar/" style="color:var(--acc);text-decoration:none;font-weight:700">📅 물때달력 무료 다운로드</a>'
+    + ' · <a href="tide/" style="color:var(--acc);text-decoration:none;font-weight:700">📍 지역별 물때</a>'
+    + ' · <a href="species/" style="color:var(--acc2);text-decoration:none">어종 도감</a>'
+    + ' · <a href="spot/" style="color:var(--acc2);text-decoration:none">전국 포인트 목록</a>'
+    + ' · <a href="method/" style="color:var(--acc2);text-decoration:none">계산 근거</a>'
+    + ' · <a href="partner/" style="color:var(--acc2);text-decoration:none">채널 제휴</a>'
+    + ' · <a href="business/" style="color:var(--acc2);text-decoration:none">업체 등록</a>'
+    + '<br>제휴·광고 문의 <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc);text-decoration:none">thecloudstay@gmail.com</a>'
+    + ' · <a href="#" id="redeemLink" style="color:var(--mut);text-decoration:underline">' + (isPremium() ? '프리미엄 이용 중' : '이용권 등록') + '</a>'
+    + ' · <a href="#" id="partnerLink" style="color:var(--mut);text-decoration:underline">파트너 모집</a>';
+  var rl = document.getElementById('redeemLink');
+  if (rl) rl.onclick = function(e){ e.preventDefault(); if (!isPremium()) openRedeem(); };
+  var pl = document.getElementById('partnerLink');
+  if (pl) pl.onclick = function(e){ e.preventDefault(); openPartner(); };
+}
+
+function renderPick(){
+  /* 내 위치 모드에서는 점수만 보지 않는다 — 반경 끝자락에서 한두 점 높은 자리보다
+     가까우면서 좋은 자리가 실제로 더 나은 선택이다. 거리는 최대 6점까지만 깎는다. */
+  var near = S.near && S.me;
+  var span = near ? (S.rad || 150) : 0;
+  var top = S.rows.slice().sort(function(a,b){
+    if (near) return (b.raw - 6*Math.min(1, (b._d||0)/span)) - (a.raw - 6*Math.min(1, (a._d||0)/span));
+    return b.raw - a.raw;
+  })[0];
+  if (!top){ $('pick').hidden = true; $('pickRestore').hidden = true; return; }
+  S.cur = top;
+  if (pickClosed()){ $('pick').hidden = true; $('pickRestore').hidden = false; $('pickRestore').classList.toggle('hasWant', !!S.want); }
+  else { $('pick').hidden = false; $('pickRestore').hidden = true; }
+  var TO = tideOnly_();
+  $('pickScore').textContent = TO ? '≈' : top.score;
+  $('pickRing').style.setProperty('--v', TO ? 0 : top.score);
+  $('pickRing').style.background = TO
+    ? 'conic-gradient(rgba(120,190,225,.4) 100%,rgba(255,255,255,.08) 0)'
+    : 'conic-gradient(var(--'+top.grade+') calc('+top.score+'*1%),rgba(255,255,255,.08) 0)';
+  $('pickName').textContent = top.n;
+  $('pickVerdict').textContent = TO
+    ? '물때만 보는 날짜입니다. 정확한 점수는 7일 이내만 제공됩니다 — 물때·진입/퇴로 시각만 참고하세요.'
+    : top.verdict;
+  var c = $('pickChips'); c.innerHTML = '';
+  c.appendChild(el('span','chip', top.r));
+  if (top._d != null) c.appendChild(el('span','chip hot',
+    '내 위치에서 ' + (top._d < 10 ? top._d.toFixed(1) : Math.round(top._d)) + 'km'));
+  c.appendChild(el('span','chip hot', top.mul + ' · 조차 ' + top.range + 'm'));
+  if (top.win) c.appendChild(el('span','chip hot', hm(top.win[0]) + '~' + hm(top.win[1])));
+  if (S.mode === 'haeru' && top.vis != null)
+    c.appendChild(el('span','chip', '시야 ' + (top.vis >= 1 ? top.vis.toFixed(1) + 'm' : Math.round(top.vis*100) + 'cm')));
+  if (S.mode === 'fish' && top.cur != null)
+    c.appendChild(el('span','chip', '조류 ' + top.cur.toFixed(1) + '노트'));
+  if (top.isl && top.fr) c.appendChild(el('span','chip', '배 ' + top.fr[0] + ' ' + top.fr[1] + '분'));
+  (top.targets||[]).slice(0,3).forEach(function(t){ c.appendChild(el('span','chip', t)); });
+  (top.banned||[]).slice(0,1).forEach(function(t){ c.appendChild(el('span','chip warn', t + ' 금어기')); });
+  if (top.warn && top.warn.length) c.appendChild(el('span','chip warn', top.warn[0]));
+  // 원픽 영상 자리 — 유튜버에게 주는 대가이자 나중의 광고 자리
+  var pv = $('pickVid');
+  if (!pv){
+    pv = el('a','pickvid'); pv.id = 'pickVid';
+    pv.target = '_blank';
+    $('pick').querySelector('.pick-inner').insertBefore(pv, $('pickCta'));
+  }
+  if (top.vid && top.vid.u){
+    var v = top.vid;
+    pv.hidden = false;
+    pv.href = v.u;
+    pv.rel = 'noopener' + (v.paid ? ' sponsored nofollow' : '');
+    pv.className = 'pickvid' + (v.paid ? ' paid' : '');
+    pv.innerHTML = (v.thumb ? '<img src="' + v.thumb + '" alt="" loading="lazy">' : '<span class="ph">▶</span>')
+      + '<span class="pv-t"><b>' + (v.t || (v.target + ' 잡는 법')) + '</b>'
+      + (v.ch ? '<i>' + v.ch + '</i>' : '') + '</span>'
+      + (v.paid ? '<em>광고</em>' : '');
+    pv.onclick = function(e){ e.stopPropagation(); refEvent('pickvid'); };
+  } else {
+    pv.hidden = true;
+  }
+
+  $('pickCta').onclick = function(){ openDetail(top.i); };
+  var bd = $('pick').querySelector('.pick-badge');
+  bd.textContent = S.near ? '내 주변 원픽' : '오늘의 원픽';
+  $('pickRestore').textContent = S.near ? '★ 내 주변 원픽' : '★ 오늘의 원픽';
+  bd.dataset.n = top.n; bd.dataset.s = top.score;
+  if (!S._moved){ S._moved = true; if (!S.sel) map.setView([top.la - 0.55, top.lo], 8, { animate:true }); }   /* 딥링크로 상세가 열려 있으면 그 자리 확대를 유지 */
+}
+
+function renderSkeleton(){
+  var l = $('list'); l.innerHTML = '';
+  for (var k=0;k<6;k++) l.appendChild(el('div','sk'));
+}
+
+/* 「시야 좋은 순」은 해루질에서만 뜻이 있다 — 낚시로 바꾸면 감추고 추천순으로 되돌린다 */
+function syncSortBtns(){
+  var vb = document.querySelector('.sort[data-sort="vis"]');
+  if (!vb) return;
+  var ok = (S.mode === 'haeru');
+  vb.hidden = !ok;
+  if (!ok && S.sort === 'vis'){
+    S.sort = 'score';
+    $('sorts').querySelectorAll('.sort').forEach(function(x){
+      x.classList.toggle('active', x.dataset.sort === 'score');
+    });
+  }
+}
+
+
+function renderList(){
+  syncSortBtns();
+  var l = $('list'); l.innerHTML = '';
+  var arr = sorted();
+  $('sheetTitle').textContent = (S.near ? '내 주변 ' : '') + MODE_NAME[S.mode] + ' ' +
+    (S.sort==='near' ? '가까운 순' : S.sort==='time' ? '시간 빠른 순'
+     : S.sort==='vis' ? '시야 좋은 순' : '추천 순위')
+    + (S.near && S.rad ? ' · 반경 ' + S.rad + 'km' : '');
+  /* 반경 안이 오늘 신통치 않으면 솔직히 말한다 — 밖에 훨씬 나은 자리가 있으면 거리와 점수까지 */
+  if (S.near && S.me && arr.length && !tideOnly_()){
+    var inBest = arr.reduce(function(m,r){ return r.raw > m.raw ? r : m; }, arr[0]);
+    var out = null;
+    (S.rowsAll || []).forEach(function(r){
+      if (r._d == null || (S.rad && r._d <= S.rad)) return;
+      if (!out || r.raw > out.raw) out = r;
+    });
+    if (inBest.score < 65 && out && out.score >= inBest.score + 10){
+      var nn = el('div','near-note',
+        '반경 ' + (S.rad || '전국') + (S.rad ? 'km' : '') + ' 안에서는 오늘 <b>' + inBest.score + '점</b>이 최고입니다. '
+        + Math.round(out._d) + 'km 떨어진 <b>' + out.n + '</b>이 ' + out.score + '점 — 반경을 넓혀 보세요.');
+      nn.onclick = function(){ openDetail(out.i); };
+      l.appendChild(nn);
+    }
+  }
+  arr.forEach(function(r, i){
+    var row = el('div','row' + (S.sel===r.i?' on':''));
+    row.appendChild(el('div','row-rank', String(i+1)));
+
+    var body = el('div','row-body');
+    var top = el('div','row-top');
+    if (favs().indexOf(r.i) >= 0) top.appendChild(el('span','row-fav','★'));
+    top.appendChild(el('span','row-name', r.n));
+    if (r.isl) top.appendChild(el('span','row-isl', r.fr ? '배 '+r.fr[1]+'분' : '섬'));
+    if (r.mil) top.appendChild(el('span','row-isl row-mil', r.mil >= 2 ? '군통제·야간금지' : '군통제'));
+    if (r.prot) top.appendChild(el('span','row-isl row-prot', '보호구역'));
+    if (r.kd === 'B') top.appendChild(el('span','row-isl row-kd', '겸용'));
+    top.appendChild(el('span','row-reg', r.r));
+    if (r._d != null) top.appendChild(el('span','row-dist', (r._d < 10 ? r._d.toFixed(1) : Math.round(r._d)) + 'km'));
+    body.appendChild(top);
+    body.appendChild(el('div','row-verdict', tideOnly_()
+      ? '물때·진입/퇴로만 제공 — 점수는 7일 이내'
+      : r.verdict));
+
+    var ch = el('div','row-chips');
+    var visChip = null;
+    if (S.mode === 'haeru' && r.vis != null)
+      visChip = el('span', 'chip' + (S.sort==='vis' ? ' vis-on' : ''), visLabel_(r.vis, r.s, r.visQ, r.visWord));
+    if (visChip && S.sort === 'vis') ch.appendChild(visChip);   // 시야순일 땐 맨 앞에
+    if (r.win) ch.appendChild(el('span','chip hot', hm(r.win[0])+'~'+hm(r.win[1])));
+    ch.appendChild(el('span','chip', r.mul));
+    if (visChip && S.sort !== 'vis') ch.appendChild(visChip);
+    (r.targets||[]).slice(0,2).forEach(function(t){ ch.appendChild(el('span','chip', t)); });
+    (r.banned||[]).slice(0,1).forEach(function(t){ ch.appendChild(el('span','chip warn', t+' 금어기')); });
+    if (r.warn && r.warn.length) ch.appendChild(el('span','chip warn', r.warn[0].length>14 ? r.warn[0].slice(0,13)+'…' : r.warn[0]));
+    body.appendChild(ch);
+    row.appendChild(body);
+
+    row.appendChild(tideOnly_()
+      ? el('div','grade g-tide', '≈<small>물때</small>')
+      : el('div','grade g-'+r.grade, r.grade + '<small>'+r.score+'</small>'));
+    row.onclick = function(){ openDetail(r.i); };
+    l.appendChild(row);
+  });
+  if (!arr.length) l.appendChild(el('div','row-verdict',
+    (S.want ? S.want + '을(를) 노릴 자리가 조건에 없습니다. 필터를 넓혀보세요.' : '조건에 맞는 자리가 없습니다.')));
+}
+
+/* ══════════════ 상세 ══════════════ */
+window.addEventListener('popstate', function(){
+  var q = parseRoute_();
+  if (!q.spot){ if (typeof closeDetail === 'function') closeDetail(); }
+});
+
+function isDesk_(){ try { return window.matchMedia('(min-width:900px)').matches; } catch(e){ return false; } }
+function openDetail(id, auto){
+  if (!auto) pushRoute_('spot', id);
+  refEvent('open');
+  S.sel = id;
+  var d = $('detail'); d.hidden = false;
+  /* 컴퓨터 화면: 상세가 왼쪽 판을 대신한다 — 되돌아갈 「목록」 단추를 붙인다 */
+  if (!$('dtBack')){
+    var bk = document.createElement('button');
+    bk.id = 'dtBack'; bk.type = 'button'; bk.innerHTML = '&#8249; 목록';
+    bk.onclick = closeDetail;
+    $('detailPanel').insertBefore(bk, $('detailBody'));
+  }
+  $('detailBody').innerHTML = '<div class="sk" style="height:120px"></div><div class="sk" style="height:180px"></div><div class="sk" style="height:120px"></div>';
+  google.script.run
+    .withSuccessHandler(renderDetail)
+    .withFailureHandler(function(){ $('detailBody').innerHTML = '<p class="row-verdict" style="padding:30px 0;text-align:center">정보를 불러오지 못했습니다.</p>'; })
+    .apiPoint(id, S.ds, S.want, isPremium() ? 15 : 7);
+  var m = S.markers[id];
+  if (!auto){
+    /* 핀이 아직 없어도(딥링크 직후) 좌표표에서 찾아 그 자리로 간다. 전국 화면이면 13단계로 다가간다. */
+    S._moved = true;   /* 첫 렌더의 전국 이동이 이 확대를 덮지 않게 */
+    var ll = m ? m.getLatLng() : null;
+    if (!ll){ try { var pp = (typeof pointById_ === 'function') ? pointById_(id) : null; if (pp && pp.la) ll = L.latLng(pp.la, pp.lo); } catch(e){} }
+    if (ll){
+      var z = map.getZoom(), tz = z < 10 ? 13 : z;
+      var off = isDesk_() ? 0 : (tz >= 13 ? 0.012 : 0.35);
+      map.setView([ll.lat - off, ll.lng], tz, { animate: z >= 10 });
+    }
+  }
+}
+function closeDetail(){
+  var p = $('detailPanel');
+  p.style.transition = 'transform .3s var(--sp)';
+  p.style.transform = isDesk_() ? 'translateX(-110%)' : 'translateY(100%)';
+  setTimeout(function(){ $('detail').hidden = true; p.style.transform = ''; p.style.transition = ''; }, 280);
+}
+$('detailScrim').onclick = closeDetail;
+
+/* ── 지도 중심 항해 — 확대해서 다가가면 그 지점 정보가 왼쪽에 뜬다 (컴퓨터 화면) ── */
+function autoDetail_(){
+  if (!isDesk_()) return;
+  if (map.getZoom() < 12) return;
+  if (!S.rows || !S.rows.length) return;
+  var c = map.getCenter(), best = null, bd = 1e9;
+  S.rows.forEach(function(r){
+    var d2 = dist(c.lat, c.lng, r.la, r.lo);
+    if (d2 < bd){ bd = d2; best = r; }
+  });
+  if (!best || bd > 6) return;                       // 중심에서 6km 안에 지점이 있어야
+  if (S.sel === best.i && !$('detail').hidden) return;
+  openDetail(best.i, true);                          // 자동 — 지도는 안 움직인다
+}
+autoDetail_._t = null;
+map.on('moveend zoomend', function(){
+  clearTimeout(autoDetail_._t);
+  autoDetail_._t = setTimeout(autoDetail_, 550);
+});
+
+/* ── 화면이 살아나는 느낌 ──
+   숫자가 갑자기 튀어나오는 것보다, 차오르는 걸 눈으로 보는 편이
+   "계산해서 낸 값"이라는 인상을 준다. 값 자체는 건드리지 않는다.
+   움직임을 싫어하는 사람(운영체제 설정)에게는 전부 끈다. */
+var NOMO = false;
+try { NOMO = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+
+/** 다음 프레임에 실행 — 브라우저가 시작값을 먼저 그리게 한다 */
+function nextFrame_(fn){
+  if (NOMO) { fn(); return; }
+  requestAnimationFrame(function(){ requestAnimationFrame(fn); });
+}
+
+/** 숫자가 올라가는 효과 */
+function countUp_(node, to, ms){
+  if (NOMO || !node) { if (node) node.textContent = to; return; }
+  var from = 0, t0 = null;
+  function step(t){
+    if (t0 === null) t0 = t;
+    var k = Math.min(1, (t - t0) / (ms || 900));
+    var e = 1 - Math.pow(1 - k, 3);                 // 끝에서 부드럽게 멈춘다
+    node.textContent = Math.round(from + (to - from) * e);
+    if (k < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/** 상세를 열 때마다 등장 효과를 다시 태운다 */
+function fillBars_(root){
+  if (!root) return;
+  var bs = root.querySelectorAll('.gauge-t i[data-w], .wade-bar i[data-w]');
+  nextFrame_(function(){
+    for (var i = 0; i < bs.length; i++) bs[i].style.width = bs[i].getAttribute('data-w') + '%';
+  });
+}
+
+function playIn_(root){
+  if (!root) return;
+  fillBars_(root);
+  var secs = root.querySelectorAll('.sec, .verdict, .dt-head, .wade, .risk');
+  for (var i = 0; i < secs.length; i++){
+    secs[i].classList.remove('rise');
+    if (!NOMO) secs[i].style.animationDelay = Math.min(i * 70, 780) + 'ms';
+  }
+  nextFrame_(function(){
+    for (var j = 0; j < secs.length; j++) secs[j].classList.add('rise');
+  });
+}
+
+function renderDetail(d){
+  window.__detail = d;            // shopChip 이 제휴 링크를 찾을 때 쓴다
+  if (!d || d.error){ $('detailBody').innerHTML = '<p style="padding:30px 0;text-align:center;color:#8ba6b8">'+((d&&d.error)||'오류')+'</p>'; return; }
+  var m = S.mode === 'fish' ? d.fish : d.haeru;
+  var o = S.mode === 'fish' ? d.haeru : d.fish;
+  var meta = d.meta, w = meta.wx || {};
+  var b = $('detailBody'); b.innerHTML = '';
+
+  /* 헤더 */
+  var head = el('div','dt-head');
+  var ring = el('div','ring', '<span>' + (NOMO ? m.score : 0) + '</span>');
+  var rcol = 'var(--' + m.grade + ')';
+  function paintRing_(pct){
+    ring.style.background = 'conic-gradient(' + rcol + ' ' + pct + '%,rgba(255,255,255,.08) 0)';
+  }
+  paintRing_(NOMO ? m.score : 0);
+  if (tideOnly_()){
+    ring.innerHTML = '<span class="tide-mark">≈</span>';
+    ring.style.background = 'conic-gradient(rgba(120,190,225,.4) 100%,rgba(255,255,255,.08) 0)';
+  }
+  head.appendChild(ring);
+  if (!NOMO && !tideOnly_()){
+    /* 숫자와 테두리를 같은 프레임에서 함께 올린다 — 따로 돌면 어긋나 보인다 */
+    ring.classList.add('ring-go');
+    var rspan = ring.querySelector('span'), t0 = null, DUR = 1500;
+    requestAnimationFrame(function tick(t){
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / DUR);
+      var e = 1 - Math.pow(1 - k, 3);
+      var v = m.score * e;
+      paintRing_(v);
+      rspan.textContent = Math.round(v);
+      if (k < 1) requestAnimationFrame(tick);
+      else { paintRing_(m.score); rspan.textContent = m.score; }
+    });
+  }
+  /* 세부 자리(서브 로케이션) — 실제로 어디로 들어가는지가 이 앱에서 가장 중요한 정보다.
+     등록된 세부 포인트가 있으면 그 이름을, 없으면 지점 설명을 크게 올린다. */
+  var subNames = (d.spots || []).map(function(x){ return x.n; }).filter(Boolean);
+  var labeled = subNames.length > 0;
+  var subs = labeled
+    ? subNames.slice(0, 4)
+    : String(d.point.tag || '').split(/[·,]/).map(function(x){ return x.trim(); }).filter(Boolean);
+  var more = labeled && subNames.length > 4 ? ' 외 ' + (subNames.length - 4) + '곳' : '';
+  var KD = { H:'해루질 전용', F:'낚시 전용', B:'해루질·낚시 겸용' };
+  head.appendChild(el('div','',
+      '<h2>' + d.point.n + '</h2>'
+    + '<p>' + d.point.r + ' · ' + d.point.floor + (KD[d.point.kd] ? ' · <b class="kd kd-' + d.point.kd + '">' + KD[d.point.kd] + '</b>' : '')
+    + (S.me ? ' · <b class="kd">내 위치에서 ' + (function(){ var v = dist(S.me[0], S.me[1], d.point.la, d.point.lo); return v < 10 ? v.toFixed(1) : Math.round(v); })() + 'km</b>' : '')
+    + '</p>'
+    + (subs.length
+        ? '<span class="dt-sub">'
+            + (labeled ? '<span class="lb">세부 자리</span>' : '')
+            + subs.join('<span class="sep">·</span>') + more
+          + '</span>'
+        : '')));
+  var fav = el('button','fav-btn' + (favs().indexOf(d.point.i) >= 0 ? ' on' : ''), '★');
+  fav.onclick = function(){
+    var on = toggleFav(d.point.i);
+    fav.classList.toggle('on', on);
+    toast(on ? '즐겨찾기에 담았습니다 — 목록 맨 위에 고정됩니다' : '즐겨찾기 해제');
+    renderList();
+  };
+  head.appendChild(fav);
+  b.appendChild(head);
+
+  /* 날짜 이동줄 — 같은 자리의 이전날/다음날을 바로 넘겨 본다 */
+  (function(){
+    var base = parseDs(BOOT.today), cur = parseDs(d.ds);
+    var off = Math.round((cur - base) / 86400000);
+    var wd = ['일','월','화','수','목','금','토'][cur.getDay()];
+    var lbl = off === 0 ? '오늘' : off === 1 ? '내일' : off === -1 ? '어제'
+              : (cur.getMonth()+1) + '/' + cur.getDate();
+    var bar = el('div','dt-daynav'); bar.setAttribute('data-rk','1');
+    var goDay = function(delta){
+      var nd = new Date(cur.getTime() + delta*86400000);
+      var nds = dstr(nd);
+      var lo = new Date(base.getTime() - 1*86400000), hi = new Date(base.getTime() + 13*86400000);
+      if (nd < lo || nd > hi){ toast('어제부터 13일 뒤까지만 볼 수 있습니다'); return; }
+      S.ds = nds; renderDates();                 // 날짜줄도 같이 맞춘다
+      openDetail(d.point.i, true);               // 같은 자리, 바뀐 날짜로 다시
+    };
+    var prev = el('button','dnav-btn', '‹ 이전날');
+    prev.onclick = function(){ goDay(-1); };
+    var mid = el('div','dnav-mid', '<b>' + lbl + '</b><span>' + (cur.getMonth()+1) + '.' + cur.getDate() + ' ' + wd + '요일</span>');
+    var next = el('button','dnav-btn', '다음날 ›');
+    next.onclick = function(){ goDay(1); };
+    bar.appendChild(prev); bar.appendChild(mid); bar.appendChild(next);
+    b.appendChild(bar);
+    var mtb = el('button','dt-mtbtn', '📋 이 자리 15일 물때표 (만조·간조·물흐름·해달)'); mtb.setAttribute('data-rk','43');
+    mtb.onclick = function(){ openMultae(d.point.i, d.point.n); };
+    b.appendChild(mtb);
+    /* 조류 — 낚시에서만 쓴다. 물흐름이 곧 입질 시간이기 때문이다.
+       해루질은 걸어 들어가 줍는 일이라 유속·유향이 판단에 끼어들 자리가 없다. */
+    (function(){
+      if (S.mode !== 'fish') return;
+      var box = el('div','dt-cur'); box.hidden = true; box.setAttribute('data-rk','34'); b.appendChild(box);
+      fetch('data/cur/pt/' + S.ds + '/' + d.point.i + '.json', {cache:'default'})
+        .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+        .then(function(j){
+          var ev = Array.isArray(j) ? j.filter(function(e){ return e && e.k; }) : null;
+          if (!ev || !ev.length) return;
+          var evs = ev.slice().sort(function(a,b2){ return a.t < b2.t ? -1 : 1; });
+          var slack = evs.filter(function(e){ return e.k === '전류'; }).map(function(e){ return e.t; });
+          var peak = evs.filter(function(e){ return e.k !== '전류'; }).sort(function(a,b2){ return b2.v - a.v; })[0];
+          var html = '<b>🌊 조류</b> <span class="dt-cur-l">물 멈춤</span> ' + (slack.length ? slack.join(' · ') : '-')
+            + (peak ? ' <span class="dt-cur-l">최강</span> ' + peak.t + ' <em>' + (peak.v/51.44).toFixed(1) + '노트</em>' : '');
+          box.title = '전류(물 멈춤) 앞뒤 1시간이 물살이 가장 약합니다. 최강류 시각엔 갯골·물골을 건너지 마세요. 자료 국립해양조사원';
+          box.innerHTML = html; box.hidden = false;
+        }).catch(function(){});
+    })();
+    var calb = document.createElement('a');
+    calb.className = 'dt-calbtn'; calb.href = 'calendar/'; calb.setAttribute('data-rk','44');
+    calb.innerHTML = '📅 한 달 물때달력 무료 인쇄 · <b>해루질 추천일(★)</b>';
+    b.appendChild(calb);
+  })();
+
+  /* 결론 */
+  b.appendChild(tideOnly_()
+    ? el('div','dt-verdict tide-note',
+        '<b>물때만 보는 날짜입니다.</b> 기상 예보가 닿지 않아 <b>정확한 점수는 7일 이내</b>만 제공됩니다. '
+      + '아래 물때·만조 간조·진입/퇴로 시각은 조석 계산이라 그대로 믿으셔도 됩니다.')
+    : el('div','dt-verdict' + (m.score < 46 ? ' bad' : ''), m.verdict));
+
+  /* 해경 출입통제구역 — 이 지점 반경 2.5km 안에 있으면 결론 바로 아래에 경고한다.
+     과태료(100만원 이하)보다 무서운 건 사고다 — 통제구역은 사고가 났던 자리다. */
+  if ((d.zones || []).length){
+    var zh = d.zones.map(function(z){
+      return '<div class="zn-row"><b>' + z.n + '</b>'
+        + ' <span class="zn-km">' + (z.km <= 0.3 ? '이 자리 일대' : z.km + 'km 거리') + '</span>'
+        + (z.period ? '<br><span class="zn-p">통제: ' + z.period + '</span>' : '')
+        + (z.est ? '<br><span class="zn-est">※ 표시 위치는 대략적입니다 — 현장 안내판 기준으로 판단하세요</span>' : '')
+        + '</div>';
+    }).join('');
+    b.appendChild(el('div','dt-verdict bad zn-box',
+        '<b>⛔ 해경 출입통제구역이 가까이 있습니다</b> — 위반 시 <b>100만원 이하 과태료</b>(연안사고예방법 제10조).'
+      + ' 통제구역은 실제 사고가 났던 자리입니다. 지도의 붉은 구역을 피해서 들어가세요.'
+      + zh));
+  }
+
+  /* 보호·제한구역 — 과태료·벌금이 걸리는 곳. 모르고 잡으면 그대로 위반이라 결론 바로 아래에 둔다 */
+  if ((d.protect || []).length){
+    var KI = { wet:'🌿', mpa:'🐟', park:'🏞', nat:'🏛', gov:'📜' };
+    var ph = d.protect.map(function(z){
+      return '<div class="zn-row"><b>' + (KI[z.k] || '⚠') + ' ' + z.n + '</b>'
+        + (z.t && z.n.indexOf(z.t) < 0 ? ' <span class="zn-km">' + z.t + '</span>' : '')
+        + (z.region ? '' : ' <span class="zn-km">' + (z.km <= 0.5 ? '이 자리 일대' : z.km + 'km 거리') + (z.est ? ' · 위치 추정' : '') + '</span>')
+        + '<br><span class="zn-p">' + z.rule + '</span>'
+        + (z.law ? '<br><span class="zn-est">근거 ' + z.law + '</span>' : '')
+        + '</div>';
+    }).join('');
+    var pb = el('div','dt-verdict bad zn-box prot-box',
+        '<b>🛡 보호·제한구역 — 채취·낚시 전에 확인</b> 경계는 대략적입니다. 현장 팻말과 관리청 고시가 우선입니다.' + ph);
+    pb.setAttribute('data-rk','82');   /* 보호구역 — 경고 묶음 */
+    b.appendChild(pb);
+  }
+
+  /* 접경지역 군 통제 — 강화·김포·서해5도. 통문 시간을 모르고 가면 못 들어가거나 못 나온다 */
+  if (d.point.mil){
+    var mb = el('div','dt-verdict bad mil-box' + (d.point.mil >= 2 ? ' mil2' : ''),
+        '<b>' + (d.point.mil >= 2 ? '🪖 접경지역 — 군 통제(야간 출입 금지)' : '🪖 군 통제 해안 — 통문 시간 확인') + '</b> '
+      + (d.point.milNote || ''));
+    mb.setAttribute('data-rk','83');   /* 군 통제 — 경고 묶음 */
+    b.appendChild(mb);
+  }
+
+  /* 이 자리 일대 인명사고 이력 — 안전 경고 (사고 데이터가 로드돼 있을 때) */
+  (function(){
+    /* 실측 — 예보 옆에 「지금 실제로 이랬다」를 붙인다. 자료가 없으면 줄 자체가 없다. */
+    if (d.obs && (d.obs.lv != null || d.obs.tw != null || d.obs.wv != null)){
+      var o = d.obs, ob = el('div','sec obs-box'); ob.setAttribute('data-rk','12');
+      var bits = [];
+      if (o.lv != null) bits.push('<b>조위 ' + o.lv + 'cm</b>');
+      if (o.tw != null) bits.push('<b>수온 ' + o.tw.toFixed(1) + '℃</b>');
+      if (o.ws != null) bits.push('바람 ' + o.ws.toFixed(1) + 'm/s');
+      if (o.wv != null) bits.push('파고 ' + o.wv.toFixed(1) + 'm');
+      ob.innerHTML = '<div class="sec-t">지금 실제 바다 <small>실측</small></div>'
+        + '<div class="obs-row">' + bits.join('<i>·</i>') + '</div>'
+        + '<div class="obs-src">국립해양조사원 ' + o.obs + ' 관측소 · ' + o.km + 'km'
+        + (o.at ? ' · ' + o.at : '') + '</div>';
+      b.appendChild(ob);
+    }
+
+    var slot = el('div',''); slot.setAttribute('data-rk','84');   /* 인명사고 이력 — 경고 묶음 */
+    b.appendChild(slot);
+    var show = function(data){
+      if (!data || !data.cells) return;
+      var la = d.point.la, lo = d.point.lo, hit = null;
+      for (var i = 0; i < data.cells.length; i++){
+        var c = data.cells[i];
+        var dla = (c.la - la) * 111, dlo = (c.lo - lo) * 89;
+        if (dla*dla + dlo*dlo <= 2.2*2.2){ if (!hit || c.n > hit.n) hit = c; }
+      }
+      if (!hit || (hit.n < 3 && !hit.d && !hit.m)) return;
+      slot.className = 'dt-verdict bad';
+      slot.innerHTML = '<b>⚠ 이 일대는 인명사고가 있었습니다</b> — 반경 2km 누적 <b>' + hit.n + '건</b>'
+        + (hit.d ? ' · 사망 <b>' + hit.d + '명</b>' : '') + (hit.m ? ' · 실종 <b>' + hit.m + '명</b>' : '')
+        + ' (주로 ' + hit.t + '). 구명조끼·물때 확인 필수. <span style="color:#8ba6b8">출처 국립해양조사원</span>';
+    };
+    if (typeof AC_DATA !== 'undefined' && AC_DATA){ show(AC_DATA); }
+    else { fetch('data/accidents.json').then(function(r){ return r.ok?r.json():null; }).then(show).catch(function(){}); }
+  })();
+
+  /* 진입·퇴로 — 갯벌에서 사고는 대부분 "언제 나와야 하는지" 몰라서 난다 */
+  if (S.mode === 'haeru' && meta.wade){
+    var wd = meta.wade;
+    var wsec = el('div','sec');
+    wsec.appendChild(el('div','sec-t','언제 들어가고 언제 나오나'));
+    var wbox = el('div','wade' + (wd.tight ? ' tight' : ''));
+    wbox.innerHTML =
+        '<div class="wade-row">'
+      +   '<div class="wade-t"><span>들어가기</span><b>' + hmH(wd.inT) + '</b></div>'
+      +   '<div class="wade-arrow" aria-hidden="true">→</div>'
+      +   '<div class="wade-t out"><span>늦어도 나오기</span><b>' + hmH(wd.outT) + '</b></div>'
+      + '</div>'
+      + '<div class="wade-bar"><i data-w="' + Math.max(6, Math.min(100,
+            Math.round(wd.workMin / Math.max(1, wd.workMin + wd.walkMin*2) * 100))) + '"></i></div>'
+      + '<div class="wade-n">'
+      +   '<b>실제로 잡을 수 있는 시간 ' + (wd.workMin >= 60
+            ? Math.floor(wd.workMin/60) + '시간 ' + (wd.workMin%60) + '분'
+            : wd.workMin + '분') + '</b>'
+      +   '<span>' + wd.why + '</span>'
+      + '</div>'
+      + (wd.tight
+          ? '<p class="wade-w">⚠ 머물 수 있는 시간이 짧습니다. 물가까지 다 나가지 마시고 중간에서 도세요.</p>'
+          : '<p class="wade-w ok">나오는 시각은 이미 안전 여유를 뺀 값입니다. 이 시각에는 뭍 쪽으로 돌아서 걷고 계셔야 합니다.</p>');
+    wsec.appendChild(wbox);
+    (function(){
+      var bar = wbox.querySelector('.wade-bar i');
+      var t1 = wbox.querySelector('.wade-t b'), t2 = wbox.querySelector('.wade-t.out b');
+      if (bar) nextFrame_(function(){ bar.style.width = bar.getAttribute('data-w') + '%'; });
+      if (t1) t1.classList.add('pop');
+      if (t2){ t2.classList.add('pop'); t2.style.animationDelay = '.22s'; }
+    })();
+
+    /* 물가가 얼마나 빨리 오는가 — 고립사고의 물리적 원인이다.
+       추정치라는 고지를 접지 않고 여기에 같이 둔다. */
+    if (meta.risk){
+      var rk = meta.risk;
+      var rbox = el('div','risk r' + rk.grade);
+      rbox.innerHTML =
+          '<div class="risk-h"><span class="risk-lb">이 자리 위험도</span>'
+        + '<b>' + rk.label + '</b></div>'
+        + '<div class="risk-g">'
+        +   '<div><i>물가가 오는 속도</i><b>' + rk.water.toLocaleString() + ' m/h</b></div>'
+        +   '<div><i>걷는 속도</i><b>' + rk.walk.toLocaleString() + ' m/h</b></div>'
+        + '</div>'
+        + '<p class="risk-s">' + rk.say + '</p>'
+        + '<p class="risk-d">위 시각과 속도는 조석·지형으로 낸 <b>추정치</b>입니다. '
+        + '실제 물때와 기상은 다를 수 있으니 현장 상황을 우선하세요. '
+        + '<a href="method/">계산 근거 보기</a></p>';
+      wsec.appendChild(rbox);
+    }
+
+    b.appendChild(wsec);
+  }
+
+  /* 갯바위 처오름 — 낚시 사고는 물때보다 너울이다 */
+  if (S.mode === 'fish' && meta.runup){
+    var ru = meta.runup;
+    var usec = el('div','sec');
+    usec.appendChild(el('div','sec-t','파도가 어디까지 올라오나'));
+    var ubox = el('div','risk r' + ru.grade);
+    ubox.innerHTML =
+        '<div class="risk-h"><span class="risk-lb">갯바위 처오름</span><b>' + ru.label + '</b></div>'
+      + '<div class="risk-g g3">'
+      +   '<div><i>유의파고</i><b>' + ru.hs.toFixed(1) + ' m</b></div>'
+      +   '<div><i>주기</i><b>' + ru.period.toFixed(0) + ' 초</b></div>'
+      +   '<div class="hot"><i>처오름</i><b>' + ru.runup.toFixed(1) + ' m</b></div>'
+      + '</div>'
+      + '<p class="risk-s">' + ru.say + '</p>'
+      + (ru.swell
+          ? '<p class="risk-x">⚠ 주기 ' + ru.period.toFixed(0) + '초 장주기 너울입니다. '
+            + '파고는 낮아 보여도 파장이 ' + ru.wavelen + 'm라 힘이 셉니다. '
+            + '갯바위 사고는 이런 날 납니다.</p>'
+          : '')
+      + '<p class="risk-d">파고 ' + ru.hs.toFixed(1) + 'm의 <b>' + ru.ratio + '배</b>까지 올라옵니다 — '
+      + '파고만 보면 안 되는 이유입니다. 유의파고는 상위 3분의 1의 평균이라 '
+      + '드물게 오는 큰 파는 ' + ru.hmax.toFixed(1) + 'm입니다. '
+      + '파랑·지형으로 낸 <b>추정치</b>이니 현장 상황을 우선하세요. '
+      + '<a href="method/">계산 근거 보기</a></p>';
+    usec.appendChild(ubox);
+    b.appendChild(usec);
+  }
+
+  /* 세부 포인트 (국민포인트) */
+  {
+    var sp0 = el('div','sec');
+    sp0.appendChild(el('div','sec-t','어디로 들어가나 — 세부 포인트'));
+    (d.spots || []).forEach(function(x, i){
+      var card = el('div','spot' + (i === 0 ? ' best' : ''));
+      card.innerHTML = '<div class="spot-h">' + (i === 0 ? '<span class="spot-star">★ 추천 진입</span>' : '') + '<b>' + x.n + '</b></div>'
+        + '<div class="spot-t">' + (x.t||[]).map(function(y){ return '<span class="chip">' + y + '</span>'; }).join('') + '</div>'
+        + '<p class="spot-d">' + x.d + '</p>'
+        + (x.w ? '<p class="spot-w">⚠ ' + x.w + '</p>' : '');
+      sp0.appendChild(card);
+    });
+    if (!(d.spots || []).length)
+      sp0.appendChild(el('div','gauge-l','아직 등록된 세부 포인트가 없습니다. 아시는 자리가 있으면 제보해 주세요 — 검토 후 모두에게 공개됩니다.'));
+    else
+      sp0.appendChild(el('div','gauge-l','어장 경계·규제는 수시로 바뀝니다. 현장 팻말과 지역 고시가 항상 우선입니다.'));
+    var sgBtn = el('button','act','이 자리 세부 포인트 제보하기');
+    sgBtn.style.marginTop = '8px';
+    sgBtn.onclick = function(){ openSuggestForm(sp0, d); };
+    sp0.appendChild(sgBtn);
+    b.appendChild(sp0);
+    
+  }
+
+  /* 조석 그래프 */
+  var s1 = el('div','sec');
+  s1.appendChild(el('div','sec-t', S.ds.slice(5).replace('-','월 ')+'일 물때 · '+meta.mul+' · 조차 '+meta.range+'m'
+    + ' <span style="font-weight:600;color:var(--mut2)">('+(meta.src==='badatime'?'바다타임':meta.src==='khoa'?'해양조사원':'자체 추정')+')</span>'));
+  var tb = el('div','tidebox');
+  tb.appendChild(tideSVG(meta, m.window));
+  var lg = el('div','tide-legend');
+  lg.innerHTML = '<span>00시</span><span>06시</span><span>12시</span><span>18시</span><span>24시</span>';
+  tb.appendChild(lg);
+  s1.appendChild(tb);
+  b.appendChild(s1);
+
+  /* 만조·간조 목록 */
+  var s2 = el('div','sec');
+  s2.appendChild(el('div','sec-t','만조 · 간조'));
+  var g = el('div','grid');
+  (meta.events||[]).slice(0,6).forEach(function(e){
+    g.appendChild(el('div','cell', '<b style="color:'+(e.k==='H'?'#1fc4c0':'#2ee6a8')+'">'+hmH(e.t)+'</b><span>'+(e.k==='H'?'만조':'간조')+' '+e.lv+'cm</span>'));
+  });
+  s2.appendChild(g);
+  b.appendChild(s2);
+
+  /* 어종 지정 결과 */
+  if (d.want && d.want.has){
+    var wb = el('div','sec'); wb.setAttribute('data-rk','80');
+    wb.appendChild(el('div','sec-t', S.want + ' 기준'));
+    wb.appendChild(el('div','dt-verdict' + (d.want.ban && d.want.ban.banned ? ' bad' : ''),
+      d.want.reason + (d.want.thermal != null ? ' · 수온 적합도 ' + d.want.thermal + '%' : '')));
+    b.appendChild(wb);
+  }
+
+  /* 금지체장 — 잡아도 되는 크기. 모르고 작은 것을 가져오면 그대로 위반이다 */
+  {
+    var szList = (m.targets || []).map(function(t){ return { n:t.n, ban:t.ban }; });
+    if (szList.length){
+      var zs = el('div','sec');
+      zs.appendChild(el('div','sec-t','잡아도 되는 크기 — 금지체장'));
+      var tb = el('div','sizes');
+      var noRule = [];
+      szList.forEach(function(t){
+        var bn = t.ban || null;
+        var has = bn && bn.size;
+        if (!has){ noRule.push(t.n); return; }
+        var row = el('div','size-row');
+        row.innerHTML = '<b>' + t.n + '</b>'
+          + '<span class="size-v">' + sizeText_(bn) + ' 이상</span>'
+          + '<span class="size-u">' + measureHow_(bn.unit) + '</span>';
+        tb.appendChild(row);
+      });
+      /* 규정 없는 것들은 한 줄로 — 칸을 세 개씩 차지할 정보가 아니다 */
+      if (noRule.length){
+        var nr = el('div','size-row none');
+        nr.innerHTML = '<b>' + noRule.join(' · ') + '</b><span class="size-v none">크기 규정 없음</span>';
+        tb.appendChild(nr);
+      }
+      zs.appendChild(tb);
+      var mt0 = meta.banMeta || {};
+      zs.appendChild(el('div','size-src',
+          '작은 것은 놓아주세요. 기준 미달을 가지고 나오면 금어기가 아니어도 위반입니다.<br>'
+        + '근거 ' + (mt0.basis || '') + ' (' + (mt0.asOf || '') + ' 기준) · '
+        + '<a href="' + (mt0.law || '#') + '" target="_blank" rel="noopener">원문 확인</a>'));
+      b.appendChild(zs);
+    }
+  }
+
+  /* 금어기 경고 */
+  var bt = (m.bannedTargets || []);
+  if (bt.length){
+    var bw = el('div','sec');
+    bw.appendChild(el('div','sec-t','지금 잡으면 안 되는 것'));
+    bt.forEach(function(t){
+      var bn = t.ban || {};
+      var box = el('div','banbox');
+      box.innerHTML = '<h4>⛔ ' + t.n + ' 금어기</h4><p>'
+        + (bn.from ? bn.from + ' ~ ' + bn.to + ' (' + bn.scope + ') 포획·채취가 금지됩니다.' : '포획이 제한됩니다.')
+        + (bn.size ? ' 기간이 아니어도 ' + sizeText_(bn) + ' 미만은 잡을 수 없습니다.' : '')
+        + (bn.note ? ' ' + bn.note : '') + '</p>';
+      bw.appendChild(box);
+    });
+    var mt = meta.banMeta || {};
+    bw.appendChild(el('div','banbox', '<p class="src">근거: ' + (mt.basis||'') + ' (' + (mt.asOf||'') + ' 기준)<br>'
+      + (mt.warn||'') + '</p>'));
+    b.appendChild(bw);
+  }
+
+  /* 수중 시야 */
+  if (S.mode === 'haeru'){
+    var vs = el('div','sec');
+    vs.appendChild(el('div','sec-t','수중 시야 추정'));
+    /* 막대는 절대 미터가 아니라 그 바다에서 기대할 수 있는 폭 안의 자리로 그린다.
+       서해 물은 원래 탁하다. 절대값으로 그리면 서해는 늘 빨간 막대만 보게 된다. */
+    var vv = meta.vis, sea = (d.point && d.point.s) || 'S';
+    var vq = (meta.visQ != null) ? meta.visQ : 0.5;
+    var vpct = Math.max(4, Math.round(vq*100));
+    var vcol = vq >= 0.60 ? '#2ee6a8' : vq >= 0.38 ? '#7fd8cf' : vq >= 0.18 ? '#b5cad8' : '#ff7f5a';
+    var vword = meta.visWord || '보통';
+    function vm_(x){ return x >= 1 ? x.toFixed(1)+'m' : Math.round(x*100)+'cm'; }
+    var digNote = (d.point && (d.point.f === 'mud' || d.point.f === 'sand'))
+      ? '이 자리는 파서 잡는 갯벌이라 시야는 점수에 조금만 들어갑니다. ' : '';
+    var bandTxt = (meta.visLo != null && meta.visHi != null)
+      ? '이 자리는 최악 ' + vm_(meta.visLo) + ' ~ 최선 ' + vm_(meta.visHi) + ' 사이를 오갑니다. 오늘은 그중 ' + Math.round(vq*100) + '% 자리입니다. '
+      : '';
+    var g = el('div','gauge');
+    g.innerHTML = '<div class="gauge-v" style="color:'+vcol+'">' + vm_(vv) + '</div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+vpct+'" style="background:'+vcol+'"></i></div>'
+      + '<div class="gauge-l"><b>' + (SEA_KO[sea]||'') + ' 기준 ' + vword + '</b> · 부유물 ' + meta.ssc + 'mg/L 추정<br>'
+      + digNote + bandTxt + '파고가 바닥을 흔든 정도와 조류·강우를 넣어 계산했습니다</div></div>';
+    vs.appendChild(g);
+    b.appendChild(vs);
+
+    var fs2 = el('div','sec');
+    fs2.appendChild(el('div','sec-t','드러나는 갯벌'));
+    var fw = meta.flatWidth;
+    var fg = el('div','gauge');
+    fg.innerHTML = '<div class="gauge-v" style="color:#1fc4c0">' + (fw >= 1000 ? (fw/1000).toFixed(1)+'km' : Math.round(fw/10)*10+'m') + '</div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+Math.min(100,Math.round(fw/2500*100))+'" style="background:#1fc4c0"></i></div>'
+      + '<div class="gauge-l">' + d.point.floor + ' 경사로 계산한 물가에서의 거리<br>돌아올 시간을 여기에 맞춰 잡으세요</div></div>';
+    fs2.appendChild(fg);
+    b.appendChild(fs2);
+  }
+
+  /* 조류와 솔루나 */
+  var cs = el('div','sec');
+  cs.appendChild(el('div','sec-t','조류와 달 활동'));
+  var cg = el('div','grid');
+  var solT = meta.solunar || {};
+  [[meta.curPeak != null ? meta.curPeak.toFixed(1)+'노트' : '-', '최대 조류'],
+   [(solT.strength||0)+'%', '솔루나 강도'],
+   [meta.moonLux != null ? meta.moonLux.toFixed(2)+'lx' : '-', '달빛 조도'],
+   [solT.moonrise != null ? hmH(solT.moonrise) : '-', '월출'],
+   [solT.moonset != null ? hmH(solT.moonset) : '-', '월몰'],
+   [meta.press != null ? (meta.press > 0 ? '+' : '') + meta.press.toFixed(1) : '-', '기압 추세']
+  ].forEach(function(c){ cg.appendChild(el('div','cell','<b>'+c[0]+'</b><span>'+c[1]+'</span>')); });
+  cs.appendChild(cg);
+  cs.appendChild(el('div','gauge-l', meta.luxWord + ' · 달 남중 ' + (solT.transit != null ? hmH(solT.transit) : '-') + ' 전후가 활성기입니다'));
+  b.appendChild(cs);
+
+  /* 배편 — 물때와 배 시간이 맞는지가 핵심이다 */
+  if (d.point.isl){
+    var fs3 = el('div','sec');
+    fs3.appendChild(el('div','sec-t','들어가는 길'));
+    var fr = d.point.fr, fp = meta.ferry || {};
+    var fbox = el('div','ferry');
+    var head = fr
+      ? '<b>' + fr[0] + '</b>에서 배로 <b>약 ' + fr[1] + '분</b>'
+        + (fr[2] ? ' · 차량 선적 가능' : ' · 차는 두고 가야 합니다')
+      : '섬입니다. 배편과 출항 여부를 먼저 확인하세요.';
+    fbox.innerHTML = '<div class="ferry-i">⛴</div><div class="ferry-t">' + head + '</div>';
+    fs3.appendChild(fbox);
+
+    // 물때 대 배 시간
+    if (fp.word){
+      var pl = el('div','fplan' + (fp.mode === 'day' ? ' ok' : ' warn'));
+      pl.innerHTML = '<b>' + (fp.mode === 'day' ? '당일치기'
+                            : fp.mode === 'stay' ? '1박 필요'
+                            : fp.mode === 'tight' ? '빠듯함' : '확인 필요') + '</b> ' + fp.word;
+      fs3.appendChild(pl);
+    }
+    // 결항 위험
+    if (fp.riskWord){
+      var rk = el('div','frisk r' + fp.risk, '⚠ ' + fp.riskWord);
+      fs3.appendChild(rk);
+    }
+
+    // 예약처·운항정보 — 실제로 눌러서 확인할 수 있게
+    var FI = (window.BOOT && BOOT.ferry) || {};
+    var links = el('div','flinks');
+    (FI.status || []).forEach(function(x){
+      var a = el('a','flink hot', x.n); a.href = x.u; a.target = '_blank'; a.rel = 'noopener';
+      a.title = x.note || ''; links.appendChild(a);
+    });
+    (FI.book || []).forEach(function(x){
+      var a = el('a','flink', x.n); a.href = x.u; a.target = '_blank'; a.rel = 'noopener';
+      a.title = x.note || ''; links.appendChild(a);
+    });
+    var pinfo = (FI.portInfo || {})[fr ? fr[0] : ''];
+    if (pinfo){
+      var a2 = el('a','flink', fr[0] + ' 안내'); a2.href = pinfo; a2.target='_blank'; a2.rel='noopener';
+      links.appendChild(a2);
+    }
+    (FI.tel || []).forEach(function(t){
+      var a3 = el('a','flink tel', '☎ ' + t.n + ' ' + t.v);
+      a3.href = 'tel:' + String(t.v).replace(/[^0-9]/g,'');
+      a3.title = t.note || ''; links.appendChild(a3);
+    });
+    if (links.childNodes.length) fs3.appendChild(links);
+
+    if ((FI.tips || []).length){
+      var tl = el('ul','ftips');
+      FI.tips.forEach(function(t){ tl.appendChild(el('li','', t)); });
+      fs3.appendChild(tl);
+    }
+    b.appendChild(fs3);
+  }
+
+  /* 바다·하늘 */
+  var s3 = el('div','sec');
+  var skyNow = (S.mode==='fish' ? w.sky : w.skyH) || '';
+  s3.appendChild(el('div','sec-t','바다와 하늘'
+    + (skyNow ? ' <em class="skytag'+(w.storm?' danger':(w.fog?' warn':''))+'">'+skyNow+'</em>' : '')));
+  var g2 = el('div','grid');
+  var cells = [
+    [w.wave!=null ? w.wave.toFixed(1)+'m' : '-', '파고'],
+    [w.wind!=null ? Math.round(w.wind)+'m/s' : '-', (w.wdir||'')+'풍' + (w.onshore ? ' · '+w.onshore : '')],
+    [w.sst !=null ? w.sst.toFixed(1)+'°' : '-', '수온'],
+    [w.temp!=null ? Math.round(w.temp)+'°' : '-', '기온'],
+    [hmH(meta.sunrise)+'/'+hmH(meta.sunset), '일출·일몰'],
+    [meta.moonBright+'%', '달 밝기'],
+    [w.rain!=null ? (w.rain>=0.05 ? w.rain.toFixed(1)+'mm' : '없음') : '-',
+     '시간당 비' + (w.rainP!=null ? ' · 확률 '+w.rainP+'%' : '')],
+    [w.cloud!=null ? Math.round(w.cloud)+'%' : '-', '구름'],
+    [(S.mode==='fish' ? w.chillF : w.chillH)!=null
+        ? Math.round(S.mode==='fish' ? w.chillF : w.chillH)+'°' : '-',
+     S.mode==='fish' ? '비바람 체감' : '젖었을 때 체감']
+  ];
+  if (w.rainDay!=null && w.rainDay>=1) cells.push([w.rainDay.toFixed(0)+'mm','오늘 누적 비']);
+  if (w.vism!=null && w.vism<4000) cells.push([w.vism>=1000 ? (w.vism/1000).toFixed(1)+'km' : w.vism+'m','시정']);
+  cells.forEach(function(c){ g2.appendChild(el('div','cell','<b>'+c[0]+'</b><span>'+c[1]+'</span>')); });
+  s3.appendChild(g2);
+  b.appendChild(s3);
+
+  /* 점수 분해 */
+  var s4 = el('div','sec');
+  s4.appendChild(el('div','sec-t','점수를 이렇게 냈습니다'));
+  var bars = el('div','bars');
+  var MAXP = m.partsMax || (S.mode === 'fish'
+    ? { 피딩:28, 조류:18, 해상:20, 수온:16, 기압:8, 물색:10 }
+    : { 시야:32, 노출:26, 타이밍:18, 안전:16, 활성:8 });
+  Object.keys(m.parts).forEach(function(k){
+    var v = m.parts[k], mx = MAXP[k] || 25;
+    var r = el('div','bar-row');
+    r.appendChild(el('div','bar-lb', k));
+    var tr = el('div','bar-tr'); var fl = el('div','bar-fl'); tr.appendChild(fl); r.appendChild(tr);
+    r.appendChild(el('div','bar-vl', v + '/' + mx));
+    bars.appendChild(r);
+    setTimeout(function(){ fl.style.width = Math.round(v/mx*100) + '%'; }, 60);
+  });
+  s4.appendChild(bars);
+  b.appendChild(s4);
+
+  /* 근거 · 주의 */
+  if ((m.why||[]).length || (m.warn||[]).length){
+    var s5 = el('div','sec');
+    s5.appendChild(el('div','sec-t','근거와 주의'));
+    var ln = el('div','lines');
+    (m.why||[]).forEach(function(t){ ln.appendChild(el('div','line','<i>✓</i><span>'+t+'</span>')); });
+    (m.warn||[]).forEach(function(t){ ln.appendChild(el('div','line w','<i>⚠</i><span>'+t+'</span>')); });
+    s5.appendChild(ln);
+    b.appendChild(s5);
+  }
+
+  /* 대상 */
+  var s6 = el('div','sec');
+  s6.appendChild(el('div','sec-t', S.mode==='fish' ? '이 시기 노릴 어종' : '이 시기 채집물'));
+  var ch = el('div','chips');
+  (m.targets||[]).forEach(function(t){
+    var lab = (t.sig ? '★ ' : '') + t.n + (t.v>=3 ? ' 제철' : '');
+    if (t.ban && t.ban.size) lab += ' · ' + t.ban.size + (t.ban.unit||'') + '↑';
+    var c0 = el('span','chip'+(t.v>=3?' hot':'')+(t.sig?' sig':''), lab);
+    if (t.sig) c0.title = '이 자리 후기에서 유독 많이 잡힌 종';
+    ch.appendChild(c0);
+  });
+  s6.appendChild(ch);
+  b.appendChild(s6);
+
+  /* 준비물과 채비 — 오늘 대상 기준 */
+  if (d.rigs){
+    var rlist = S.mode === 'fish' ? d.rigs.fish : d.rigs.haeru;
+    var rs2 = el('div','sec');
+    rs2.appendChild(el('div','sec-t', S.mode === 'fish' ? '채비와 미끼 — 오늘 대상 기준' : '준비물 — 오늘 대상 기준'));
+    (rlist || []).forEach(function(r){
+      var card = el('div','rig');
+      card.innerHTML = '<div class="rig-h"><b>' + r.n + '</b></div>'
+        + ((r.t && r.t.length) ? '<div class="rig-t">' + r.t.map(shopChip).join('') + '</div>' : '')
+        + (r.b ? '<p class="rig-b">🪱 ' + r.b + '</p>' : '')
+        + (r.tip ? '<p class="rig-tip">' + r.tip + '</p>' : '')
+        + (r.warn ? '<p class="spot-w">⚠ ' + r.warn + '</p>' : '');
+      rs2.appendChild(card);
+    });
+    if (!(rlist || []).length)
+      rs2.appendChild(el('div','gauge-l','오늘 대상에 등록된 채비 정보가 없습니다.'));
+    if (rs2.querySelector('.chip.buy')) rs2.appendChild(aff_());
+    if (S.mode === 'haeru' && d.rigs.safe){
+      var sf = el('div','rig safe');
+      sf.innerHTML = '<div class="rig-h"><b>🦺 안전 장비 — 대상과 무관하게 항상</b></div>'
+        + '<div class="rig-t">' + d.rigs.safe.map(shopChip).join('') + '</div>';
+      rs2.appendChild(sf);
+    }
+    if (d.shop && d.shop.disclosure)
+      rs2.appendChild(el('div','shop-disc', d.shop.disclosure));
+    b.appendChild(rs2);
+  }
+
+  /* 잡는 법 영상 — 유튜버 노출 자리 */
+  var vlist = d.videos ? (S.mode === 'fish' ? d.videos.fish : d.videos.haeru) : null;
+  if (vlist && vlist.length){
+    var vs = el('div','sec');
+    vs.appendChild(el('div','sec-t','잡는 법 영상'));
+    var vw = el('div','vids');
+    vlist.forEach(function(v){
+      var a = el('a','vid' + (v.paid ? ' paid' : '') + (v.search ? ' srch' : ''));
+      a.href = v.u; a.target = '_blank'; a.rel = 'noopener' + (v.paid ? ' sponsored nofollow' : '');
+      var thumb = v.thumb
+        ? '<img class="vid-th" src="' + v.thumb + '" alt="" loading="lazy">'
+        : '<div class="vid-th ph">▶</div>';
+      a.innerHTML = thumb
+        + '<div class="vid-b"><b>' + v.target + (v.search ? ' 잡는 법 찾아보기' : '') + '</b>'
+        + (v.t ? '<span>' + v.t + '</span>' : '')
+        + (v.ch ? '<span class="vid-ch">' + v.ch + '</span>' : '')
+        + (v.paid ? '<em class="vid-ad">광고</em>' : '') + '</div>';
+      a.addEventListener('click', function(){ refEvent('video'); });
+      vw.appendChild(a);
+    });
+    vs.appendChild(vw);
+    vs.appendChild(joinBox_('ch',
+      '이 자리 영상 가지고 계신가요',
+      '해루낚을 소개해 주시면 이 자리가 좋은 날마다 그 영상을 여기에 겁니다. 노출료는 받지 않습니다.',
+      'partner/', '채널 제휴 보기'));
+    b.appendChild(vs);
+  } else {
+    var vs0 = el('div','sec');
+    vs0.appendChild(el('div','sec-t','잡는 법 영상'));
+    vs0.appendChild(el('div','gauge-l','이 대상물 영상이 아직 없습니다.'));
+    vs0.appendChild(joinBox_('ch',
+      '이 자리 영상 가지고 계신가요',
+      '유튜브·블로그 하시면 여기에 영상을 걸어드립니다. 이 자리가 좋은 날마다 자동으로 노출됩니다. 노출료는 받지 않습니다.',
+      'partner/', '채널 제휴 보기'));
+    b.appendChild(vs0);
+  }
+
+  /* 오늘 조건에 맞는 준비물 (제휴 링크) */
+  if (d.gear && d.gear.length){
+    var gs = el('div','sec');
+    gs.appendChild(el('div','sec-t','조건 맞춤 장비 <span style="font-weight:600;color:var(--mut2)">(제휴 링크)</span>'));
+    var gw = el('div','chips');
+    d.gear.forEach(function(g){
+      var label = g.n + (g.why ? ' · ' + g.why : '');
+      if (!g.url){                       // 링크가 없으면 앵커로 만들지 않는다
+        gw.appendChild(el('span','chip gear off', label));
+        return;
+      }
+      var c = el('a','chip gear', label);
+      c.href = g.url; c.target = '_blank'; c.rel = 'noopener sponsored nofollow';
+      c.addEventListener('click', function(){ bizClick(g.id, 'gear'); });
+      gw.appendChild(c);
+    });
+    gs.appendChild(gw);
+    gs.appendChild(aff_());
+    b.appendChild(gs);
+  }
+
+  /* 이 근처 제휴처 — 등록된 곳이 있을 때만 (빈 권유 상자는 없앤다) */
+  if (d.partners && d.partners.length){
+    var ps = el('div','sec');
+    ps.appendChild(el('div','sec-t','이 근처 <span style="font-weight:600;color:var(--mut2)">(제휴)</span>'));
+    var TY = { shop:'🎣 낚시점', stay:'🏠 숙박', food:'🍜 식당', boat:'⛴ 낚싯배' };
+    d.partners.forEach(function(x){
+      var card = el('div','pcard');
+      card.innerHTML = '<div class="pcard-h"><em>' + (TY[x.ty] || '🏷') + '</em><b>' + x.n + '</b>'
+        + (x.tag ? '<span class="pcard-tag">' + x.tag + '</span>' : '') + '</div>'
+        + (x.d ? '<p>' + x.d + '</p>' : '');
+      var acts = el('div','pcard-a');
+      if (x.tel){
+        var tb = el('a','act','전화');
+        tb.href = 'tel:' + x.tel;
+        tb.addEventListener('click', function(){ bizClick(x.id, 'partner'); });
+        acts.appendChild(tb);
+      }
+      if (x.url){
+        var ub = el('a','act','자세히');
+        ub.href = x.url; ub.target = '_blank'; ub.rel = 'noopener';
+        ub.addEventListener('click', function(){ bizClick(x.id, 'partner'); });
+        acts.appendChild(ub);
+      }
+      if (x.ty === 'boat'){
+        var bb = el('button','act primary','예약 문의');
+        bb.onclick = function(){ openBookForm(ps, d, x); };
+        acts.appendChild(bb);
+      }
+      card.appendChild(acts);
+      ps.appendChild(card);
+    });
+    ps.appendChild(el('div','gauge-l','제휴처 등록·광고 문의 thecloudstay@gmail.com'));
+    b.appendChild(ps);
+  }
+
+  /* 제휴 광고 — 맨 아래 한 곳에만, 조용히 (지역·시즌 타겟, 프리미엄 숨김) */
+  if (d.ad && !isPremium()){
+    var adBox = el('a','adcard');
+    adBox.href = d.ad.url || '#'; adBox.target = '_blank'; adBox.rel = 'noopener sponsored';
+    adBox.innerHTML = '<span class="adtag">제휴</span><b>' + d.ad.t + '</b>' + (d.ad.d ? '<span>' + d.ad.d + '</span>' : '');
+    adBox.addEventListener('click', function(){ bizClick(d.ad.id, 'ad'); });
+    b.appendChild(adBox);
+  }
+
+  /* 반대 모드 */
+  var s7 = el('div','sec');
+  s7.appendChild(el('div','sec-t', S.mode==='fish' ? '같은 날 해루질은' : '같은 날 낚시는'));
+  s7.appendChild(el('div','dt-verdict'+(o.score<46?' bad':''), o.verdict));
+  b.appendChild(s7);
+
+  /* 실제 조황 */
+  var cs2 = el('div','sec');
+  cs2.appendChild(el('div','sec-t','실제 조황 기록'));
+  var cbody = el('div','catchbody');
+  cbody.innerHTML = '<div class="gauge-l" style="padding:4px 2px">불러오는 중…</div>';
+  cs2.appendChild(cbody);
+  b.appendChild(cs2);
+  google.script.run.withSuccessHandler(function(cd){
+    renderCatch(cbody, cd || {n:0,recent:[]}, d);
+  }).withFailureHandler(function(){ cbody.innerHTML = ''; renderCatch(cbody, {n:0,recent:[]}, d); })
+    .apiCatchPoint(d.point.i, S.mode);
+
+  /* 7일 전망 */
+  if (d.week && d.week.length){
+    var s8 = el('div','sec');
+    s8.appendChild(el('div','sec-t','앞으로 7일'));
+    var wk = el('div','week');
+    d.week.forEach(function(x){
+      var v = S.mode==='fish' ? x.f : x.h;
+      var win = S.mode==='fish' ? x.fw : x.hw;
+      var dt = parseDs(x.ds);
+      var c = v>=88?'#2ee6a8':v>=76?'#7fd8cf':v>=62?'#b5cad8':v>=46?'#ff7f5a':'#e0563a';
+      var card = el('div','wd'+(x.ds===S.ds?' today':''),
+        '<em>'+(dt.getMonth()+1)+'/'+dt.getDate()+' '+WD[dt.getDay()]+'</em>'+
+        '<b style="color:'+c+'">'+v+'</b>'+
+        '<div class="wv"><i style="width:'+v+'%;background:'+c+'"></i></div>'+
+        '<small>'+x.mul+'</small>'+
+        (S.mode==='haeru'&&x.vis!=null?'<small class="vis">'+(x.vis>=1?x.vis.toFixed(1)+'m':Math.round(x.vis*100)+'cm')+'</small>':'')+
+        '<small style="color:var(--mut2)">'+(win?hm(win[0]):'-')+'</small>');
+      card.onclick = function(){ S.ds = x.ds; renderDates(); closeDetail(); load(); };
+      wk.appendChild(card);
+    });
+    s8.appendChild(wk);
+    b.appendChild(s8);
+  }
+
+  /* 비어업인 수칙 */
+  if (S.mode === 'haeru' && BOOT.nonpro && BOOT.nonpro.length){
+    var rs = el('div','sec');
+    rs.appendChild(el('div','sec-t','해루질 전에 확인할 것'));
+    var rb = el('div','rulebox');
+    BOOT.nonpro.forEach(function(x){
+      rb.appendChild(el('div','r','<b>'+x.t+'</b><span>'+x.d+'</span>'));
+    });
+    rs.appendChild(rb);
+    b.appendChild(rs);
+  }
+
+  /* 액션 */
+  var act = el('div','dt-actions');
+  var nav = el('a','act primary','길찾기');
+  nav.href = 'https://map.kakao.com/link/to/' + encodeURIComponent(d.point.n) + ',' + d.point.la + ',' + d.point.lo;
+  nav.target = '_blank'; nav.rel = 'noopener';
+  nav.addEventListener('click', function(){ refEvent('nav'); });
+  act.appendChild(nav);
+  var info = el('a','act','이 자리 정보');
+  info.href = 'spot/' + d.point.i + '.html';
+  act.appendChild(info);
+  var sh = el('button','act','링크 복사');
+  sh.onclick = function(){
+    var u = shareUrl_('spot', d.point.i);
+    var done = function(){ toast('링크를 복사했습니다'); };
+    if (navigator.share){
+      navigator.share({ title: '해루낚 · ' + d.point.n, url: u }).catch(function(){});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(u).then(done, function(){ prompt('복사하세요', u); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = u; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch(e){}
+      document.body.removeChild(ta);
+    }
+  };
+  act.appendChild(sh);
+  var cl = el('button','act','닫기'); cl.onclick = closeDetail;
+  act.appendChild(cl);
+  b.appendChild(act);
+
+  if (tideOnly_()){
+    var KILL = ['수중 시야', '바다와 하늘', '점수를 이렇게', '파도가 어디까지', '근거와 주의', '같은 날 낚시는', '조건 맞춤 장비'];
+    var secs2 = b.querySelectorAll('.sec');
+    for (var q = 0; q < secs2.length; q++){
+      var tt = secs2[q].querySelector('.sec-t');
+      if (!tt) continue;
+      for (var q2 = 0; q2 < KILL.length; q2++)
+        if (tt.textContent.indexOf(KILL[q2]) >= 0){ secs2[q].remove(); break; }
+    }
+  }
+
+  orderDetail_(b);
+  b.scrollTop = 0;
+  playIn_(b);
+}
+
+/* 상세 화면 순서 — 사람들이 먼저 찾는 것부터: 0 물때 → 1 어종 → 2 시야 → 3 들어가고 나오기 → 4 앞으로 7일 → 나머지.
+   머리·날짜줄·한 줄 결론·안전 경고는 짧으니 맨 위에 그대로 둔다. */
+var DT_ORDER = [
+  /* ── 언제 가나 — 가장 먼저 알고 싶은 것 ── */
+  ['물때 ·',10],['만조 · 간조',11],['지금 실제 바다',12],
+  ['언제 들어가고',13],['드러나는 갯벌',14],['파도가 어디까지',15],
+  /* ── 무엇을 잡나 ── */
+  ['노릴 어종',20],['채집물',20],
+  /* ── 어디로 어떻게 ── */
+  ['세부 포인트',30],['들어가는 길',31],['수중 시야',32],['바다와 하늘',33],['조류와 달',34],
+  /* ── 앞날과 기록 ── */
+  ['앞으로 7일',40],['실제 조황',41],['같은 날',42],
+  /* ── 준비물 ── */
+  ['준비물',50],['채비와 미끼',50],
+  /* ── 규정과 경고 — 정보를 다 본 뒤 ── */
+  ['금지체장',80],['잡으면 안 되는',81],['확인할 것',85],['점수를 이렇게',86],['근거와 주의',87],
+  /* ── 홍보·제휴 — 맨 아래 ── */
+  ['잡는 법 영상',90],['조건 맞춤 장비',91],['이 근처',92]
+];
+
+function orderDetail_(b){
+  var kids = Array.prototype.slice.call(b.children);
+  function rank(n){
+    var rk = n.getAttribute && n.getAttribute('data-rk');
+    if (rk) return +rk;
+    var c = n.className || '';
+    if (/dt-head/.test(c)) return 0;
+    if (/dt-verdict/.test(c) && !/sec/.test(c)) return 2;
+    if (/adcard/.test(c)) return 95;
+    if (/dt-actions/.test(c)) return 99;
+    var t = n.querySelector && n.querySelector('.sec-t');
+    if (t){
+      var tx = t.textContent || '';
+      for (var i = 0; i < DT_ORDER.length; i++) if (tx.indexOf(DT_ORDER[i][0]) >= 0) return DT_ORDER[i][1];
+      return 80;
+    }
+    return 3;
+  }
+  kids.map(function(n, i){ return { n:n, r:rank(n), i:i }; })
+      .sort(function(a, c){ return a.r - c.r || a.i - c.i; })
+      .forEach(function(x){ b.appendChild(x.n); });
+}
+
+/* 낚싯배 예약 문의 양식 */
+function openBookForm(box, d, partner){
+  var old = box.querySelector('.catch-form');
+  if (old){ old.remove(); return; }
+  var f = el('div','catch-form');
+  f.innerHTML =
+    '<div class="gauge-l" style="padding:0 2px 4px"><b style="color:var(--txt)">' + partner.n + '</b> 예약 문의 — 출조일 ' + S.ds + '</div>'
+    + '<div class="cf-row"><span>인원</span><input id="bkPax" maxlength="4" inputmode="numeric" placeholder="2"></div>'
+    + '<div class="cf-row"><span>연락처</span><input id="bkTel" maxlength="16" inputmode="tel" placeholder="010-0000-0000"></div>'
+    + '<div class="cf-row"><span>요청</span><input id="bkMemo" maxlength="80" placeholder="대상어·시간대 등 (선택)"></div>'
+    + '<button class="act primary" id="bkSave">문의 보내기</button>'
+    + '<div class="gauge-l">확인 후 업체 또는 해루낚에서 연락드립니다. 기상으로 출항이 취소될 수 있습니다.</div>';
+  box.appendChild(f);
+  f.querySelector('#bkSave').onclick = function(){
+    var tel = f.querySelector('#bkTel').value.trim();
+    if (!tel){ toast('연락처를 적어주세요'); return; }
+    f.querySelector('#bkSave').textContent = '보내는 중…';
+    google.script.run.withSuccessHandler(function(r){
+      toast(r && r.ok ? '문의가 접수됐습니다. 곧 연락드리겠습니다' : (r && r.msg) || '전송 실패');
+      f.remove();
+    }).withFailureHandler(function(){ toast('보내지 못했습니다. ' + (partner.tel ? '전화(' + partner.tel + ')로 문의해주세요' : '')); f.querySelector('#bkSave').textContent = '문의 보내기'; })
+      .apiBookRequest({ ds: S.ds, point: d.point.n, partner: partner.n, pid: partner.id,
+        pax: f.querySelector('#bkPax').value, tel: tel,
+        memo: f.querySelector('#bkMemo').value, ref: refCode() || '', uid: myUid() });
+  };
+}
+
+/* 이용권 등록 — prompt() 는 구글 iframe·일부 브라우저에서 차단되므로 자체 창을 쓴다 */
+function openRedeem(){
+  var old = document.getElementById('redeemBox');
+  if (old){ old.remove(); return; }
+  var wrap = el('div','detail');
+  wrap.id = 'redeemBox';
+  wrap.innerHTML = '<div class="detail-scrim"></div>'
+    + '<div class="detail-panel glass" style="max-height:none;padding-bottom:calc(20px + var(--safeB))">'
+    + '<div class="handle"><i></i></div>'
+    + '<div style="padding:4px 18px 8px">'
+    + '<h3 style="font-size:17px;font-weight:800;margin-bottom:6px">이용권 등록</h3>'
+    + '<p class="gauge-l" style="margin-bottom:12px">프리미엄: 15일 전망 · 광고 없음 · 1년</p>'
+    + '<div class="cf-row"><span>코드</span><input id="rdCode" maxlength="24" autocapitalize="characters" placeholder="HRN-XXXX"></div>'
+    + '<div class="dt-actions"><button class="act primary" id="rdGo">등록</button><button class="act" id="rdX">닫기</button></div>'
+    + '</div></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('.detail-scrim').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#rdX').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#rdGo').onclick = function(){
+    var code = wrap.querySelector('#rdCode').value.trim();
+    if (!code){ toast('코드를 입력하세요'); return; }
+    wrap.querySelector('#rdGo').textContent = '확인 중…';
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.ok){
+        try { localStorage.setItem('hrn_premium', JSON.stringify({ until: r.until })); } catch(e){}
+        toast('프리미엄이 켜졌습니다. 감사합니다!');
+        wrap.remove(); load();
+      } else { toast((r && r.msg) || '코드 확인 실패'); wrap.querySelector('#rdGo').textContent = '등록'; }
+    }).withFailureHandler(function(){ toast('확인하지 못했습니다'); wrap.querySelector('#rdGo').textContent = '등록'; })
+      .apiRedeem(code, myUid());
+  };
+}
+
+/* 파트너(유튜버) 안내 + 성과 조회 */
+function openPartner(){
+  var old = document.getElementById('ptBox');
+  if (old){ old.remove(); return; }
+  var wrap = el('div','detail');
+  wrap.id = 'ptBox';
+  wrap.innerHTML = '<div class="detail-scrim"></div>'
+    + '<div class="detail-panel glass" style="max-height:88vh">'
+    + '<div class="handle"><i></i></div>'
+    + '<div style="padding:4px 18px calc(20px + var(--safeB));overflow-y:auto">'
+    + '<h3 style="font-size:18px;font-weight:800;margin-bottom:6px">파트너 모집 — 유튜버·커뮤니티</h3>'
+    + '<p class="gauge-l" style="margin-bottom:12px">영상·게시글에 본인 링크를 붙이면, 그 링크로 들어온 사용자가 만드는 수익을 나눕니다.</p>'
+    + '<div class="rig"><div class="rig-h"><b>이렇게 됩니다</b></div>'
+    + '<p class="rig-tip">1. 채널 코드를 받습니다 (예: haeru_tv)<br>'
+    + '2. 고정댓글에 <b style="color:var(--acc)">앱주소?ref=코드</b> 를 답니다<br>'
+    + '3. 30일 안에 그 사용자가 만든 수익이 코드에 귀속됩니다<br>'
+    + '4. 매월 1일 자동 정산 — 집계표를 그대로 공유합니다</p></div>'
+    + '<div class="rig"><div class="rig-h"><b>분배율</b></div>'
+    + '<p class="rig-tip">기본 <b>30%</b> · 월 유입 100명 이상 <b>35%</b> · 1,000명 이상 <b>40%</b> · 예약 수수료는 20%</p></div>'
+    + '<div class="rig"><div class="rig-h"><b>내 코드 성과 조회</b></div>'
+    + '<div class="cf-row" style="margin-top:8px"><span>코드</span><input id="ptCode" maxlength="24" placeholder="haeru_tv"></div>'
+    + '<button class="act primary" id="ptGo" style="margin-top:8px;width:100%">조회</button>'
+    + '<div id="ptOut" class="gauge-l" style="margin-top:8px"></div></div>'
+    + '<div class="gauge-l" style="margin-top:10px">제휴 신청: <a href="mailto:thecloudstay@gmail.com" style="color:var(--acc)">thecloudstay@gmail.com</a> 으로 채널 링크를 보내주세요. 하루 안에 코드를 드립니다.</div>'
+    + '<button class="act" id="ptX" style="width:100%;margin-top:12px">닫기</button>'
+    + '</div></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('.detail-scrim').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#ptX').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#ptGo').onclick = function(){
+    var code = wrap.querySelector('#ptCode').value.trim();
+    if (!code){ toast('코드를 입력하세요'); return; }
+    var out = wrap.querySelector('#ptOut');
+    out.textContent = '조회 중…';
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.ok)
+        out.innerHTML = '<b style="color:var(--acc)">' + r.code + '</b> — 유입 ' + r.visit
+          + ' · 상세열람 ' + r.open + ' · 길찾기 ' + r.nav
+          + (r.amount ? ' · 귀속 매출 ' + r.amount + '원' : '')
+          + '<br>현재 분배율 <b>' + r.rate + '%</b> · 첫 유입 ' + r.first + ' · 최근 ' + r.last;
+      else out.textContent = (r && r.msg) || '집계가 없습니다';
+    }).withFailureHandler(function(){ out.textContent = '정적판에서는 조회가 되지 않습니다. 앱스 스크립트판 주소에서 확인하세요'; })
+      .apiRefLookup(code);
+  };
+}
+
+/* 세부 포인트 제보 양식 */
+function openSuggestForm(box, d){
+  var old = box.querySelector('.catch-form');
+  if (old){ old.remove(); return; }
+  var f = el('div','catch-form');
+  f.innerHTML =
+    '<div class="cf-row"><span>포인트명</span><input id="sgN" maxlength="30" placeholder="예: 해수욕장 좌측 갯바위"></div>'
+    + '<div class="cf-row"><span>설명</span><input id="sgD" maxlength="100" placeholder="무엇이 잡히고 어떻게 들어가는지"></div>'
+    + '<div class="cf-row"><span>주의</span><input id="sgW" maxlength="80" placeholder="고립·어촌계 등 (선택)"></div>'
+    + '<div class="cf-row"><span>닉네임</span><input id="sgNick" maxlength="12" value="' + lsGet('hrn_nick') + '"></div>'
+    + '<button class="act primary" id="sgSave">제보 보내기</button>'
+    + '<div class="gauge-l">검토 후 반영됩니다. 잘못된 제보(사유지·금지구역)는 제외됩니다.</div>';
+  box.appendChild(f);
+  f.querySelector('#sgSave').onclick = function(){
+    var name = f.querySelector('#sgN').value.trim();
+    if (!name){ toast('포인트 이름을 적어주세요'); return; }
+    var nick = f.querySelector('#sgNick').value.trim();
+    try { localStorage.setItem('hrn_nick', nick); } catch(e){}
+    f.querySelector('#sgSave').textContent = '보내는 중…';
+    google.script.run.withSuccessHandler(function(r){
+      toast(r && r.ok ? (r.local ? '이 기기에 저장했습니다. 공동 반영은 앱스 스크립트판에서 됩니다' : '제보 감사합니다! 검토 후 모두에게 공개됩니다') : '전송 실패');
+      f.remove();
+    }).withFailureHandler(function(){ toast('보내지 못했습니다'); f.querySelector('#sgSave').textContent = '제보 보내기'; })
+      .apiSpotSuggest({ i: d.point.i, n: d.point.n, spot: name,
+        desc: f.querySelector('#sgD').value, warn: f.querySelector('#sgW').value,
+        nick: nick, uid: myUid() });
+  };
+}
+
+/* 조황 기록 렌더 */
+function renderCatch(box, cd, d){
+  box.innerHTML = '';
+  if (cd.n > 0){
+    var head = el('div','gauge');
+    var col = cd.rate >= 62 ? '#2ee6a8' : cd.rate >= 40 ? '#ffb08a' : '#ff7f5a';
+    head.innerHTML = '<div class="gauge-v" style="color:'+col+'">'+cd.rate+'%</div>'
+      + '<div class="gauge-b"><div class="gauge-t"><i data-w="'+cd.rate+'" style="background:'+col+'"></i></div>'
+      + '<div class="gauge-l">기록 '+cd.n+'건의 성공률'
+      + (cd.byMul && cd.byMul.length ? ' · 잘 나온 물때: ' + cd.byMul.slice(0,3).map(function(m){ return m.mul+'('+m.rate+'%)'; }).join(' ') : '')
+      + '</div></div>';
+    box.appendChild(head);
+    (cd.recent||[]).slice(0,4).forEach(function(r){
+      var ic = r.rs==='상'?'🟢':r.rs==='중'?'🟡':r.rs==='하'?'🟠':'⚫';
+      box.appendChild(el('div','catch-row', ic+' <b>'+r.ds+'</b> '+(r.mul||'')+' · '+(r.tg||'')+' '
+        + (r.memo ? '— '+r.memo : '') + ' <em>'+r.nick+'</em>'));
+    });
+  } else {
+    box.appendChild(el('div','gauge-l','아직 기록이 없습니다. 첫 기록을 남기면 이 자리 점수가 실측으로 보정되기 시작합니다.'));
+  }
+  var btn = el('button','act primary catch-open','다녀온 기록 남기기');
+  btn.onclick = function(){ openCatchForm(box, d); };
+  box.appendChild(btn);
+  fillBars_(box);
+}
+function openCatchForm(box, d){
+  var old = box.querySelector('.catch-form');
+  if (old){ old.remove(); return; }
+  var m = S.mode === 'fish' ? d.fish : d.haeru;
+  var f = el('div','catch-form');
+  f.innerHTML =
+    '<div class="cf-row"><span>조과</span><div class="cf-seg" id="cfRes">'
+    + ['상','중','하','꽝'].map(function(x,i){ return '<button data-v="'+x+'"'+(i===1?' class="on"':'')+'>'+x+'</button>'; }).join('') + '</div></div>'
+    + '<div class="cf-row"><span>잡은 것</span><input id="cfTg" maxlength="40" value="' + (m.targets||[]).slice(0,2).map(function(t){return t.n;}).join(', ') + '"></div>'
+    + '<div class="cf-row"><span>한 줄</span><input id="cfMemo" maxlength="60" placeholder="물색 좋았음, 씨알 굵음 등"></div>'
+    + '<div class="cf-row"><span>닉네임</span><input id="cfNick" maxlength="12" value="' + lsGet('hrn_nick') + '" placeholder="익명"></div>'
+    + '<button class="act primary" id="cfSave">저장</button>';
+  box.appendChild(f);
+  f.querySelector('#cfRes').addEventListener('click', function(e){
+    var b2 = e.target.closest('button'); if (!b2) return;
+    f.querySelectorAll('#cfRes button').forEach(function(x){ x.classList.remove('on'); });
+    b2.classList.add('on');
+  });
+  f.querySelector('#cfSave').onclick = function(){
+    var nick = f.querySelector('#cfNick').value.trim();
+    try { localStorage.setItem('hrn_nick', nick); } catch(e){}
+    var entry = {
+      ds: S.ds, i: d.point.i, n: d.point.n, mode: S.mode,
+      targets: f.querySelector('#cfTg').value, result: (f.querySelector('#cfRes .on')||{}).dataset ? f.querySelector('#cfRes .on').dataset.v : '중',
+      memo: f.querySelector('#cfMemo').value, nick: nick,
+      mul: d.meta.mul, score: m.score, uid: myUid()
+    };
+    f.querySelector('#cfSave').textContent = '저장 중…';
+    google.script.run.withSuccessHandler(function(r){
+      toast(r && r.ok ? '기록됐습니다. 이 자리 점수에 반영됩니다' : (r && r.msg) || '저장 실패');
+      google.script.run.withSuccessHandler(function(cd){ renderCatch(box, cd, d); }).apiCatchPoint(d.point.i, S.mode);
+    }).withFailureHandler(function(){ toast('저장하지 못했습니다'); f.querySelector('#cfSave').textContent = '저장'; })
+      .apiCatchSave(entry);
+  };
+}
+
+/* 조석 곡선 SVG */
+function tideSVG(meta, win){
+  var W = 320, H = 108, PT = 10, PB = 20;
+  var ev = (meta.events||[]).slice().sort(function(a,b){ return a.t-b.t; });
+  var ns = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  if (!ev.length) return svg;
+
+  // 앞뒤로 가상 극점을 붙여 0~24시를 모두 덮는다
+  var pts = ev.slice();
+  var P = 6.2103;
+  while (pts[0].t > 0)      pts.unshift({ k: pts[0].k==='H'?'L':'H', t: pts[0].t - P, lv: oppLv(pts, pts[0]) });
+  while (pts[pts.length-1].t < 24){
+    var last = pts[pts.length-1];
+    pts.push({ k: last.k==='H'?'L':'H', t: last.t + P, lv: oppLv(pts, last) });
+  }
+  function oppLv(list, ref){
+    for (var k=0;k<list.length;k++){ if (list[k].k !== ref.k) return list[k].lv; }
+    return ref.lv;
+  }
+  var lvs = pts.map(function(p){ return p.lv; });
+  var mn = Math.min.apply(null,lvs), mx = Math.max.apply(null,lvs);
+  if (mx - mn < 10) mx = mn + 10;
+  var X = function(t){ return t/24*W; };
+  var Y = function(l){ return PT + (1 - (l-mn)/(mx-mn)) * (H-PT-PB); };
+
+  function level(t){
+    for (var k=0;k<pts.length-1;k++){
+      if (t >= pts[k].t && t <= pts[k+1].t){
+        var a = pts[k], b2 = pts[k+1];
+        var f = (t - a.t)/(b2.t - a.t);
+        return (a.lv + b2.lv)/2 + (a.lv - b2.lv)/2 * Math.cos(Math.PI*f);
+      }
+    }
+    return pts[pts.length-1].lv;
+  }
+  var dpath = '', apath = '';
+  for (var t=0; t<=24; t+=0.25){
+    var x = X(t).toFixed(1), y = Y(level(t)).toFixed(1);
+    dpath += (t===0 ? 'M' : 'L') + x + ' ' + y;
+  }
+  apath = dpath + 'L'+W+' '+(H-PB)+'L0 '+(H-PB)+'Z';
+
+  // 그라데이션
+  var defs = document.createElementNS(ns,'defs');
+  defs.innerHTML = '<linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0%" stop-color="#1fc4c0" stop-opacity=".38"/>'+
+    '<stop offset="100%" stop-color="#1fc4c0" stop-opacity="0"/></linearGradient>';
+  svg.appendChild(defs);
+
+  // 야간 음영
+  function shade(a, b2){
+    if (b2 <= a) return;
+    var r = document.createElementNS(ns,'rect');
+    r.setAttribute('x', X(a)); r.setAttribute('y', 0);
+    r.setAttribute('width', X(b2)-X(a)); r.setAttribute('height', H-PB);
+    r.setAttribute('fill','rgba(2,10,18,.45)');
+    svg.appendChild(r);
+  }
+  if (meta.sunrise != null) shade(0, meta.sunrise);
+  if (meta.sunset != null)  shade(meta.sunset, 24);
+
+  // 추천 시간창
+  function drawWin(a2, b3){
+    if (b3 > a2){
+      var hi = document.createElementNS(ns,'rect');
+      hi.setAttribute('x', X(a2)); hi.setAttribute('y', 0);
+      hi.setAttribute('width', X(b3)-X(a2)); hi.setAttribute('height', H-PB);
+      hi.setAttribute('fill','rgba(46,230,168,.16)');
+      hi.setAttribute('stroke','rgba(46,230,168,.5)'); hi.setAttribute('stroke-width','1');
+      hi.setAttribute('class','tide-win');
+      svg.appendChild(hi);
+      var lb = document.createElementNS(ns,'text');
+      lb.setAttribute('x', (X(a2)+X(b3))/2); lb.setAttribute('y', H-PB-5);
+      lb.setAttribute('text-anchor','middle'); lb.setAttribute('font-size','9');
+      lb.setAttribute('fill','#2ee6a8'); lb.setAttribute('font-weight','800');
+      lb.setAttribute('class','tide-win-lb');
+      lb.textContent = '추천';
+      svg.appendChild(lb);
+    }
+  }
+  if (win){
+    var wa = win[0], wb = win[1];
+    drawWin(Math.max(0, wa), Math.min(24, wb));
+    if (wb > 24) drawWin(0, wb - 24);        // 자정을 넘긴 부분
+    if (wa < 0)  drawWin(24 + wa, 24);
+  }
+
+  var area = document.createElementNS(ns,'path');
+  area.setAttribute('d', apath); area.setAttribute('fill','url(#tg)');
+  area.setAttribute('class','tide-area');
+  svg.appendChild(area);
+  var line = document.createElementNS(ns,'path');
+  line.setAttribute('d', dpath); line.setAttribute('fill','none');
+  line.setAttribute('class','tide-line');
+  line.setAttribute('stroke','#1fc4c0'); line.setAttribute('stroke-width','2'); line.setAttribute('stroke-linecap','round');
+  svg.appendChild(line);
+
+  // 극점 표시
+  ev.forEach(function(e){
+    var c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx', X(e.t)); c.setAttribute('cy', Y(e.lv)); c.setAttribute('r', 3.2);
+    c.setAttribute('fill', e.k==='H' ? '#1fc4c0' : '#2ee6a8');
+    svg.appendChild(c);
+    var tx = document.createElementNS(ns,'text');
+    tx.setAttribute('x', Math.min(W-16, Math.max(16, X(e.t))));
+    tx.setAttribute('y', Y(e.lv) + (e.k==='H' ? -8 : 14));
+    tx.setAttribute('text-anchor','middle'); tx.setAttribute('font-size','9');
+    tx.setAttribute('fill', e.k==='H' ? '#a4e9d4' : '#7fe8c4'); tx.setAttribute('font-weight','700');
+    tx.textContent = hmH(e.t);
+    svg.appendChild(tx);
+  });
+
+  // 현재 시각
+  if (S.ds === BOOT.today){
+    var now = new Date(); var nt = now.getHours() + now.getMinutes()/60;
+    var nl = document.createElementNS(ns,'line');
+    nl.setAttribute('x1', X(nt)); nl.setAttribute('x2', X(nt));
+    nl.setAttribute('y1', 0); nl.setAttribute('y2', H-PB);
+    nl.setAttribute('stroke','#fff'); nl.setAttribute('stroke-width','1');
+    nl.setAttribute('stroke-dasharray','3 3'); nl.setAttribute('opacity','.55');
+    svg.appendChild(nl);
+  }
+  // 기준선
+  var base = document.createElementNS(ns,'line');
+  base.setAttribute('x1',0); base.setAttribute('x2',W);
+  base.setAttribute('y1',H-PB); base.setAttribute('y2',H-PB);
+  base.setAttribute('stroke','rgba(255,255,255,.12)'); base.setAttribute('stroke-width','1');
+  svg.appendChild(base);
+  return svg;
+}
+
+/* ══════════════ 날짜 ══════════════ */
+/* ── 물때만 날짜 ──
+   기상 예보는 7일이 한계다. 그 너머 날짜는 점수를 지어내지 않고
+   물때·진입/퇴로처럼 조석만으로 계산되는 것만 보여준다. */
+var WX_DAYS = 6;                       // 오늘 포함 7일 (오늘+6)
+function tideOnlyDs_(ds){
+  try {
+    var b = parseDs(BOOT.today), d = parseDs(ds);
+    return Math.round((d - b) / 86400000) > WX_DAYS;
+  } catch(e){ return false; }
+}
+function tideOnly_(){ return tideOnlyDs_(S.ds); }
+
+function renderDates(){
+  var n = $('datestrip'); n.innerHTML = '';
+  var base = parseDs(BOOT.today);   // 서버 기준 오늘
+  for (var k=-1; k<=13; k++){
+    var d = new Date(base.getTime() + k*86400000);
+    var ds = dstr(d);
+    var far = k > WX_DAYS;
+    var lbl = k===0 ? '오늘' : k===1 ? '내일' : k===-1 ? '어제' : (d.getMonth()+1)+'/'+d.getDate();
+    var c = el('button','dchip'+(ds===S.ds?' on':'')+(far?' far':'')+(k===0?' today':''),
+      '<b>'+lbl+'</b><span>'+(far?'물때만':WD[d.getDay()])+'</span>');
+    (function(x, fx){ c.onclick = function(){
+      if (S.ds===x) return; S.ds = x; renderDates(); load();
+      if (fx) toast('정확한 점수는 7일 이내만 제공됩니다 — 이 날짜는 물때·진입/퇴로만 보여드립니다', 3600);
+    }; })(ds, far);
+    n.appendChild(c);
+  }
+  /* 오늘을 보고 있으면 왼쪽 시작점에, 다른 날짜면 그 칸을 가운데로.
+     레이아웃이 끝난 뒤 잡아야 폭이 0이 아니어서 제대로 붙는다 */
+  var apply = function(){
+    var td = n.querySelector('.dchip.today');
+    var on = n.querySelector('.dchip.on');
+    if (S.ds === BOOT.today && td){
+      td.scrollIntoView({ inline:'start', block:'nearest' });
+      n.scrollLeft = Math.max(0, n.scrollLeft - 6);
+    } else if (on){
+      on.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+    }
+    dsCtlSync_();
+  };
+  dsCtl_();
+  requestAnimationFrame(function(){ requestAnimationFrame(apply); });
+}
+
+/* ── 날짜줄 이동 단추 — 좌우 화살표 + 「오늘」 복귀 ── */
+function dsCtl_(){
+  var st = $('datestrip'); if (!st) return;
+  if (!$('dsPrev')){
+    var mk = function(id, html, fn){
+      var b = document.createElement('button');
+      b.id = id; b.className = 'dsctl'; b.type = 'button'; b.innerHTML = html; b.onclick = fn;
+      document.body.appendChild(b); return b;
+    };
+    mk('dsPrev', '&#8249;', function(){ st.scrollBy({ left:-280, behavior:'smooth' }); });
+    mk('dsNext', '&#8250;', function(){ st.scrollBy({ left: 280, behavior:'smooth' }); });
+    mk('dsToday', '오늘', function(){
+      if (S.ds !== BOOT.today){ S.ds = BOOT.today; renderDates(); load(); }
+      else {
+        var on2 = st.querySelector('.dchip.on');
+        if (on2) on2.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
+      }
+    });
+    st.addEventListener('scroll', function(){ dsCtlSync_(); }, { passive:true });
+    window.addEventListener('resize', function(){ dsCtlSync_(); });
+  }
+  dsCtlSync_();
+}
+function dsCtlSync_(){
+  var st = $('datestrip'); if (!st || !$('dsPrev')) return;
+  var r = st.getBoundingClientRect();
+  var midY = (r.top + r.height/2);
+  var place = function(id, x, fromRight){
+    var b = $(id); if (!b) return;
+    b.style.top = midY + 'px';
+    if (fromRight){ b.style.right = x + 'px'; b.style.left = 'auto'; }
+    else { b.style.left = x + 'px'; b.style.right = 'auto'; }
+  };
+  place('dsPrev', r.left + 2, false);
+  place('dsNext', (window.innerWidth - r.right) + 2, true);
+  place('dsToday', (window.innerWidth - r.right) + 2, true);   /* 오른쪽 화살표와 같은 자리 — 겹치지 않게 번갈아 */
+  /* 「오늘」 단추는 오늘이 화면 밖이거나 다른 날짜를 보고 있을 때만 */
+  var need = (S.ds !== BOOT.today);
+  if (!need){
+    var today = st.querySelector('.dchip.today');
+    if (today){
+      var tr = today.getBoundingClientRect(), sr = st.getBoundingClientRect();
+      need = (tr.right < sr.left + 4 || tr.left > sr.right - 4);
+    }
+  }
+  var td = $('dsToday'); if (td) td.hidden = !need;
+  /* 화살표는 넘칠 때만 */
+  var over = st.scrollWidth > st.clientWidth + 8;
+  var pv = $('dsPrev'), nx = $('dsNext');
+  if (pv) pv.hidden = !over;
+  if (nx) nx.hidden = !over || need;   /* 「오늘」이 뜨는 동안은 오른쪽 화살표를 비켜 준다 */
+}
+
+/* ══════════════ 모드 토글 ══════════════ */
+function movePill(){
+  var seg = $('seg'), act = seg.querySelector('.seg-btn.active'), pill = seg.querySelector('.seg-pill');
+  pill.style.width = act.offsetWidth + 'px';
+  pill.style.transform = 'translateX(' + (act.offsetLeft - 4) + 'px)';
+}
+$('seg').addEventListener('click', function(e){
+  var b = e.target.closest('.seg-btn');
+  if (!b || b.classList.contains('active')) return;
+  $('seg').querySelectorAll('.seg-btn').forEach(function(x){ x.classList.remove('active'); });
+  b.classList.add('active'); movePill();
+  S.mode = b.dataset.mode;
+  load();
+});
+
+/* ══════════════ 정렬 ══════════════ */
+$('sorts').addEventListener('click', function(e){
+  var b = e.target.closest('.sort');
+  if (!b) return;
+  if (b.dataset.sort === 'near' && !S.me){
+    meAsk_(function(ok){ if (ok){ applyFloor_(); applySort(b); } });
+    return;
+  }
+  applySort(b);
+});
+function applySort(b){
+  $('sorts').querySelectorAll('.sort').forEach(function(x){ x.classList.remove('active'); });
+  b.classList.add('active');
+  S.sort = b.dataset.sort;
+  renderList();
+  $('sheet').classList.add('open');
+  syncPick();
+}
+
+/* ══════════════ 목록 판 접기 — 지도만 크게 ══════════════ */
+function sheetOff_(v){
+  document.body.classList.toggle('sheet-off', v);
+  $('sheetBack').hidden = !v;
+  try { if (v) setPickMini(true); } catch(e){}
+  setTimeout(function(){ try { map.invalidateSize(); } catch(e){} }, 60);
+}
+$('sheetX').onclick = function(e){ e.stopPropagation(); sheetOff_(true); };
+$('sheetBack').onclick = function(){ sheetOff_(false); $('sheet').classList.add('open'); syncPick(); };
+
+/* ══════════════ 바텀시트 드래그 ══════════════ */
+(function(){
+  var sheet = $('sheet'), h = $('handle');
+  var closedY = null, startY = 0, cur = 0, dragging = false;
+  function closed(){
+    return sheet.classList.contains('open') ? 0 : sheet.offsetHeight - 148 - (window.__sb||0);
+  }
+  function setY(y){ sheet.style.setProperty('--sy', y + 'px'); }
+  function down(e){
+    dragging = true; sheet.classList.add('drag');
+    startY = (e.touches ? e.touches[0].clientY : e.clientY);
+    cur = sheet.classList.contains('open') ? 0 : sheet.offsetHeight - 148;
+    e.preventDefault();
+  }
+  function move(e){
+    if (!dragging) return;
+    var y = (e.touches ? e.touches[0].clientY : e.clientY) - startY + cur;
+    y = Math.max(0, Math.min(sheet.offsetHeight - 100, y));
+    setY(y);
+  }
+  function up(){
+    if (!dragging) return;
+    dragging = false; sheet.classList.remove('drag');
+    var y = parseFloat(getComputedStyle(sheet).getPropertyValue('--sy')) || 0;
+    var open = y < (sheet.offsetHeight - 148) / 2;
+    sheet.style.removeProperty('--sy');
+    sheet.classList.toggle('open', open);
+    syncPick();
+  }
+  h.addEventListener('touchstart', down, { passive:false });
+  h.addEventListener('mousedown', down);
+  window.addEventListener('touchmove', move, { passive:false });
+  window.addEventListener('mousemove', move);
+  window.addEventListener('touchend', up);
+  window.addEventListener('mouseup', up);
+  h.addEventListener('click', function(){
+    if (!dragging){ sheet.classList.toggle('open'); syncPick(); }
+  });
+})();
+
+/* 상세 패널 아래로 밀어 닫기 */
+(function(){
+  var p = $('detailPanel'), h = $('detailHandle');
+  var sy = 0, on = false;
+  function down(e){ on = true; sy = (e.touches?e.touches[0].clientY:e.clientY); p.classList.add('drag'); e.preventDefault(); }
+  function move(e){
+    if (!on) return;
+    var dy = Math.max(0, (e.touches?e.touches[0].clientY:e.clientY) - sy);
+    p.style.transform = 'translateY(' + dy + 'px)';
+  }
+  function up(e){
+    if (!on) return; on = false; p.classList.remove('drag');
+    var dy = parseFloat((p.style.transform.match(/([\d.]+)px/)||[0,0])[1]) || 0;
+    p.style.transform = '';
+    if (dy > 110) closeDetail();
+  }
+  h.addEventListener('touchstart', down, { passive:false });
+  h.addEventListener('mousedown', down);
+  window.addEventListener('touchmove', move, { passive:false });
+  window.addEventListener('mousemove', move);
+  window.addEventListener('touchend', up);
+  window.addEventListener('mouseup', up);
+})();
+
+/* ══════════════ 시작 ══════════════ */
+$('btnReload').onclick = function(){
+  google.script.run.withSuccessHandler(function(){}).clearCache();
+  toast('새로 계산합니다');
+  load();
+};
+// 레퍼럴 코드 보존 — 나중에 예약·결제가 붙으면 이 코드로 정산한다
+try {
+  if (BOOT.ref) localStorage.setItem('hrn_ref', JSON.stringify({ c: BOOT.ref, t: Date.now() }));
+} catch(e){}
+function lsGet(k, d){ try { return localStorage.getItem(k) || d || ''; } catch(e){ return d || ''; } }
+function favs(){
+  try { return JSON.parse(localStorage.getItem('hrn_fav') || '[]'); } catch(e){ return []; }
+}
+function toggleFav(id){
+  var f = favs(), k = f.indexOf(id);
+  if (k >= 0) f.splice(k, 1); else f.push(id);
+  try { localStorage.setItem('hrn_fav', JSON.stringify(f)); } catch(e){}
+  return k < 0;
+}
+function isPremium(){
+  try {
+    var p = JSON.parse(localStorage.getItem('hrn_premium') || 'null');
+    return !!(p && p.until > Date.now());
+  } catch(e){ return false; }
+}
+/* 업체 클릭 집계 —
+   "우리 번호로 몇 통 왔냐"에 답할 수 있어야 업체에서 돈을 받을 수 있다.
+   앱스판은 서버가 받고, 정적판은 data/track.json 에 적힌 곳으로 흘려보낸다.
+   보낼 곳이 없으면 이 기기에만 쌓아 두었다가 나중에 올린다. */
+function bizClick(id, kind, extra){
+  if (!id) return;
+  var rec = { id:id, kind:kind||'partner', t:Date.now(),
+              spot:(window.__detail && window.__detail.point) ? window.__detail.point.i : null,
+              ref:(typeof refCode==='function' ? refCode() : ''),
+              uid:(typeof myUid==='function' ? myUid() : ''),
+              extra: extra||'' };
+  /* 앱스 스크립트판 */
+  try { if (window.google && google.script && google.script.run) google.script.run.apiBizClick(id, rec.kind); } catch(e){}
+  /* 이 기기 기록 — 보낼 곳이 없어도 잃지 않는다 */
+  try {
+    var q = JSON.parse(localStorage.getItem('hrn_biz') || '[]');
+    q.push(rec); if (q.length > 500) q = q.slice(-500);
+    localStorage.setItem('hrn_biz', JSON.stringify(q));
+  } catch(e){}
+  bizFlush_();
+}
+var BIZ_CFG = null, BIZ_SENDING = false;
+function bizFlush_(){
+  if (BIZ_SENDING) return;
+  var go = function(cfg){
+    if (!cfg || !cfg.url) return;
+    var q = [];
+    try { q = JSON.parse(localStorage.getItem('hrn_biz') || '[]'); } catch(e){}
+    if (!q.length) return;
+    BIZ_SENDING = true;
+    var send = function(r){
+      if (cfg.form){
+        /* 구글 폼으로 보내는 방식 — 서버 없이도 시트에 쌓인다 */
+        var fd = new FormData();
+        var f = cfg.form;
+        if (f.id)   fd.append(f.id,   r.id);
+        if (f.kind) fd.append(f.kind, r.kind);
+        if (f.spot) fd.append(f.spot, r.spot === null ? '' : String(r.spot));
+        if (f.ref)  fd.append(f.ref,  r.ref || '');
+        if (f.uid)  fd.append(f.uid,  r.uid || '');
+        if (f.t)    fd.append(f.t,    new Date(r.t).toISOString());
+        return fetch(cfg.url, { method:'POST', mode:'no-cors', body:fd });
+      }
+      return fetch(cfg.url, { method:'POST', mode:'no-cors',
+        headers:{'content-type':'text/plain'}, body: JSON.stringify(r) });
+    };
+    Promise.all(q.map(function(r){ return send(r).catch(function(){}); }))
+      .then(function(){ try { localStorage.setItem('hrn_biz','[]'); } catch(e){} })
+      .catch(function(){})
+      .then(function(){ BIZ_SENDING = false; });
+  };
+  if (BIZ_CFG !== null) return go(BIZ_CFG);
+  fetch('data/track.json', {cache:'default'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ BIZ_CFG = (j && j.url) ? j : {}; go(BIZ_CFG); })
+    .catch(function(){ BIZ_CFG = {}; });
+}
+function myUid(){
+  try {
+    var u = localStorage.getItem('hrn_uid');
+    if (!u){ u = 'u' + Math.random().toString(36).slice(2, 12); localStorage.setItem('hrn_uid', u); }
+    return u;
+  } catch(e){ return 'u0'; }
+}
+function refCode(){
+  try {
+    var d = JSON.parse(localStorage.getItem('hrn_ref') || 'null');
+    if (d && Date.now() - d.t < 30*86400000) return d.c;   // 30일 귀속 창
+  } catch(e){}
+  return null;
+}
+
+/* 준비물 칩 — 제휴 링크가 걸린 도구만 누를 수 있게 만든다 */
+
+/* 금지체장 표기 — size 는 숫자, unit 은 재는 기준(전장·각장·두동장 등)
+   'g' 로 끝나는 기준은 무게다 */
+function sizeText_(bn){
+  if (!bn || !bn.size) return '';
+  var u = String(bn.unit || '');
+  if (/무게|중량|g$/.test(u)) return bn.size + 'g';
+  return (u ? u + ' ' : '') + bn.size + 'cm';
+}
+function measureHow_(unit){
+  var M = {
+    '전장': '주둥이 끝부터 꼬리 끝까지',
+    '체장': '주둥이 끝부터 꼬리자루까지',
+    '항문장': '입에서 항문까지 (전장 아님)',
+    '각장': '껍데기의 가장 긴 쪽',
+    '각고': '껍데기 높이',
+    '두동장': '몸통(머리) 길이',
+    '갑장': '등딱지 너비',
+    '두흉갑장': '등딱지 길이',
+    '무게': '손질하지 않은 상태의 무게'
+  };
+  var u = String(unit || '');
+  for (var k in M) if (u.indexOf(k) >= 0) return M[k] + ' 기준';
+  return u ? u + ' 기준' : '';
+}
+
+
+/* 쿠팡 파트너스 대가성 고지 — 공정위 추천·보증 심사지침상 링크가 보이는 자리에 함께 떠야 한다.
+   숨기거나 접어두면 고지로 인정되지 않는다. */
+function aff_(){
+  return el('p','affnote',
+    '이 화면의 「사기」와 장비 링크는 쿠팡 파트너스 활동의 일환으로, '
+  + '이를 통해 일정액의 수수료를 제공받습니다. 구매자가 더 내는 금액은 없습니다.');
+}
+
+/* 제휴 권유 상자 — 이 화면을 보고 있는 사람이 곧 그 자리의 업자이거나 촬영자다.
+   가장 반응이 좋은 자리에만 놓는다. 아무 데나 붙이면 광고가 된다. */
+function joinBox_(kind, title, body, href, cta){
+  var box = el('div','joinbox ' + (kind === 'biz' ? 'jb-biz' : 'jb-ch'));
+  box.innerHTML = '<b>' + title + '</b><p>' + body + '</p>';
+  var a = el('a','joinbox-a', cta + ' →');
+  a.href = href;
+  box.appendChild(a);
+  return box;
+}
+
+function shopChip(name){
+  var esc = function(v){ return String(v).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  var d = window.__detail;
+  var hit = null;
+  if (d && d.shop && d.shop.items){
+    var items = d.shop.items;
+    // 1순위 — 이 도구가 실제로 묶인 상품군
+    for (var i = 0; i < items.length && !hit; i++){
+      if (items[i].u && items[i].src && items[i].src.indexOf(name) >= 0) hit = items[i];
+    }
+    // 2순위 — 이름이 같거나 서로를 포함
+    for (var j = 0; j < items.length && !hit; j++){
+      var it = items[j];
+      if (!it.u) continue;
+      if (name === it.n || String(name).indexOf(it.n) >= 0 || String(it.n).indexOf(name) >= 0) hit = it;
+    }
+  }
+  if (!hit) return '<span class="chip">' + esc(name) + '</span>';
+  return '<a class="chip buy" href="' + esc(hit.u) + '" target="_blank" rel="noopener sponsored nofollow">'
+       + esc(name) + ' <em>사기</em></a>';
+}
+
+function refEvent(ev){
+  var c = refCode();
+  if (c && window.google && google.script) try { google.script.run.apiRefEvent(c, ev); } catch(e){}
+}
+$('bootCount').textContent = BOOT.count;
+renderDates();
+movePill();
+window.addEventListener('resize', movePill);
+setTimeout(load, 120);
+
+/* ══════════════ 원픽 접기 — 지도를 가리지 않게 ══════════════ */
+function setPickMini(v){ $('pick').classList.toggle('mini', v); }
+function pickClosed(){
+  try { return localStorage.getItem('hrn_pickoff') === '1'; } catch(e){ return false; }
+}
+function setPickClosed(v){
+  try { v ? localStorage.setItem('hrn_pickoff','1') : localStorage.removeItem('hrn_pickoff'); } catch(e){}
+  $('pick').hidden = v || !S.rows.length;
+  $('pickRestore').hidden = !v || !S.rows.length;
+  $('pickRestore').classList.toggle('hasWant', !!S.want);
+}
+$('pickClose').onclick = function(e){
+  e.stopPropagation();
+  setPickClosed(true);
+  toast('원픽 카드를 닫았습니다. 위의 ★ 단추로 다시 열 수 있어요');
+};
+$('pickRestore').onclick = function(){ setPickClosed(false); };
+$('pickMin').onclick = function(e){ e.stopPropagation(); setPickMini(!$('pick').classList.contains('mini')); };
+$('pick').querySelector('.pick-inner').addEventListener('click', function(){
+  if ($('pick').classList.contains('mini')) setPickMini(false);
+});
+map.on('dragstart', function(){ setPickMini(true); });   // 지도를 만지면 비켜준다
+
+/* ══════════════ 지형 필터 — 펄·모래·혼합·갯바위 (여러 개 켤 수 있고, 하나도 안 켜면 전체) ══════════════
+   서버를 다시 부르지 않는다. 받은 목록을 바닥 지형으로 거르기만 하면 되고, 그래야 토글이 즉시 반응한다. */
+S.floors = {};
+function applyFloor_(){
+  var on = Object.keys(S.floors).filter(function(k){ return S.floors[k]; });
+  var all = S.rowsAll || [];
+  var a = on.length ? all.filter(function(r){ return on.indexOf(r.f) >= 0; }) : all.slice();
+  /* 내 위치를 알고 있으면 거리를 늘 달아 둔다 — 목록·원픽 어디서나 바로 쓴다 */
+  if (S.me) a.forEach(function(r){ r._d = dist(S.me[0], S.me[1], r.la, r.lo); });
+  else a.forEach(function(r){ r._d = null; });
+  if (S.near && S.me && S.rad) a = a.filter(function(r){ return r._d <= S.rad; });
+  S.rows = a;
+}
+$('filters').addEventListener('click', function(e){
+  var b = e.target.closest('.fchip.fl');
+  if (!b) return;
+  e.stopImmediatePropagation();
+  var k = b.dataset.fl;
+  S.floors[k] = !S.floors[k];
+  b.classList.toggle('on', !!S.floors[k]);
+  applyFloor_();
+  try { flatDraw_(); } catch(err){}
+  if (!S.rows.length){ toast('이 지형은 지금 조건에 없습니다'); }
+  S._moved = false;
+  render();
+}, true);
+
+/* ══════════════ 내 위치 기준 추천 ══════════════
+   위치를 한 번 받아 두면 목록·원픽·지도가 모두 「지금 내가 갈 수 있는 자리」로 바뀐다.
+   반경 밖은 아예 빼 버려서, 오늘 실제로 닿을 수 있는 자리만 남는다.
+   위치는 이 기기 안에만 두고(6시간), 서버로 보내지 않는다. */
+var ME_KEY = 'hrn_me';
+function meLoad_(){
+  try {
+    var j = JSON.parse(localStorage.getItem(ME_KEY) || 'null');
+    if (j && j.la != null && j.lo != null && Date.now() - (j.t || 0) < 6*36e5) return j;
+  } catch(e){}
+  return null;
+}
+function meSave_(la, lo){
+  try { localStorage.setItem(ME_KEY, JSON.stringify({ la:la, lo:lo, t:Date.now() })); } catch(e){}
+}
+function meDraw_(){
+  if (S.meMk){ try { map.removeLayer(S.meMk); } catch(e){} S.meMk = null; }
+  if (!S.me) return;
+  S.meMk = L.marker(S.me, {
+    icon: L.divIcon({ className:'me-dot', html:'<b></b><i></i>', iconSize:[34,34], iconAnchor:[17,17] }),
+    interactive:false, keyboard:false, zIndexOffset:2000
+  }).addTo(map);
+}
+function meAsk_(cb){
+  if (!navigator.geolocation){ toast('이 기기에서는 위치를 쓸 수 없습니다'); cb && cb(false); return; }
+  var g = $('btnGeo'); if (g) g.classList.add('geo-wait');
+  toast('현재 위치를 확인하는 중…');
+  navigator.geolocation.getCurrentPosition(function(pos){
+    if (g) g.classList.remove('geo-wait');
+    S.me = [pos.coords.latitude, pos.coords.longitude];
+    meSave_(S.me[0], S.me[1]);
+    meDraw_();
+    cb && cb(true);
+  }, function(err){
+    if (g) g.classList.remove('geo-wait');
+    toast(err && err.code === 1
+      ? '위치 권한이 꺼져 있습니다 — 주소창의 자물쇠에서 위치를 허용해 주세요'
+      : '위치를 확인하지 못했습니다', 3600);
+    cb && cb(false);
+  }, { enableHighAccuracy:true, timeout:9000, maximumAge:300000 });
+}
+function radChips_(on){
+  $('rads').hidden = !on;
+}
+function nearOn_(v){
+  S.near = v;
+  $('btnGeo').classList.toggle('geo-on', v);
+  radChips_(v);
+  applyFloor_();
+  if (v && S.me){ map.setView(S.me, 10, { animate:true }); S._moved = true; }
+  else S._moved = false;
+  render();
+  if (v){
+    var n = S.rows.length;
+    toast(n
+      ? ('내 위치에서 ' + (S.rad ? '반경 ' + S.rad + 'km' : '전국') + ' 안 ' + n + '곳을 추렸습니다')
+      : '이 반경 안에는 자리가 없습니다 — 반경을 넓혀보세요', 3200);
+    $('sheet').classList.add('open'); syncPick();
+  } else {
+    toast('전국 기준으로 돌아왔습니다');
+  }
+}
+$('btnGeo').onclick = function(){
+  if (S.near){ nearOn_(false); return; }
+  if (S.me){ nearOn_(true); return; }
+  meAsk_(function(ok){ if (ok) nearOn_(true); });
+};
+/* 반경 칩 — 30 / 60 / 100km / 전국 / 해제 */
+$('rads').addEventListener('click', function(e){
+  var b = e.target.closest('.rad');
+  if (!b) return;
+  if (b.id === 'radOff'){ nearOn_(false); return; }
+  $('rads').querySelectorAll('.rad').forEach(function(x){ x.classList.remove('on'); });
+  b.classList.add('on');
+  S.rad = +b.dataset.rad || 0;
+  applyFloor_();
+  if (S.me) S._moved = true;
+  render();
+  $('sheet').classList.add('open');
+  if (!S.rows.length) toast('이 반경 안에는 자리가 없습니다');
+});
+/* 지난번에 허용해 둔 위치가 남아 있으면 조용히 되살린다 — 다시 묻지 않는다 */
+(function(){
+  var j = meLoad_();
+  if (j){ S.me = [j.la, j.lo]; meDraw_(); }
+})();
+
+/* ══════════════ 접근 방식 필터 ══════════════ */
+$('filters').addEventListener('click', function(e){
+  var b = e.target.closest('.fchip');
+  if (!b || b.classList.contains('fl') || b.classList.contains('on')) return;
+  $('filters').querySelectorAll('.fchip:not(.fl)').forEach(function(x){ x.classList.remove('on'); });
+  b.classList.add('on');
+  S.filter = b.dataset.f;
+  S._moved = false;
+  load();
+});
+
+/* ══════════════ 어종·지점 찾기 ══════════════ */
+function movePillIn(seg){
+  var act = seg.querySelector('.seg-btn.active'), pill = seg.querySelector('.seg-pill');
+  if (!act || !pill) return;
+  pill.style.width = act.offsetWidth + 'px';
+  pill.style.transform = 'translateX(' + (act.offsetLeft - 4) + 'px)';
+}
+function openFinder(){
+  $('finder').hidden = false;
+  S.fmode = S.mode;
+  $('fseg').querySelectorAll('.seg-btn').forEach(function(x){
+    x.classList.toggle('active', x.dataset.fmode === S.fmode);
+  });
+  setTimeout(function(){ movePillIn($('fseg')); }, 30);
+  loadSpecies();
+}
+function closeFinder(){ $('finder').hidden = true; }
+$('btnSearch').onclick = openFinder;
+$('finderScrim').onclick = closeFinder;
+$('finderHandle').onclick = closeFinder;
+$('fseg').addEventListener('click', function(e){
+  var b = e.target.closest('.seg-btn');
+  if (!b || b.classList.contains('active')) return;
+  $('fseg').querySelectorAll('.seg-btn').forEach(function(x){ x.classList.remove('active'); });
+  b.classList.add('active'); movePillIn($('fseg'));
+  S.fmode = b.dataset.fmode;
+  if ($('wantQ')){ $('wantQ').value = ''; $('wantQX').hidden = true; }
+  loadSpecies();
+});
+
+function loadSpecies(){
+  var body = $('finderBody');
+  body.innerHTML = '<div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div>';
+  google.script.run
+    .withSuccessHandler(function(list){ renderSpecies(list || []); })
+    .withFailureHandler(function(){ body.innerHTML = '<p class="gauge-l" style="padding:20px 4px">목록을 불러오지 못했습니다.</p>'; })
+    .apiSpecies(S.ds, S.fmode);
+}
+var SPLIST = [];
+function renderSpecies(list){
+  SPLIST = list || [];
+  drawSpecies_();
+}
+/* 대상 검색 — 이름과 다른 이름(별명)을 함께 훑는다 */
+function spMatch_(x, q){
+  if (!q) return true;
+  if (x.n.indexOf(q) >= 0) return true;
+  var al = x.a || [];
+  for (var k = 0; k < al.length; k++) if (al[k].indexOf(q) >= 0) return true;
+  return false;
+}
+function drawSpecies_(){
+  var q = ($('wantQ') && $('wantQ').value || '').trim();
+  var list = SPLIST.filter(function(x){ return spMatch_(x, q); });
+  var body = $('finderBody'); body.innerHTML = '';
+  var g = el('div','spgrid');
+  var any = el('div','spcard' + (S.want ? '' : ' on'), '<b>전체</b><span>대상 지정 없음</span>');
+  any.onclick = function(){ pickWant(null); };
+  g.appendChild(any);
+  list.forEach(function(x){
+    var cls = 'spcard' + (x.banned ? ' ban' : (x.season >= 2 ? ' peak' : '')) + (S.want === x.n ? ' on' : '');
+    var sub = x.banned ? '금어기'
+            : x.season >= 3 ? '제철 · ' + x.spots + '곳'
+            : x.season === 2 ? '시즌 · ' + x.spots + '곳'
+            : x.season > 0  ? x.spots + '곳'
+            : '철 아님';
+    var c = el('div', cls, '<b>' + x.n + '</b><span>' + sub + '</span>');
+    c.onclick = function(){
+      if (x.banned){
+        var bn = x.ban || {};
+        toast(x.n + '은(는) ' + (bn.from ? bn.from + '~' + bn.to + ' ' : '') + '금어기입니다', 3600);
+        return;
+      }
+      pickWant(x.n);
+    };
+    g.appendChild(c);
+  });
+  body.appendChild(g);
+  if (!list.length){
+    var no = el('div','gauge-l','「' + q + '」에 맞는 대상이 없습니다.');
+    no.style.padding = '20px 4px'; body.appendChild(no);
+  }
+  var note = el('div','gauge-l', q
+    ? list.length + '개 찾았습니다.'
+    : '많이 찾는 순서로 세웠습니다. 철이 아닌 대상과 금어기는 아래쪽에 있습니다.');
+  note.style.padding = '12px 4px 4px';
+  body.appendChild(note);
+}
+/* 검색창 */
+(function(){
+  var q = $('wantQ'), x = $('wantQX');
+  if (!q) return;
+  q.addEventListener('input', function(){
+    x.hidden = !q.value;
+    if (SPLIST.length) drawSpecies_();
+  });
+  x.onclick = function(){ q.value = ''; x.hidden = true; drawSpecies_(); q.focus(); };
+})();
+function pickWant(name){
+  S.want = name;
+  if (name && S.fmode !== S.mode){
+    S.mode = S.fmode;
+    $('seg').querySelectorAll('.seg-btn').forEach(function(x){
+      x.classList.toggle('active', x.dataset.mode === S.mode);
+    });
+    movePill();
+  }
+  closeFinder();
+  S._moved = false;
+  load();
+  if (name) toast(name + ' 기준으로 다시 계산합니다');
+}
+$('wantbarX').onclick = function(){ S.want = null; S._moved = false; load(); };
+
+/* 지점 이름 검색 */
+(function(){
+  var inp = $('spotQ'), res = $('spotRes'), t = null;
+  inp.addEventListener('input', function(){
+    clearTimeout(t);
+    var q = inp.value.trim();
+    if (q.length < 1){ res.innerHTML = ''; return; }
+    t = setTimeout(function(){
+      google.script.run.withSuccessHandler(function(list){
+        res.innerHTML = '';
+        if (!list || !list.length){ res.appendChild(el('div','sres','찾는 이름이 없습니다')); return; }
+        list.slice(0, 25).forEach(function(x){
+          var r = el('div','sres');
+          r.innerHTML = '<b>' + x.n + '</b>'
+            + (x.curated ? '<span class="badge">정밀</span>' : '<span class="badge auto">자동</span>')
+            + '<em>' + (x.r || ({W:'서해',S:'남해',E:'동해',J:'제주'}[x.s] || '')) + '</em>';
+          r.onclick = function(){ closeFinder(); openDetail(x.i); };
+          res.appendChild(r);
+        });
+      }).withFailureHandler(function(){ res.innerHTML = ''; }).apiSearch(q);
+    }, 260);
+  });
+})();
+
+
+/* ══════════════ 물때표 한눈에 — 상세로 안 들어가고 바로 본다 ══════════════
+ * 요일·물때·만조·간조(수위 숫자)·물흐름·날씨를 한 표로. 수위(cm)가 주인공이다. */
+var MT = { el:null, sel:null };
+function mtDayWx_(p, dd){
+  var rec = WXC && WXC[dd + '|' + gridKey_(p.la, p.lo)];
+  if (!rec || !rec.wind) return null;
+  var w = rec.wind, dgs = rec.wdir || [], cl = rec.cloud || [], rn = rec.rain || [];
+  var n = Math.min(24, w.length), ws = 0, cd = 0, rs = 0, dx = 0, dy = 0;
+  for (var i = 0; i < n; i++){
+    ws += w[i] || 0; cd += cl[i] || 0; rs += rn[i] || 0;
+    var a = (dgs[i] || 0) * Math.PI / 180; dx += Math.sin(a); dy += Math.cos(a);
+  }
+  var deg = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+  var D8 = ['북','북동','동','남동','남','남서','서','북서'];
+  return { w: ws/n, dir: D8[Math.round(deg/45) % 8],
+           sky: rs > 1 ? '비' : cd/n >= 70 ? '흐림' : cd/n >= 35 ? '구름' : '맑음' };
+}
+function mtFlow_(range){
+  if (range == null) return '';
+  return range >= 7 ? '급함' : range >= 5 ? '셈' : range >= 3 ? '보통' : '느림';
+}
+function mtBuild_(){
+  if (MT.el) return;
+  var d = el('div','mtwrap');
+  d.id = 'mtwrap'; d.hidden = true;
+  d.innerHTML =
+      '<div class="mtcard glass">'
+    +   '<div class="mthead">'
+    +     '<h3>물때표</h3>'
+    +     '<select id="mtSel" aria-label="지점 선택"></select>'
+    +     '<button class="mtx" id="mtClose" aria-label="닫기">×</button>'
+    +   '</div>'
+    +   '<div class="mtbody" id="mtBody"><p class="mtload">물때를 불러오는 중…</p></div>'
+    +   '<a class="mtcal" href="calendar/">📅 이 달 물때달력 무료 인쇄·PDF — <b>해루질 추천일(★) 한눈에</b></a>'
+    +   '<div class="mtfoot"><b class="rec-star">★</b> 그날의 해루질·낚시 추천도 · 만조·간조 옆 <b>굵은 숫자가 조위(cm)</b>, <b class="up">▲</b>/<b class="dn">▼</b>는 전날 대비 증감 · 물때 국립해양조사원 · 기상 오픈메테오 · 8일째부터는 물때만</div>'
+    + '</div>';
+  document.body.appendChild(d);
+  MT.el = d;
+  d.addEventListener('click', function(e){ if (e.target === d) mtClose_(); });
+  d.querySelector('#mtClose').onclick = mtClose_;
+  d.querySelector('#mtSel').onchange = function(){ mtLoad_(+this.value); };
+}
+function mtClose_(){ if (MT.el) MT.el.hidden = true; }
+function openMultae(forceId, forceName){
+  mtBuild_();
+  var sel = MT.el.querySelector('#mtSel');
+  sel.innerHTML = '';
+  var seen = {};
+  var fv = favs();
+  var cands = [];
+  if (forceId != null && !seen[forceId]){ seen[forceId]=1; cands.push({i:forceId, n:(forceName||'')}); }
+  S.rows.forEach(function(r){ if (fv.indexOf(r.i) >= 0 && !seen[r.i]){ seen[r.i]=1; cands.push({i:r.i,n:'★ '+r.n}); } });
+  S.rows.slice(0, 20).forEach(function(r){ if (!seen[r.i]){ seen[r.i]=1; cands.push({i:r.i,n:r.n}); } });
+  cands.forEach(function(c){
+    var o = document.createElement('option'); o.value = c.i; o.textContent = c.n; sel.appendChild(o);
+  });
+  MT.el.hidden = false;
+  var first = (forceId != null) ? forceId : ((S.sel && seen[S.sel]) ? S.sel : (cands[0] && cands[0].i));
+  if (first != null){ sel.value = first; mtLoad_(+first); }
+}
+function mtLoad_(id){
+  var body = MT.el.querySelector('#mtBody');
+  body.innerHTML = '<p class="mtload">물때를 불러오는 중…</p>';
+  google.script.run.withSuccessHandler(function(d){
+    if (!d || d.error || !d.week){ body.innerHTML = '<p class="mtload">불러오지 못했습니다</p>'; return; }
+    var p = d.point;
+    /* 예보 닿는 날짜의 날씨를 미리 받아 둔다 (있는 것만) */
+    var jobs = d.week.slice(0, 7).map(function(w){
+      return (typeof ensureWeather === 'function') ? ensureWeather(w.ds).catch(function(){}) : Promise.resolve();
+    });
+    Promise.all(jobs).then(function(){
+      var moonIco = function(ld){
+        /* 음력 일자로 달 모양 — 1 삭, 15 보름, 30 그믐 */
+        if (ld == null) return '';
+        var p2 = (ld - 1) / 29.53;
+        if (p2 < .04 || p2 > .96) return '🌑';
+        if (p2 < .21) return '🌒'; if (p2 < .29) return '🌓';
+        if (p2 < .46) return '🌔'; if (p2 < .54) return '🌕';
+        if (p2 < .71) return '🌖'; if (p2 < .79) return '🌗';
+        return '🌘';
+      };
+      var prevHi = null, prevLo = null;
+      var mMode = S.mode === 'fish' ? 'f' : 'h';
+      /* 이 지점의 15일 조차(range) 최소~최대로 정규화 → 물흐름·해루질 추천의 기준.
+         이렇게 하면 사리 2~3일만 '급/셈'으로 뜨고, 나머지는 보통/느림 (바다타임식) */
+      var _rg = d.week.map(function(w){ return (w.range != null ? w.range : null); }).filter(function(v){ return v != null; });
+      var _rMin = _rg.length ? Math.min.apply(null, _rg) : 0;
+      var _rMax = _rg.length ? Math.max.apply(null, _rg) : 1;
+      var recession01 = function(w){
+        if (w.range == null || _rMax <= _rMin) return null;
+        return Math.max(0, Math.min(1, (w.range - _rMin) / (_rMax - _rMin)));
+      };
+      var flowLbl_ = function(r){
+        if (r == null) return '';
+        return r >= 0.8 ? '급함' : r >= 0.55 ? '셈' : r >= 0.3 ? '보통' : '느림';
+      };
+      var narrow = false; try { narrow = window.matchMedia('(max-width:680px)').matches; } catch(e){}
+      var h = '<table class="mtt mtt-full' + (narrow?' mtt-narrow':'') + '"><thead><tr>'
+            + '<th>날짜</th><th>물때</th><th>' + (mMode==='h'?'해루질':'낚시') + '<br>추천</th><th>물흐름</th>'
+            + '<th>만조 <span>시각·조위·증감</span></th><th>간조 <span>시각·조위·증감</span></th>'
+            + (narrow ? '<th>야간</th>' : '<th>해<br>뜸/짐</th><th>달<br>뜸/짐</th>')
+            + '<th>날씨</th>'
+            + '</tr></thead><tbody>';
+      d.week.forEach(function(w, i){
+        var dt = parseDs(w.ds);
+        var wd = WD[dt.getDay()];
+        var hi = (w.ev || []).filter(function(e){ return e.k === 'H'; });
+        var lo = (w.ev || []).filter(function(e){ return e.k === 'L'; });
+        /* 전날 대비 조위 증감(cm) — 물이 더 빠지는지/차는지를 화살표로 */
+        var fmt = function(list, prevRef){
+          if (!list.length) return '—';
+          var out = list.map(function(e){
+            var s2 = hm(e.m);
+            if (e.lv != null){
+              s2 += ' <b>' + e.lv + '</b>';
+              if (prevRef != null){
+                var dv = e.lv - prevRef;
+                if (Math.abs(dv) >= 3) s2 += ' <i class="' + (dv>0?'up':'dn') + '">' + (dv>0?'▲':'▼') + Math.abs(dv) + '</i>';
+              }
+            }
+            return s2;
+          }).join('<br>');
+          return out;
+        };
+        var curHi = hi.length ? hi[hi.length-1].lv : null;
+        var curLo = lo.length ? lo[lo.length-1].lv : null;
+        var hiCell = fmt(hi, prevHi), loCell = fmt(lo, prevLo);
+        prevHi = curHi; prevLo = curLo;
+        var wx = i < 7 ? mtDayWx_(p, w.ds) : null;
+        var wxs = wx ? (wx.sky + '<br><span class="mtwind">' + wx.dir + ' ' + wx.w.toFixed(1) + '</span>') : '<span class="mtdim">—</span>';
+        var rec01 = recession01(w);
+        var flow = rec01 != null ? Math.round(rec01*100) : (w.flow != null ? w.flow : null);
+        var flowBar = flow != null
+          ? '<div class="flowb"><i style="width:' + Math.min(100,flow) + '%"></i></div><span class="mtsub">' + flowLbl_(rec01) + '</span>'
+          : '—';
+        /* 추천 별 + 초간략 이유 */
+        var sc = (mMode === 'f') ? w.f : w.h;
+        var stars, slab = '', why = '';
+        if (mMode === 'h'){
+          /* 해루질 = 물이 최대로 빠지는 날(사리)이 최고. 여기에 맑으면 가점, 비/강풍은 감점. */
+          var t01 = rec01 != null ? rec01 : (sc != null ? sc/100 : 0.4);
+          var sky = (i < 7 && wx) ? wx.sky : null;
+          var wf = 1;
+          if (sky === '비') wf = 0.25; else if (sky === '흐림') wf = 0.72; else if (sky === '구름') wf = 0.9; else if (sky === '맑음') wf = 1.08;
+          if (i < 7 && wx && wx.w >= 9) wf *= 0.85;
+          var comb = Math.max(0, Math.min(1, t01 * 0.72 * wf + t01 * 0.28));
+          var st5 = Math.round(comb*5);
+          if (t01 >= 0.85 && sky !== '비') st5 = Math.max(st5, 4);
+          if (t01 >= 0.6 && sky !== '비' && sky !== '흐림') st5 = Math.max(st5, 3);
+          st5 = Math.max(0, Math.min(5, st5));
+          stars = '<span class="rec-star">' + '★'.repeat(st5) + '<span class="rec-off">' + '★'.repeat(5-st5) + '</span></span>';
+          slab = st5 >= 5 ? '<span class="rec-best">강추</span>' : st5 >= 4 ? '<span class="rec-good">추천</span>' : '';
+          var tp = t01 >= 0.8 ? '물 많이 빠짐' : t01 >= 0.55 ? '물 잘 빠짐' : t01 >= 0.3 ? '물 보통' : '물 적게 빠짐';
+          why = tp + (sky ? (' · ' + sky) : '');
+        } else {
+          /* 낚시 = 어종별 조류 적합도 기반 엔진 점수 유지 */
+          if (sc != null && i < 7){
+            var st5f = Math.max(0, Math.min(5, Math.round(sc/20)));
+            stars = '<span class="rec-star">' + '★'.repeat(st5f) + '<span class="rec-off">' + '★'.repeat(5-st5f) + '</span></span>';
+            slab = sc >= 78 ? '<span class="rec-best">강추</span>' : sc >= 62 ? '<span class="rec-good">추천</span>' : '';
+          } else {
+            var fp = flow || 0, goodF = (fp >= 30 && fp <= 70);
+            stars = '<span class="rec-star rec-approx">' + (goodF ? '★★★☆☆' : '★★☆☆☆') + '</span>';
+            slab = goodF ? '<span class="rec-good">물때 좋음</span>' : '';
+          }
+        }
+        var recCell = stars + (slab ? '<br>' + slab : '') + (why ? '<br><span class="rec-why">' + why + '</span>' : '');
+        var sunC = (w.sr!=null||w.ss!=null) ? (hm(w.sr) + '<br><span class="mtsub">' + hm(w.ss) + '</span>') : '—';
+        var moonC = (w.mr!=null||w.ms!=null) ? (hm(w.mr) + '<br><span class="mtsub">' + hm(w.ms) + '</span>') : '—';
+        /* 야간 골든타임 — 해 지고, 달빛 적을 때(달 지면 더 어둡다)가 밤 채집 명당.
+           해루질에 특히 중요: 낙지·꽃게가 달 밝으면 경계한다. */
+        var night = '—';
+        if (w.ss != null){
+          var afterDark = hm(w.ss);
+          if (w.bright != null && w.bright >= 55 && w.ms != null && w.ms > w.ss){
+            night = '<b>' + hm(w.ms) + '~</b><br><span class="mtsub">달 진 뒤(달빛 ' + w.bright + '%)</span>';
+          } else if (w.bright != null && w.bright < 35){
+            night = '<b>' + afterDark + '~</b><br><span class="mtsub">어두운 밤(달빛 ' + w.bright + '%)</span>';
+          } else {
+            night = '<b>' + afterDark + '~</b><br><span class="mtsub">일몰 후</span>';
+          }
+        }
+        var today = i === 0;
+        var bestRow = (sc != null && i < 7 && sc >= 78);
+        h += '<tr' + (today ? ' class="today"' : '') + (bestRow ? ' data-best="1"' : '') + '>'
+          + '<td class="mtd">' + (dt.getMonth()+1) + '.' + dt.getDate()
+            + ' <em' + (dt.getDay()===0?' class="sun"':dt.getDay()===6?' class="sat"':'') + '>' + wd + '</em></td>'
+          + '<td class="mtm">' + moonIco(w.ld) + ' ' + (w.mul || '—')
+            + (w.ld!=null?'<br><span class="mtsub">달빛 ' + w.bright + '%</span>':'') + '</td>'
+          + '<td class="mtrec">' + recCell + '</td>'
+          + '<td class="mtfl">' + flowBar + '</td>'
+          + '<td class="mth">' + hiCell + '</td>'
+          + '<td class="mtl">' + loCell + '</td>'
+          + (narrow ? ('<td class="mtsm mtnight">' + night + '</td>')
+                    : ('<td class="mtsm">' + sunC + '</td><td class="mtsm">' + moonC + '</td>'))
+          + '<td class="mtw">' + wxs + '</td>'
+          + '</tr>';
+      });
+      h += '</tbody></table>';
+      body.innerHTML = h;
+    });
+  }).withFailureHandler(function(){
+    body.innerHTML = '<p class="mtload">불러오지 못했습니다</p>';
+  }).apiPoint(id, S.ds, null);
+}
+/* 정렬 줄에 물때표 단추를 끼워 넣는다 — 첫 화면에서 한 번에 연다 */
+(function(){
+  var sorts = $('sorts');
+  if (!sorts) return;
+  var b = document.createElement('button');
+  b.className = 'sort mtbtn'; b.type = 'button'; b.textContent = '물때표';
+  b.onclick = function(e){ e.stopPropagation(); openMultae(); };
+  sorts.appendChild(b);
+})();
+
+/* 상단 물때표 단추 — 사람들이 제일 많이 찾는 것이 물때다. 목록을 열지 않고 바로 연다.
+   내 위치를 아는 경우 가장 가까운 자리로 맞춰 연다. */
+(function(){
+  var b = $('btnTide');
+  if (!b) return;
+  b.onclick = function(){
+    var id = null, nm = '';
+    try {
+      if (S.sel != null) id = S.sel;
+      else if (S.rows && S.rows.length){
+        var best = S.rows[0];
+        if (S.me){
+          for (var i = 0; i < S.rows.length; i++){
+            if (S.rows[i]._d != null && (best._d == null || S.rows[i]._d < best._d)) best = S.rows[i];
+          }
+        }
+        id = best.i; nm = best.n;
+      }
+    } catch(e){}
+    openMultae(id, nm);
+  };
+})();
+
+/* 주소에 ?mt=1 이 붙어 들어오면 열자마자 물때표를 띄운다 —
+   홈 화면 바로가기·위젯에서 「오늘 물때」로 곧장 들어올 수 있게 */
+(function(){
+  try {
+    var q = location.search || '';
+    if (q.indexOf('mt=1') >= 0) setTimeout(function(){ try { $('btnTide').click(); } catch(e){} }, 1400);
+    else if (q.indexOf('geo=1') >= 0) setTimeout(function(){ try { $('btnGeo').click(); } catch(e){} }, 900);
+  } catch(e){}
+})();
+
+/* ══════════════ 바람·풍향 — 지도 위에 실시간 바람 화살표(Open-Meteo, 카카오/지도 직접 표시) ══════════════
+   기존 윈디 iframe(embed.windy.com)은 접속 차단·X-Frame 문제로 자주 에러가 나서 제거.
+   대신 사이트가 이미 받는 Open-Meteo 격자 바람으로 화살표를 직접 그린다 → 팝업 없음, 카카오 위에서도 동작. */
+var WINDL = { layer:null, on:false, ds:null };
+function windColor_(ms){
+  /* 팔레트 3톤 안에서: 잔잔=중립 → 적당=민트 → 강풍=산호 */
+  return ms>=12 ? '#e0563a' : ms>=8 ? '#ff7f5a' : ms>=5 ? '#2ee6a8' : ms>=2 ? '#7fd8cf' : '#9db4c4';
+}
+function windHour_(){
+  /* S.ds가 오늘이면 현재 한국시각 시(時), 아니면 정오 12시 */
+  try {
+    if (S.ds === BOOT.today){ return new Date(Date.now()+9*36e5).getUTCHours(); }
+  } catch(e){}
+  return 12;
+}
+function windArrowIcon_(deg, ms){
+  /* 바람 — 공기가 흘러가는 결. 꼬리에서 머리로 갈수록 진해지는 굽은 줄기 + 옆에 짧은 돌풍 줄 + 열린 꺾쇠 머리.
+     세기는 크기·줄기 굵기로, 색은 3톤 안에서. 화살표는 바람이 불어가는 쪽을 가리킨다. */
+  var col = windColor_(ms), k = 0.78 + Math.min(0.55, ms/22), gid = 'wg' + col.slice(1);
+  var sw = 2 + Math.min(1.6, ms/9);
+  var svg = '<svg width="38" height="38" viewBox="0 0 38 38" style="transform:rotate('+deg+'deg) scale('+k.toFixed(2)+');overflow:visible">'
+    + '<defs><linearGradient id="'+gid+'" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="'+col+'" stop-opacity="0"/><stop offset=".55" stop-color="'+col+'" stop-opacity=".75"/><stop offset="1" stop-color="'+col+'" stop-opacity="1"/></linearGradient></defs>'
+    + '<path d="M19 34 C 14.5 27, 23.5 21, 19 9" fill="none" stroke="url(#'+gid+')" stroke-width="'+sw.toFixed(1)+'" stroke-linecap="round"/>'
+    + '<path d="M13.5 13.5 L19 7 L24.5 13.5" fill="none" stroke="'+col+'" stroke-width="'+sw.toFixed(1)+'" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '<path d="M11.5 29 C 9.5 25, 13 22.5, 11.5 18" fill="none" stroke="'+col+'" stroke-opacity=".42" stroke-width="1.4" stroke-linecap="round"/>'
+    + '<path d="M27 28 C 25.5 25, 28 22.5, 26.5 19.5" fill="none" stroke="'+col+'" stroke-opacity=".3" stroke-width="1.2" stroke-linecap="round"/>'
+    + '</svg>';
+  return L.divIcon({ className:'wind-arrow', html:svg
+    + '<span class="wind-spd" style="color:'+col+'">'+Math.round(ms)+'<i>m/s</i></span>',
+    iconSize:[38,38], iconAnchor:[19,19] });
+}
+function windDraw_(){
+  if (!WINDL.on) return;
+  if (!WINDL.layer){ WINDL.layer = L.layerGroup().addTo(map); }
+  WINDL.layer.clearLayers();
+  var ds = S.ds, hr = windHour_();
+  /* 이 날짜의 모든 기상 격자셀을 모은다 */
+  var cells = [];
+  for (var key in WXC){
+    if (key.indexOf(ds + '|') !== 0) continue;
+    var gk = key.slice(ds.length+1), parts = gk.split(',');
+    var la = +parts[0], lo = +parts[1];
+    if (isNaN(la) || isNaN(lo)) continue;
+    var rec = WXC[key];
+    if (!rec || !rec.wind) continue;
+    var ms = rec.wind[hr];
+    if (ms == null) continue;
+    var dg = (rec.wdir && rec.wdir[hr] != null) ? rec.wdir[hr] : 0;
+    cells.push({ la: la, lo: lo, ms: ms, dg: dg });
+  }
+  if (!cells.length){ var b0=document.getElementById('wdBtn'); if(b0) b0.classList.add('on'); return; }
+  /* 화면 위에 규칙적인 표시격자를 깔고, 각 지점을 가장 가까운 기상셀에서 샘플링 —
+     저배율에선 여러 셀이 촘촘히, 고배율에선 인근 셀 바람이 화면을 채운다 */
+  var b = map.getBounds();
+  var sw = b.getSouthWest(), ne = b.getNorthEast();
+  var sz = map.getSize();
+  var cols = Math.max(3, Math.min(11, Math.round(sz.x / 88)));
+  var rows = Math.max(3, Math.min(11, Math.round(sz.y / 88)));
+  var dLa = (ne.lat - sw.lat) / rows, dLo = (ne.lng - sw.lng) / cols;
+  var seen = {};
+  for (var r = 0; r < rows; r++){
+    for (var c = 0; c < cols; c++){
+      var pLa = sw.lat + dLa * (r + 0.5);
+      var pLo = sw.lng + dLo * (c + 0.5);
+      /* 가장 가까운 기상셀 찾기 */
+      var best = null, bd = 1e9;
+      for (var i = 0; i < cells.length; i++){
+        var ce = cells[i];
+        var dd = (ce.la - pLa) * (ce.la - pLa) + (ce.lo - pLo) * (ce.lo - pLo);
+        if (dd < bd){ bd = dd; best = ce; }
+      }
+      if (!best) continue;
+      /* 표시지점이 어떤 셀에서도 너무 멀면(내륙 깊숙이 등) 건너뜀 — 약 0.5도 */
+      if (bd > 0.25) continue;
+      /* 같은 셀을 같은 화면칸에서 중복으로 그리지 않도록 위치 스냅 */
+      var kk = pLa.toFixed(3) + ',' + pLo.toFixed(3);
+      if (seen[kk]) continue; seen[kk] = 1;
+      L.marker([pLa, pLo], { icon: windArrowIcon_((best.dg + 180) % 360, best.ms), interactive:false, keyboard:false, zIndexOffset:-500 }).addTo(WINDL.layer);
+    }
+  }
+  var btn = document.getElementById('wdBtn'); if (btn) btn.classList.add('on');
+}
+function windToggle_(){
+  WINDL.on = !WINDL.on;
+  var btn = document.getElementById('wdBtn');
+  if (!WINDL.on){
+    if (WINDL.layer) WINDL.layer.clearLayers();
+    if (btn) btn.classList.remove('on');
+    return;
+  }
+  if (btn){ btn.classList.add('on'); btn.textContent = '바람'; }
+  var ds = S.ds;
+  if (typeof ensureWeather === 'function'){
+    ensureWeather(ds).then(function(){ windDraw_(); }).catch(function(){ windDraw_(); });
+  } else { windDraw_(); }
+}
+map.on('moveend', function(){ if (WINDL.on) windDraw_(); if (CURL.on) curDraw_(); });
+
+/* ══════════════ 조류(유향·유속) 겹쳐 보기 ══════════════
+   국립해양조사원 수치조류도 예측을 자동작업이 data/cur/<날짜>/<시>.json 으로 받아 둔다.
+   화살표는 물이 흘러가는 쪽을 가리키고, 색·길이는 유속(cm/s). 해루질은 전류(물 멈춤) 전후가 안전하다. */
+var CURL = { layer:null, on:false, cache:{}, miss:{} };
+function curColor_(v){ /* cm/s — 약함=중립 → 보통=민트 → 셈=산호 (3톤) */
+  return v>=100 ? '#e0563a' : v>=60 ? '#ff7f5a' : v>=30 ? '#2ee6a8' : v>=15 ? '#7fd8cf' : '#9db4c4';
+}
+function curHour_(){
+  try { if (S.ds === BOOT.today){ return new Date(Date.now()+9*36e5).getUTCHours(); } } catch(e){}
+  return 12;
+}
+function curArrowIcon_(deg, v){
+  /* 조류 — 물이 미는 결. 앞에 꽉 찬 물머리(쐐기), 뒤로 물결 마루가 겹겹이 따라온다.
+     유속이 셀수록 마루가 많아지고 굵어진다. 값은 낚시꾼이 쓰는 노트로. */
+  var col = curColor_(v), n = v >= 60 ? 3 : v >= 25 ? 2 : 1, sw = 1.8 + Math.min(1.4, v/70);
+  var k = 0.8 + Math.min(0.5, v/160);
+  var svg = '<svg width="38" height="38" viewBox="0 0 38 38" style="transform:rotate('+deg+'deg) scale('+k.toFixed(2)+');overflow:visible">';
+  for (var i = 0; i < n; i++){
+    var y = 18 + i*6, op = (1 - i*0.28).toFixed(2);
+    svg += '<path d="M11 '+(y+2)+' q4 -4 8 0 t8 0" fill="none" stroke="'+col+'" stroke-opacity="'+op+'" stroke-width="'+sw.toFixed(1)+'" stroke-linecap="round"/>';
+  }
+  svg += '<path d="M19 4 L27.5 15 L19 11.5 L10.5 15 Z" fill="'+col+'"/></svg>';
+  return L.divIcon({ className:'cur-arrow', html:svg + '<span class="cur-spd" style="color:'+col+'">'+(v/51.44).toFixed(1)+'<i>kn</i></span>', iconSize:[38,38], iconAnchor:[19,19] });
+}
+function curLoad_(ds, hh){
+  var key = ds + '/' + (hh<10?'0':'') + hh;
+  if (CURL.cache[key]) return Promise.resolve(CURL.cache[key]);
+  if (CURL.miss[key]) return Promise.resolve(null);
+  return fetch('data/cur/' + key + '.json', {cache:'default'})
+    .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+    .then(function(j){ if(!j || !j.g || !j.g.length) throw 0; CURL.cache[key] = j; return j; })
+    .catch(function(){ CURL.miss[key] = 1; return null; });
+}
+function curDraw_(){
+  if (!CURL.on) return;
+  if (!CURL.layer){ CURL.layer = L.layerGroup().addTo(map); }
+  var ds = S.ds, hh = curHour_();
+  curLoad_(ds, hh).then(function(j){
+    if (!CURL.on) return;
+    CURL.layer.clearLayers();
+    var btn = document.getElementById('crBtn');
+    if (!j){ if (btn){ btn.classList.add('on'); btn.textContent = '조류·자료없음'; } return; }
+    if (btn){ btn.classList.add('on'); btn.textContent = '조류 ' + (hh<10?'0':'') + hh + '시'; }
+    var cells = j.g;   /* [위도,경도,유속,유향] */
+    var b = map.getBounds(), sz = map.getSize();
+    /* 화면 표시격자마다 가장 가까운 예측격자 값을 샘플링 — 바람과 같은 방식이라 어느 배율에서도 적당히 보인다 */
+    var sw = b.getSouthWest(), ne = b.getNorthEast();
+    var cols = Math.max(3, Math.min(11, Math.round(sz.x/88))), rows = Math.max(3, Math.min(11, Math.round(sz.y/88)));
+    var dLa = (ne.lat-sw.lat)/rows, dLo = (ne.lng-sw.lng)/cols;
+    var lim = Math.max(0.02, Math.pow(Math.min(dLa, dLo)*0.8, 2));   /* 격자에서 화면칸 하나 넘게 떨어지면(육지 깊숙이) 비움 */
+    for (var r=0;r<rows;r++) for (var q=0;q<cols;q++){
+      var pLa = sw.lat + dLa*(r+0.5), pLo = sw.lng + dLo*(q+0.5), best=null, bd=1e9;
+      for (var k=0;k<cells.length;k++){ var e=cells[k]; var dd=(e[0]-pLa)*(e[0]-pLa)+(e[1]-pLo)*(e[1]-pLo); if(dd<bd){bd=dd;best=e;} }
+      if (!best || bd > lim) continue;
+      L.marker([pLa, pLo], { icon: curArrowIcon_(best[3], best[2]), interactive:false, keyboard:false, zIndexOffset:-600 }).addTo(CURL.layer);
+    }
+  });
+}
+function curToggle_(){
+  CURL.on = !CURL.on;
+  var btn = document.getElementById('crBtn');
+  if (!CURL.on){ if (CURL.layer) CURL.layer.clearLayers(); if (btn){ btn.classList.remove('on'); btn.textContent = '조류'; } return; }
+  curDraw_();
+}
+/* ══════════════ 범례 — 색이 무슨 뜻인지 지도 위에서 바로 ══════════════
+   갯벌·해안 재질은 색으로 말하는 겹이라, 색표가 없으면 절반만 전달된다. */
+var LEG_OPEN = !PHONE;                     // 휴대폰에서는 지도를 넓게 — 기본은 접어 둔다
+try { var lv = localStorage.getItem('hrn_leg'); if (lv === '1') LEG_OPEN = true; else if (lv === '0') LEG_OPEN = false; } catch(e){}
+function legHtml_(){
+  var bright = (typeof brightMap_ === 'function') ? brightMap_() : false;
+  var rows = [];
+  if (typeof FLAT_ON !== 'undefined' && FLAT_ON && map.getZoom() >= FLAT_MINZ){
+    rows.push('<b>물 빠지면 드러나는 갯벌</b>');
+    ['mud','mix','sand'].forEach(function(k){
+      var c = FLAT_COL[k]; if (!c) return;
+      rows.push('<span><i style="background:' + (bright ? c.l : c.d) + '"></i>' + c.ko + '</span>');
+    });
+  }
+  if (typeof CL_ON !== 'undefined' && CL_ON && map.getZoom() >= CL_MINZ){
+    rows.push('<b>해안 재질</b>');
+    ['mud','mudsand','sand','sandgv','gravel','rock','cliff','art','flat'].forEach(function(k){
+      var d = CL_KIND[k]; if (!d) return;
+      var svg = '<svg class="ln" viewBox="0 0 26 8" aria-hidden="true"><line x1="1" y1="4" x2="25" y2="4" stroke="' + d.c
+              + '" stroke-width="' + Math.min(5, d.w) + '" stroke-linecap="' + (d.d ? 'butt' : 'round') + '"'
+              + (d.d ? ' stroke-dasharray="' + d.d + '"' : '') + '/></svg>';
+      rows.push('<span>' + svg + d.ko.replace(/\s*\(.*\)/,'') + '</span>');
+    });
+  }
+  if (!rows.length) return '';
+  return '<div class="leg-t">범례<button class="leg-x" id="legX" type="button" aria-label="접기">' + (LEG_OPEN ? '−' : '+') + '</button></div>'
+       + (LEG_OPEN ? '<div class="leg-b">' + rows.join('') + '</div>' : '');
+}
+var legCtl = L.control({ position: 'bottomright' });
+legCtl.onAdd = function(){
+  var d = L.DomUtil.create('div', 'legend');
+  d.id = 'legend';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(e){
+    if (e.target && e.target.id === 'legX'){
+      LEG_OPEN = !LEG_OPEN;
+      try { localStorage.setItem('hrn_leg', LEG_OPEN ? '1' : '0'); } catch(err){}
+      legDraw_();
+    }
+  });
+  return d;
+};
+legCtl.addTo(map);
+function legDraw_(){
+  var d = document.getElementById('legend');
+  if (!d) return;
+  var h = legHtml_();
+  d.innerHTML = h;
+  d.style.display = h ? '' : 'none';
+}
+map.on('zoomend moveend', legDraw_);
+setTimeout(legDraw_, 600);
+
+/* 지도 왼쪽 아래 — 어장·갯골 토글 옆에 바람·조류 단추 */
+var wdCtl = L.control({position:'bottomleft'});
+wdCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw wdsw');
+  d.innerHTML = '<button class="basebtn" id="wdBtn" type="button">바람</button><button class="basebtn" id="crBtn" type="button">조류</button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d.querySelector('#wdBtn'), 'click', function(){ windToggle_(); });
+  L.DomEvent.on(d.querySelector('#crBtn'), 'click', function(){ curToggle_(); });
+  return d;
+};
+wdCtl.addTo(map);
+
+/* ══════════════ 겹 단추 접기 ══════════════
+ * 지도 왼쪽 아래에 배경·지형·바다 단추가 세 줄로 쌓여 휴대폰에서는 지도의 아래 절반을
+ * 가렸다. 평소에는 알약 하나로 접어 두고, 누르면 세 줄이 펼쳐진다.
+ * 펼친 상태는 저장돼 다음에도 그대로다. 지도가 주인공이고 단추는 손님이다. */
+var LAY_OPEN = !PHONE;                     // 휴대폰은 접어 두고, 넓은 화면은 펼쳐 둔다
+try { var lay = localStorage.getItem('hrn_lay'); if (lay === '1') LAY_OPEN = true; else if (lay === '0') LAY_OPEN = false; } catch(e){}
+
+function layCount_(){
+  var n = 0;
+  if (FLAT_ON) n++;
+  if (CL_ON) n++;
+  if (EO_ON) n++;
+  if (GG_ON) n++;
+  if (RK_ON) n++;
+  if (AC_ON) n++;
+  try { if (WINDL && WINDL.on) n++; } catch(e){}
+  try { if (CURL && CURL.on) n++; } catch(e){}
+  return n;
+}
+function layApply_(){
+  document.body.classList.toggle('lay-open', LAY_OPEN);
+  var b = document.getElementById('layTog');
+  if (!b) return;
+  b.classList.toggle('on', LAY_OPEN);
+  b.setAttribute('aria-expanded', LAY_OPEN ? 'true' : 'false');
+  b.innerHTML = '<i class="lay-i" aria-hidden="true"></i><span>겹</span>'
+              + (LAY_OPEN ? '' : '<b class="lay-n">' + layCount_() + '</b>');
+}
+var layCtl = L.control({position:'bottomleft'});
+layCtl.onAdd = function(){
+  var d = L.DomUtil.create('div','basesw laysw');
+  d.innerHTML = '<button class="basebtn laytog" id="layTog" type="button"'
+              + ' aria-label="지도에 겹쳐 볼 것 고르기" aria-expanded="false"></button>';
+  L.DomEvent.disableClickPropagation(d);
+  L.DomEvent.on(d, 'click', function(){
+    LAY_OPEN = !LAY_OPEN;
+    try { localStorage.setItem('hrn_lay', LAY_OPEN ? '1' : '0'); } catch(e){}
+    layApply_();
+  });
+  return d;
+};
+layCtl.addTo(map);
+layApply_();
+/* 겹을 켜고 끌 때마다 알약의 숫자를 고쳐 준다 — 접어 둬도 몇 개가 켜졌는지 보인다 */
+document.addEventListener('click', function(e){
+  var t = e.target;
+  if (t && t.closest && t.closest('.basesw')) setTimeout(layApply_, 0);
+}, true);
+
+window.__icons = { wind: windArrowIcon_, cur: curArrowIcon_ };   // 견본 확인용
+
+})();
+</script>

@@ -1,0 +1,48 @@
+# 해루낚 — 소스가 바뀌면 사이트를 다시 만든다.
+#
+# 왜 필요한가
+#   예전엔 빌드된 index.html(700KB)을 통째로 올려야 했다. 이제는 src/ 의 소스만 올리면
+#   여기서 빌드해 index.html 과 정적 페이지를 만들고 저장소에 커밋한다.
+#   그래서 올릴 것이 몇 KB짜리 소스 파일 한두 개로 줄고, 깃허브 웹에서 직접 고쳐도 배포된다.
+
+name: 사이트 빌드
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 빌드
+        run: bash src/build.sh
+
+      - name: 바뀌었으면 저장
+        run: |
+          git add -A -- . ':!src'
+          if git diff --cached --quiet; then
+            echo "바뀐 것 없음"; exit 0
+          fi
+          git config user.name  "haerunak-bot"
+          git config user.email "bot@haerunak.com"
+          git commit -m "사이트 빌드 $(TZ=Asia/Seoul date +'%Y-%m-%d %H:%M')"
+          git pull --rebase --autostash origin main || true
+          git push
