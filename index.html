@@ -322,6 +322,15 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .icon-btn:active{transform:scale(.9);background:rgba(255,255,255,.12)}
 .icon-btn svg{width:19px;height:19px}
 .icon-btn.spin svg{animation:spin .9s linear infinite}
+/* 물때표는 사람들이 제일 많이 찾는 것이라 상단에서 한 톤 도드라지게 둔다 */
+.icon-btn.icon-mt{background:rgba(46,230,168,.15);color:var(--acc)}
+.icon-btn.icon-mt:active{background:rgba(46,230,168,.28)}
+/* 좁은 휴대폰에서 단추가 넷이면 빠듯하다 — 조금 줄여 브랜드 글자를 살린다 */
+@media (max-width:380px){
+  .icon-btn{width:34px;height:34px;border-radius:11px}
+  .icon-btn svg{width:17px;height:17px}
+  .topbar .tagline{display:none}
+}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* 날짜 스트립 */
@@ -1436,8 +1445,12 @@ body.map-kakao .dchip span{color:#b5cad8}
 
 </style>
 
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="해루낚">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="mask-icon" href="icon.svg" color="#2ee6a8">
 <meta name="naver-site-verification" content="91e427302481f46851e378e769ad02f7d8660b2d">
 <meta name="description" content="물때 해석은 앱이 합니다. 전국 599곳을 조석·수중시야·조류·바람·수온·금어기로 분석해 오늘 어디 가서 뭐를 잡을지 결론만 알려드립니다.">
@@ -1461,6 +1474,9 @@ body.map-kakao .dchip span{color:#b5cad8}
     <span class="logo">해루낚</span>
     <span class="tagline" id="tagline">오늘 어디서 뭘 잡지</span>
   </div>
+  <button class="icon-btn icon-mt" id="btnTide" title="오늘 물때표" aria-label="오늘 물때표 바로 보기">
+    <svg viewBox="0 0 24 24"><rect x="3.3" y="3.8" width="17.4" height="16.4" rx="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3.5 8.7h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6.2 16.4c1.3-1.6 2.6-1.6 3.9 0s2.6 1.6 3.9 0 2.6-1.6 3.8 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.4 12.3h2.1M13.5 12.3h2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </button>
   <button class="icon-btn" id="btnGeo" title="내 위치" aria-label="내 위치 기준 추천">
     <svg viewBox="0 0 24 24"><path d="M12 2.6v3.2M12 18.2v3.2M2.6 12h3.2M18.2 12h3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="6.1" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg>
   </button>
@@ -9980,6 +9996,39 @@ function mtLoad_(id){
   b.className = 'sort mtbtn'; b.type = 'button'; b.textContent = '물때표';
   b.onclick = function(e){ e.stopPropagation(); openMultae(); };
   sorts.appendChild(b);
+})();
+
+/* 상단 물때표 단추 — 사람들이 제일 많이 찾는 것이 물때다. 목록을 열지 않고 바로 연다.
+   내 위치를 아는 경우 가장 가까운 자리로 맞춰 연다. */
+(function(){
+  var b = $('btnTide');
+  if (!b) return;
+  b.onclick = function(){
+    var id = null, nm = '';
+    try {
+      if (S.sel != null) id = S.sel;
+      else if (S.rows && S.rows.length){
+        var best = S.rows[0];
+        if (S.me){
+          for (var i = 0; i < S.rows.length; i++){
+            if (S.rows[i]._d != null && (best._d == null || S.rows[i]._d < best._d)) best = S.rows[i];
+          }
+        }
+        id = best.i; nm = best.n;
+      }
+    } catch(e){}
+    openMultae(id, nm);
+  };
+})();
+
+/* 주소에 ?mt=1 이 붙어 들어오면 열자마자 물때표를 띄운다 —
+   홈 화면 바로가기·위젯에서 「오늘 물때」로 곧장 들어올 수 있게 */
+(function(){
+  try {
+    var q = location.search || '';
+    if (q.indexOf('mt=1') >= 0) setTimeout(function(){ try { $('btnTide').click(); } catch(e){} }, 1400);
+    else if (q.indexOf('geo=1') >= 0) setTimeout(function(){ try { $('btnGeo').click(); } catch(e){} }, 900);
+  } catch(e){}
 })();
 
 /* ══════════════ 바람·풍향 — 지도 위에 실시간 바람 화살표(Open-Meteo, 카카오/지도 직접 표시) ══════════════
