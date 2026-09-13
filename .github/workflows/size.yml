@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: size
+  cancel-in-progress: false
+
 jobs:
   점검:
     runs-on: ubuntu-latest
@@ -32,5 +36,6 @@ jobs:
           if [ -n "$(git status --porcelain 전송량점검.md)" ]; then
             git add 전송량점검.md
             git commit -m "전송량 점검 갱신"
+            git pull --rebase --autostash origin main || true
             git push
           fi
