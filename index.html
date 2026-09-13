@@ -6263,20 +6263,34 @@ var TIDE_ST = null, TIDE_CACHE = {}, TIDE_NEAR = {};
 function tideKm_(a,b,c,d){ var r=Math.PI/180,x=(c-a)*r,y=(d-b)*r;
   var h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2);
   return 2*6371*Math.asin(Math.sqrt(h)); }
-function nearStation_(p){
+/* 지점에서 가까운 순서로 후보를 늘어놓는다(30km 안). 조위관측소 27곳에 예보지점(마을 단위)이 더해져
+   강화 외포처럼 수로 관측소(교동대교)와 물때가 다른 곳도 제 자리 예보를 받는다.
+   그날 자료가 없는 후보는 건너뛰고 다음으로 간다. */
+function nearStation_(p, cache){
   if (!TIDE_ST) return null;
-  if (TIDE_NEAR[p.i] !== undefined) return TIDE_NEAR[p.i];
-  var best=null, bd=1e9;
-  TIDE_ST.forEach(function(st){ var d=tideKm_(p.la,p.lo,st.la,st.lo); if(d<bd){bd=d;best=st;} });
-  var r = (best && bd <= 30) ? best.code : null;    // 30km 넘으면 그 관측소는 다른 물때다
-  TIDE_NEAR[p.i]=r; return r;
+  var cands = TIDE_NEAR[p.i];
+  if (!cands){
+    cands = TIDE_ST.map(function(st){ return { c: st.code, d: tideKm_(p.la,p.lo,st.la,st.lo) }; })
+      .filter(function(x){ return x.d <= 30; })
+      .sort(function(a,b){ return a.d - b.d; })
+      .slice(0, 6).map(function(x){ return x.c; });
+    TIDE_NEAR[p.i] = cands;
+  }
+  if (!cache) return cands[0] || null;
+  for (var i = 0; i < cands.length; i++) if (cache[cands[i]] && cache[cands[i]].length) return cands[i];
+  return null;
 }
 function ensureTide(ds){
   if (ensureTide._d[ds]) return ensureTide._d[ds];
   ensureTide._d[ds] = (function(){
-    var stP = TIDE_ST ? Promise.resolve() : fetch('data/tide-stations.json')
-      .then(function(r){ return r.ok?r.json():null; })
-      .then(function(j){ TIDE_ST = (j && j.stations) || []; }).catch(function(){ TIDE_ST=[]; });
+    var stP = TIDE_ST ? Promise.resolve() : Promise.all([
+        fetch('data/tide-stations.json').then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }),
+        fetch('data/tide-points.json').then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; })
+      ]).then(function(a){
+        var st = (a[0] && a[0].stations) || [], pt = (a[1] && a[1].points) || [];
+        var seen = {}; TIDE_ST = [];
+        st.concat(pt).forEach(function(x){ if (x && x.code && !seen[x.code] && isFinite(x.la) && isFinite(x.lo)){ seen[x.code]=1; TIDE_ST.push(x); } });
+      }).catch(function(){ TIDE_ST=[]; });
     return stP.then(function(){
       return fetch('data/tide/'+ds+'.json', {cache:'default'})
         .then(function(r){ return r.ok?r.json():null; })
@@ -6292,7 +6306,7 @@ calcTide_ = function(p, y, mo, d){
     var ds = y + '-' + ('0'+mo).slice(-2) + '-' + ('0'+d).slice(-2);
     var cache = TIDE_CACHE[ds];
     if (cache){
-      var code = nearStation_(p);
+      var code = nearStation_(p, cache);
       if (code && cache[code] && cache[code].length){
         var ev = cache[code].map(function(e){ return {k:e.k,t:e.t,lv:e.lv}; });
         var lv = ev.map(function(x){return x.lv;});
