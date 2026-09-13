@@ -46,6 +46,8 @@ async function probe(code){
 (async () => {
   let used = 0, found = 0;
   const have = new Set(st.points.map(p => p.code));
+  const seenXY = {};
+  st.points.forEach(p => { seenXY[(+p.la).toFixed(4) + ',' + (+p.lo).toFixed(4)] = 1; });
   for (const pre of ['SO','DT']){
     while (st.next[pre] <= RANGE[pre] && used < BUDGET){
       const code = pre + '_' + String(st.next[pre]).padStart(4,'0');
@@ -54,9 +56,11 @@ async function probe(code){
       let p = null;
       try { p = await probe(code); }
       catch(e){ console.log('하루 호출 한도에 닿음 — 내일 이어서'); st.next[pre]--; used = BUDGET; break; }
-      if (p && !have.has(code) && !/기점/.test(p.name) && isFinite(p.la) && isFinite(p.lo)){
-        st.points.push(p); have.add(code); found++;
-        console.log('찾음', code, p.name);
+      if (p && !have.has(code) && isFinite(p.la) && isFinite(p.lo)){
+        /* 「10년(마라도)_기점」처럼 기준면 이름이 붙어 오는 것이 있다. 예보 값은 멀쩡하니 이름만 다듬어 쓴다. */
+        p.name = p.name.replace(/^\d+년\s*\(([^)]+)\)_?기점$/, '$1').replace(/_?기점$/, '').trim();
+        var key = p.la.toFixed(4) + ',' + p.lo.toFixed(4);
+        if (!seenXY[key]){ seenXY[key] = 1; st.points.push(p); have.add(code); found++; console.log('찾음', code, p.name); }
       }
       await sleep(110);
     }
