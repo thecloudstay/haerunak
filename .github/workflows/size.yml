@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  점검:
+  check:
+    name: 점검
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
