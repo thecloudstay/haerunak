@@ -6275,20 +6275,42 @@ function tideKm_(a,b,c,d){ var r=Math.PI/180,x=(c-a)*r,y=(d-b)*r;
    │   남쪽 입구 황산도 13:34 ↔ 북쪽 끝 15:18 사이를 보면 14:10 안팎, 강화외포 13:59가 가장 가깝다.
    ├ 감포항 — 양포항을 쓰면 79분 이르다. 바다타임 감포 14:33 ↔ 읍천항 14:29
    └ 칠포해수욕장 — 영일만 안이다. 월포리(외해)는 64분 이르다. 바다타임 칠포 13:09 ↔ 포항 13:08 */
+   값은 두 가지로 적는다.
+     'DT_0001'            그 지점 물때를 그대로 쓴다
+     {c:'DT_0001', dt:8}  그 지점보다 8분 늦게 쓴다 (분 단위 시차)
+
+   시차를 쓰는 이유. 조석 예보는 원래 「기준항 + 시차 + 조위비」로 만든다.
+   국립해양조사원 조석표가 그렇게 되어 있고, 물때 사이트들이 지점을 수천 곳까지
+   늘리는 것도 새로 관측해서가 아니라 이 시차표를 쓰기 때문이다.
+   우리도 같은 방법을 쓰면 갯벌 하나하나에 제 물때를 줄 수 있다.
+   갯벌은 옆 항구보다 물이 늦게 빠진다 — 항구 기준 물때가 갯벌에서 안 맞는 이유다. */
 var TIDE_FIX = {
+  /* 기준 지점을 바꾸는 곳 */
   168:'SO_1256', 2427:'SO_1256', 593:'SO_1256', 2428:'SO_1256',
   161:'SO_1256', 592:'SO_1256',
   167:'SO_1256', 2415:'SO_1256', 386:'SO_1256', 2414:'SO_1256', 602:'SO_1256',
   1619:'SO_0539',
-  2307:'SO_0572', 2313:'DT_0091'
+  2307:'SO_0572', 2313:'DT_0091',
+  /* 지점은 그대로 두고 분 단위로 당기거나 미는 곳 */
+  1618:{c:'DT_0058', dt:8},   // 황산도 선착장 — 염하 입구. 경인항보다 8분 늦다
+  160 :{c:'SO_0554', dt:6}    // 장봉도 — 영종왕산보다 6분 늦다
 };
+function tideShift_(v, dt){
+  if (!dt) return v;
+  var h = dt / 60;
+  return v.map(function(x){
+    var t = x.t + h, d = 0;
+    if (t >= 24){ t -= 24; d = 1; } else if (t < 0){ t += 24; d = -1; }
+    return { k: x.k, t: t, lv: x.lv, dd: d };
+  });
+}
 /* 지점에서 가까운 순서로 후보를 늘어놓는다(30km 안). 조위관측소 27곳에 예보지점(마을 단위)이 더해져
    강화 외포처럼 수로 관측소(교동대교)와 물때가 다른 곳도 제 자리 예보를 받는다.
    그날 자료가 없는 후보는 건너뛰고 다음으로 간다. */
 function nearStation_(p, cache){
   if (!TIDE_ST) return null;
-  var fix = TIDE_FIX[p.i];
-  if (fix && (!cache || (cache[fix] && cache[fix].length))) return fix;
+  var fix = TIDE_FIX[p.i], fc = fix && (fix.c || fix);
+  if (fc && (!cache || (cache[fc] && cache[fc].length))) return fc;
   var cands = TIDE_NEAR[p.i];
   if (!cands){
     cands = TIDE_ST.map(function(st){ return { c: st.code, d: tideKm_(p.la,p.lo,st.la,st.lo) }; })
@@ -6329,7 +6351,10 @@ calcTide_ = function(p, y, mo, d){
     if (cache){
       var code = nearStation_(p, cache);
       if (code && cache[code] && cache[code].length){
-        var ev = cache[code].map(function(e){ return {k:e.k,t:e.t,lv:e.lv}; });
+        var fx = TIDE_FIX[p.i];
+        var ev = tideShift_(cache[code].map(function(e){ return {k:e.k,t:e.t,lv:e.lv}; }),
+                            (fx && fx.dt) || 0)
+                 .filter(function(e){ return !e.dd; });   /* 시차로 날짜를 넘어간 극값은 뺀다 */
         var lv = ev.map(function(x){return x.lv;});
         return { events: ev, range: (Math.max.apply(null,lv)-Math.min.apply(null,lv))/100, src:'khoa' };
       }
