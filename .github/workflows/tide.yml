@@ -51,6 +51,9 @@ jobs:
           FETCH_BUDGET: '3000'  # 지점이 늘어난 만큼 넉넉히. 한도에 닿으면 멈춘다
         run: node scripts/fetch-tide.js
 
+      - name: 이웃끼리 맞춰 보고 이상한 지점 알리기
+        run: node scripts/check-tide.js
+
       - name: 바뀌었으면 저장
         run: |
           if [ -n "$(git status --porcelain data/tide data/tide-points.json)" ]; then

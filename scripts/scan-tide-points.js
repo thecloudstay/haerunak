@@ -57,8 +57,8 @@ async function probe(code){
       try { p = await probe(code); }
       catch(e){ console.log('하루 호출 한도에 닿음 — 내일 이어서'); st.next[pre]--; used = BUDGET; break; }
       if (p && !have.has(code) && isFinite(p.la) && isFinite(p.lo)){
-        /* 「10년(마라도)_기점」처럼 기준면 이름이 붙어 오는 것이 있다. 예보 값은 멀쩡하니 이름만 다듬어 쓴다. */
-        p.name = p.name.replace(/^\d+년\s*\(([^)]+)\)_?기점$/, '$1').replace(/_?기점$/, '').trim();
+        /* 「10년(마라도)_기점」은 기준면 산정용 가상 지점이라 예보 값이 실제 그 섬과 다르다(마라도는 2시간 어긋남). 버린다. */
+        if (/기점/.test(p.name)) continue;
         var key = p.la.toFixed(4) + ',' + p.lo.toFixed(4);
         if (!seenXY[key]){ seenXY[key] = 1; st.points.push(p); have.add(code); found++; console.log('찾음', code, p.name); }
       }
