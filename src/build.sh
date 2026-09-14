@@ -17,6 +17,8 @@ cp 해루낚_미리보기.html ../index.html
 node build_atlas.js
 node build_tide.js          # 마지막 — atlas 가 sitemap 을 새로 쓰고 tide 가 거기에 덧붙인다
 
+node check_build.js ../index.html   # 브라우저에서 실제로 도는지 — 구문 오류가 있으면 여기서 멈춘다
+
 # 부산물은 남기지 않는다 (.gitignore 에도 적어 두었지만 깨끗이)
 rm -f 해루낚_미리보기.html artifact.html atlas_data.json
 echo "빌드 끝 — index.html $(du -k ../index.html | cut -f1)KB"
