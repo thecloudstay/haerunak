@@ -102,6 +102,64 @@ var HAERU_TIDE = {
   '돌멍게':'low', '미역':'low', '톳':'low', '청각':'low', '파래':'low', '갯고둥':'low'
 };
 
+/* ══════════════ 밤에 나오나 낮에 나오나 ══════════════
+   점수 엔진과 화면이 같이 쓴다. Script.html 의 BITE 는 이 표를 가리킬 뿐이다.
+   조황·생태 자료를 뒤져 어종·채집물마다 언제 잘 나오는지 정리한 표다.
+   근거를 못 찾은 것은 아예 넣지 않았다 — 표에 없으면 「모름」이고, 아무 표시도 안 한다.
+   틀린 표시를 다는 것보다 표시를 안 다는 편이 낫다.
+
+   값: [때, 피크시간, 집어등]
+     때   2 밤에만 · 1 밤이 낫다 · 0 밤낮 무관 · -1 낮이 낫다 · -2 낮에만
+     집어등 1이면 불빛에 모인다(밤낚시에서 크게 다름)                         */
+var SP_NIGHT = {
+  /* ── 낚시 ── */
+  '붕장어':[2,'완전히 어두운 뒤',0], '갈치':[2,'한밤~새벽',1], '한치':[2,'해진 뒤~심야',1],
+  '농어':[1,'해진 뒤~심야',0], '우럭':[1,'',0], '감성돔':[1,'초저녁·자정·새벽여명',0],
+  '벵에돔':[1,'해질녘 30분~1시간',0], '민어':[1,'해질녘~해진 뒤 1~2시간',0],
+  '고등어':[1,'물돌이',1], '전갱이':[1,'물돌이',1], '멸치':[1,'저녁~밤',1],
+  '무늬오징어':[1,'해질녘~밤',1], '도루묵':[1,'밤(11~12월 산란기)',0],
+  '문어':[1,'',0], '낙지':[1,'밤 간조',0], '꽃게':[1,'',0],
+  '볼락':[0,'여름은 낮·겨울은 밤',0], '갑오징어':[0,'',0],
+  '참돔':[-1,'여름철만 밤이 낫다',0], '광어':[-1,'',0], '주꾸미':[-1,'',0],
+  '숭어':[-1,'',0], '학공치':[-1,'',0], '자리돔':[-1,'',0], '망상어':[-1,'',0],
+  '쥐노래미':[-1,'',0], '삼치':[-2,'해질녘이면 끝난다',0],
+  /* ── 해루질 ── */
+  '박하지':[1,'간조가 해질녘에 걸릴 때',0], '돌게':[1,'',0],
+  '해삼':[1,'7~10월 중순은 여름잠이라 거의 없다',0], '피뿔고둥':[1,'',0],
+  '바지락':[0,'',0], '동죽':[0,'',0], '백합':[0,'',0], '꼬막':[0,'',0], '가무락':[0,'',0],
+  '모시조개':[0,'',0], '맛조개':[0,'',0], '가리맛조개':[0,'',0], '대맛':[0,'',0], '홍맛':[0,'',0],
+  '개조개':[0,'',0], '명주조개':[0,'',0], '떡조개':[0,'',0], '서해비단조개':[0,'',0], '키조개':[0,'',0],
+  '굴':[0,'',0], '홍합':[0,'',0], '거북손':[0,'',0], '따개비':[0,'',0], '돌멍게':[0,'',0],
+  '개불':[0,'',0], '갯지렁이':[0,'',0],
+  '고둥':[-1,'',0], '보말':[-1,'',0], '칠게':[-1,'',0],
+  '짱뚱어':[-1,'갯벌 16도 밑이면 겨울잠',0], '미역':[-1,'',0], '톳':[-1,'',0]
+};
+/* 낙지는 불빛을 보고 달려든다 — 해루질에서 이것만은 확실하다 */
+var SP_LAMP = { '낙지':1 };
+
+/* 그 대상이 그 시각에 맞는가. day 1=낮 0=밤 0.5=여명·땅거미 → 0.35(어긋남)~1(맞음) */
+function nightFit_(name, day){
+  var b = SP_NIGHT[name];
+  if (!b) return 1;              // 모르면 손대지 않는다
+  var t = b[0];
+  if (t === 0) return 1;         // 밤낮 무관
+  var wantNight = t > 0;
+  var isNight = 1 - day;         // 0(대낮)~1(한밤)
+  var fit = wantNight ? isNight : day;
+  var 세기 = Math.abs(t) >= 2 ? 0.65 : 0.45;   // 「밤에만」은 더 크게 본다
+  return 1 - 세기 * (1 - fit);
+}
+
+/* 받침에 맞는 조사를 고른다 — 「낙지은(는)」 같은 말이 나오면 다 읽기 싫어진다 */
+function josa_(w, pair){
+  var t = { '은':'는', '이':'가', '을':'를', '과':'와', '으로':'로' };
+  var c = (w || '').charCodeAt((w || '').length - 1);
+  var hasJong = (c >= 0xAC00 && c <= 0xD7A3) ? ((c - 0xAC00) % 28) !== 0 : false;
+  if (pair === '으로') return hasJong && ((c - 0xAC00) % 28) !== 8 ? '으로' : '로';
+  return hasJong ? pair : (t[pair] || pair);
+}
+function withJosa_(w, pair){ return w + josa_(w, pair); }
+
 /* ══════════════ 조간대 높이 — 물때가 대상을 바꾼다 ══════════════
  * 갯벌은 높이에 따라 사는 것이 다르다. 물가에서 먼 위쪽은 조금에도 드러나지만,
  * 아래쪽은 사리에 크게 빠져야 비로소 나온다. 그래서 같은 자리라도 물때에 따라
@@ -340,6 +398,21 @@ function analyze_(p, ds, tide, wxRec, want){
   var hRaw = sExpo + sVis + sTime + sSafe + sLive;
   /* 최대 22%까지만 가감한다. 근거 강도가 중간이라 순서만 바꾸고 판을 뒤집진 않는다. */
   hRaw = hRaw * (0.78 + 0.22 * hZoneFit);
+  /* 밤에 나오는 것과 낮에 나오는 것이 다르다.
+     간조가 대낮에만 걸리는 날 낙지·문어를 노리면 헛걸음이다 — 경고만 하던 것을 점수에도 넣는다.
+     반대로 굴·바지락처럼 밤낮 없는 대상이면 낮 간조라도 깎지 않는다. */
+  var hDay = daylightAt_(lowT, sun);
+  var hNightFit = 1, hNightOff = [];
+  if (hSeason.length){
+    var nSum = 0, nW = 0;
+    hSeason.forEach(function(t, k){
+      var f = nightFit_(t.n, hDay), w = 1 / (1 + k*0.6);
+      nSum += f*w; nW += w;
+      if (f < 0.7) hNightOff.push(t.n);
+    });
+    if (nW > 0) hNightFit = nSum / nW;
+  }
+  hRaw = hRaw * (0.80 + 0.20 * hNightFit);
 
   // 안전 게이트
   var hCap = 100;
@@ -386,7 +459,7 @@ function analyze_(p, ds, tide, wxRec, want){
   else if (expo < 0.3) hWarn.push('조금 물때 — 얕게만 빠짐');
   /* 물때가 대상을 바꾼다 — 오늘 뭐가 드러나고 뭐가 안 드러나는지 그대로 말해 준다 */
   if (zoneOn && hZoneLow.length)
-    hWarn.push(hZoneLow.slice(0,3).join('·') + '은(는) 물가 끝이라 이 물때엔 잘 안 드러납니다'
+    hWarn.push(withJosa_(hZoneLow.slice(0,3).join('·'), '은') + ' 물가 끝이라 이 물때엔 잘 안 드러납니다'
                + (hZoneBest && hZoneBest.f > 0.8 ? ' — 대신 ' + hZoneBest.n + '은 됩니다' : ''));
   else if (zoneOn && hZoneFit > 0.85 && hZoneBest && hZoneBest.z === 'low')
     hWhy.push('물가 끝까지 드러나는 물때 — ' + hZoneBest.n + ' 노릴 수 있음');
@@ -397,16 +470,34 @@ function analyze_(p, ds, tide, wxRec, want){
   if (visQ >= 0.60) hWhy.push('수중 시야 ' + visTxt + ' — 이 바다 기준 ' + visWord);
   else if (visQ < 0.18) hWarn.push('수중 시야 ' + visTxt + ' — 이 바다 기준으로도 ' + visWord);
   if (vis.R > 1.4) hWarn.push('파랑이 바닥을 흔들어 흙탕물');
-  if (lux < 0.02) hWhy.push('달 없는 밤 — 문어·낙지 활동 좋음');
-  else if (lux > 0.18) hWarn.push('달이 밝아 야행성 대상이 숨음');
+  /* 간조가 대낮이면 달빛 이야기는 뜻이 없다 — 「대낮이라 숨었다」와 같이 뜨면 앞뒤가 안 맞는다 */
+  if (hDay < 1){
+    if (lux < 0.02) hWhy.push('달 없는 밤 — 문어·낙지 활동 좋음');
+    else if (lux > 0.18) hWarn.push('달이 밝아 야행성 대상이 숨음');
+  }
   // 낮 물때에 야행성 대상을 노리고 나가면 헛걸음이다 — 분명히 적는다
-  if (daylightAt_(lowT, sun) >= 1)
-    hWarn.push('간조가 대낮 — 낙지·문어·주꾸미·꽃게는 이 시각엔 숨어 있습니다');
+  if (hDay >= 1 && hNightOff.length)
+    hWarn.push('간조가 대낮 — ' + withJosa_(hNightOff.slice(0,4).join('·'), '은') + ' 이 시각엔 숨어 있습니다');
+  else if (hDay >= 1)
+    hWarn.push('간조가 대낮 — 야행성 대상은 이 시각엔 숨어 있습니다');
+  else if (hDay === 0 && hNightFit > 0.95 && hSeason.some(function(t){ var b=SP_NIGHT[t.n]; return b && b[0] > 0; }))
+    hWhy.push('간조가 밤 — 야행성 대상에 맞는 시각');
   if (visQ < 0.18 && hSeason.some(function(t){ return SIGHT_HUNT[t.n]; }))
     hWarn.push('물이 흐려 랜턴 사냥(꽃게·문어류)은 어렵습니다 — 호미로 파는 대상 위주로 가세요');
   if (Math.abs(toKnot_(hCur)) >= 1.6) hWarn.push('조류 ' + Math.abs(toKnot_(hCur)).toFixed(1) + '노트 — 발 밑 조심');
   if (hWx.wind !== null && hWe.eff >= 9) hWarn.push((hWe.wo.word||'바람') + ' ' + Math.round(hWx.wind) + 'm/s — 체온 손실·물결 주의');
   if (p.f === 'none') hWarn.push('조차가 작아 갯벌 노출이 거의 없음');
+  /* 지역 조례 — 우리가 밤 간조를 골라 추천해 놓고 그게 불법인 걸 안 알리면 안 된다.
+     제주는 야간 맨손어업 자체가 금지라 「밤에 나가라」는 추천과 정면으로 부딪친다. */
+  if (p.s === 'J'){
+    hWarn.unshift('제주는 일몰 후 30분부터 일출 전 30분까지 맨손어업(해루질)이 금지입니다. '
+      + '수경·오리발 등 장비도 쓸 수 없고, 뿔소라는 체험만으로도 적발된 사례가 있습니다');
+  } else if (/^강원/.test(p.r || '')){
+    hWarn.push('강원도 조례 — 마을어장 안 전복·해삼·성게·홍합·문어 채취는 금지입니다 (위반 시 1천만원 이하). '
+      + '대문어는 산란기 3~5월 8kg 이상 포획 금지');
+  }
+  if (p.f !== 'none' && (p.s === 'J' || /^강원/.test(p.r || '')))
+    hWarn.push('공기통(스쿠버) 착용 채취는 전국 금지 — 호미·뜰채·집게·손까지만 됩니다');
   // 하늘 — 작업 시간대 기준
   if (hSky.storm) hWarn.unshift('뇌우 예보 — 갯벌에서는 사람이 가장 높은 물체입니다. 나가지 마세요');
   else if (hSky.fog) hWarn.unshift('안개' + (hWx.vism !== null ? ' (시정 ' + Math.round(hWx.vism) + 'm)' : '')
@@ -525,6 +616,20 @@ function analyze_(p, ds, tide, wxRec, want){
   fRaw = fRaw * (0.60 + 0.40 * fTideFit);
   /* 사리·조금은 들물·날물보다 영향이 작다. 최대 18%만 가감한다. */
   fRaw = fRaw * (0.82 + 0.18 * fSpringFit);
+  /* 밤 어종이냐 낮 어종이냐 — 붕장어·갈치를 한낮에 노리게 두면 안 된다.
+     시간창(fMid)이 실제로 언제인지를 보고 제철 어종과 맞춰 본다. */
+  var fDay = daylightAt_(((fMid % 24) + 24) % 24, sun);
+  var fNightFit = 1, fNightWho = null;
+  if (fSeason.length){
+    var nS = 0, nWt = 0;
+    fSeason.forEach(function(t, k){
+      var f = nightFit_(t.n, fDay), w = 1 / (1 + k*0.6);
+      nS += f*w; nWt += w;
+      if (f < 0.7 && (!fNightWho || f < fNightWho.v)) fNightWho = { n:t.n, v:f };
+    });
+    if (nWt > 0) fNightFit = nS / nWt;
+  }
+  fRaw = fRaw * (0.80 + 0.20 * fNightFit);
   var fCap = 100;
   if (fTideFit < 0.35) fCap = Math.min(fCap, 45);   // 제철어가 물때 안 맞으면 상단 배제
   if (fWx.wave !== null){
@@ -555,7 +660,7 @@ function analyze_(p, ds, tide, wxRec, want){
   else if (flow.peak < 0.25 && p.mr > 0.4) fWarn.push('조류 거의 없음 — 입질 뜸함');
   if (fTideWorst && fTideWorstV < 0.4){
     var PW = { flood:'들물(밀물)', ebb:'날물(썰물)', high:'만조 부근', low:'간조 부근', move:'물 움직일 때' };
-    fWarn.push(fTideWorst.n + '은(는) ' + (PW[fTideWorst.pref]||'맞는 물때') + '에 잘 됩니다 — 이 시각 물때가 안 맞습니다');
+    fWarn.push(withJosa_(fTideWorst.n, '은') + ' ' + (PW[fTideWorst.pref]||'맞는 물때') + '에 잘 됩니다 — 이 시각 물때가 안 맞습니다');
   } else if (fSeason.length && FISH_TIDE[fSeason[0].n] && fTideFit > 0.7){
     var PW2 = { flood:'들물', ebb:'날물', high:'만조', low:'간조', move:'물 흐를 때' };
     fWhy.push(fSeason[0].n + ' 물때(' + (PW2[FISH_TIDE[fSeason[0].n]]||'') + ')가 맞음');
@@ -563,8 +668,18 @@ function analyze_(p, ds, tide, wxRec, want){
   if (fSpringWho){
     var SW = { '1':'사리', '-1':'조금', '0.5':'중간물때' };
     var sw = SW[String(fSpringWho.pref)];
-    if (fSpringWho.v < 0.6) fWarn.push(fSpringWho.n + '은(는) ' + sw + ' 물때가 낫습니다 — 오늘은 ' + mul.name);
+    if (fSpringWho.v < 0.6) fWarn.push(withJosa_(fSpringWho.n, '은') + ' ' + sw + ' 물때가 낫습니다 — 오늘은 ' + mul.name);
     else if (fSpringWho.v > 0.88) fWhy.push(fSpringWho.n + '에 맞는 ' + sw + ' 물때 (' + mul.name + ')');
+  }
+  if (fNightWho){
+    var nb = SP_NIGHT[fNightWho.n];
+    fWarn.push(withJosa_(fNightWho.n, '은') + ' ' + (nb[0] > 0 ? '밤' : '낮') + '에 무는 어종입니다 — 이 시간창은 '
+               + (fDay >= 1 ? '한낮' : fDay === 0 ? '한밤' : '여명·땅거미') + '입니다'
+               + (nb[1] ? ' (' + nb[1] + ')' : ''));
+  } else if (fNightFit > 0.97 && fSeason.length && SP_NIGHT[fSeason[0].n] && SP_NIGHT[fSeason[0].n][0] !== 0){
+    var nb0 = SP_NIGHT[fSeason[0].n];
+    fWhy.push(fSeason[0].n + '에 맞는 ' + (nb0[0] > 0 ? '밤' : '낮') + ' 시간창'
+              + (nb0[2] ? ' — 집어등이 크게 다릅니다' : ''));
   }
   if (fBestName && fTherm > 0.75) fWhy.push('수온이 ' + fBestName + '에 맞음');
   if (fCatchV >= 2 && fCatchName) fWhy.push('실제 조황 — 이맘때 이 지역 ' + fCatchName + ' 조과 보고 많음');
@@ -708,7 +823,7 @@ function analyze_(p, ds, tide, wxRec, want){
 /** 어종을 지정했을 때의 배수와 설명 */
 function applyWant_(p, want, mo, d, hAll, fAll, hWx, fWx, hSeason, fSeason){
   var isH = hAll.indexOf(want) >= 0, isF = fAll.indexOf(want) >= 0;
-  if (!isH && !isF) return { kind:null, mul:0.12, has:false, reason: want + '을(를) 노릴 자리가 아닙니다' };
+  if (!isH && !isF) return { kind:null, mul:0.12, has:false, reason: withJosa_(want, '을') + ' 노릴 자리가 아닙니다' };
   var kind = isH ? 'haeru' : 'fish';
   var table = isH ? SEASON_SP : SEASON_FX;
   var sst = isH ? hWx.sst : fWx.sst;
@@ -719,7 +834,7 @@ function applyWant_(p, want, mo, d, hAll, fAll, hWx, fWx, hSeason, fSeason){
   var reason;
   if (ban && ban.banned){
     mul = 0.05;
-    reason = want + '은(는) ' + ban.from + '~' + ban.to + ' 금어기입니다 (' + ban.scope + ')';
+    reason = withJosa_(want, '은') + ' ' + ban.from + '~' + ban.to + ' 금어기입니다 (' + ban.scope + ')';
   } else if (seasonV === 0) reason = want + ' 철이 아닙니다';
   else if (seasonV >= 3)    reason = want + ' 제철';
   else                      reason = want + ' 시즌 초입';

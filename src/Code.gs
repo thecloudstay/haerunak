@@ -65,7 +65,7 @@ function apiBoard(ds, mode, opts){
     return true;
   });
   if (!pool.length) return { ds: ds, mode: mode, rows: [], empty: true,
-                             msg: opts.want ? (opts.want + '을(를) 노릴 포인트가 조건에 없습니다') : '조건에 맞는 포인트가 없습니다' };
+                             msg: opts.want ? (withJosa_(opts.want, '을') + ' 노릴 포인트가 조건에 없습니다') : '조건에 맞는 포인트가 없습니다' };
 
   var wx = fetchWeather_(pool, ds);
   var rows = pool.map(function(p){
