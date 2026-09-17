@@ -32,6 +32,76 @@ const esc = s => String(s == null ? '' : s)
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const slug = s => encodeURIComponent(String(s).replace(/\s+/g,'-'));
 
+
+/* ── 밤낮·물때 성질을 엔진에서 그대로 읽어 온다 ──
+   이 파일 맨 위에 「물때는 넣지 않는다」고 적어 두었는데, 그건 오늘의 물때 이야기다.
+   「붕장어는 밤에만 문다」, 「낙지는 사리에 드러난다」는 날짜가 바뀌어도 그대로인 성질이라
+   정적 페이지에 들어가야 맞다. 색인을 흔들지 않으면서 검색으로 들어온 사람에게 쓸모가 있다.
+   표를 여기서 다시 쓰지 않고 Score.gs 것을 읽는 이유는, 두 벌이 되면 언젠가 어긋나기 때문이다. */
+const TRAITS = (function(){
+  try {
+    const src = fs.readFileSync('Score.gs', 'utf8');
+    const grab = name => {
+      const m = src.match(new RegExp('var\\s+' + name + '\\s*=\\s*\\{[\\s\\S]*?\\n\\};'));
+      return m ? m[0] : null;
+    };
+    const parts = ['SP_NIGHT','FLAT_ZONE','FISH_SPRING','FISH_TIDE','HAERU_TIDE']
+      .map(grab).filter(Boolean).join('\n');
+    const out = {};
+    new Function('o', parts + '\n; o.SP_NIGHT=typeof SP_NIGHT!=="undefined"?SP_NIGHT:{};'
+      + 'o.FLAT_ZONE=typeof FLAT_ZONE!=="undefined"?FLAT_ZONE:{};'
+      + 'o.FISH_SPRING=typeof FISH_SPRING!=="undefined"?FISH_SPRING:{};'
+      + 'o.FISH_TIDE=typeof FISH_TIDE!=="undefined"?FISH_TIDE:{};'
+      + 'o.HAERU_TIDE=typeof HAERU_TIDE!=="undefined"?HAERU_TIDE:{};')(out);
+    return out;
+  } catch(e){
+    console.log('  주의 — 밤낮·물때 표를 못 읽었습니다: ' + e.message);
+    return { SP_NIGHT:{}, FLAT_ZONE:{}, FISH_SPRING:{}, FISH_TIDE:{}, HAERU_TIDE:{} };
+  }
+})();
+
+const NIGHT_WORD = { '2':'밤에만 나옵니다', '1':'밤이 낫습니다', '0':'밤낮 차이가 없습니다',
+                     '-1':'낮이 낫습니다', '-2':'낮에만 나옵니다' };
+const ZONE_WORD = {
+  up:  ['갯벌 위쪽', '조금 물때에도 드러나는 자리입니다. 물이 조금만 빠져도 손이 닿습니다.'],
+  mid: ['갯벌 가운데', '보통 물때면 드러납니다. 호미로 파는 자리입니다.'],
+  low: ['갯벌 아래쪽', '사리처럼 크게 빠지는 날이라야 드러납니다. 물때를 꼭 보고 가세요.']
+};
+const STAGE_WORD = { flood:'들물(밀물)', ebb:'날물(썰물)', high:'만조 부근', low:'간조 부근',
+                     move:'물이 흐를 때(정조에는 뜸합니다)' };
+const SPRING_WORD = { '1':'사리처럼 물살이 센 물때', '-1':'조금처럼 물살이 약한 물때',
+                      '0.5':'사리와 조금 사이, 중간 물때' };
+
+/* 그 대상의 성질을 한 덩어리로 — 없으면 빈 문자열 */
+function traitBlock(name, kind){
+  const nb = TRAITS.SP_NIGHT[name];
+  const zone = TRAITS.FLAT_ZONE[name];
+  const stage = kind === 'fish' ? TRAITS.FISH_TIDE[name] : TRAITS.HAERU_TIDE[name];
+  const spring = TRAITS.FISH_SPRING[name];
+  const rows = [];
+  if (nb && nb[0] !== 0){
+    let t = NIGHT_WORD[String(nb[0])];
+    if (nb[1]) t += ' — ' + nb[1];
+    if (nb[2]) t += '. 집어등 불빛에 모입니다';
+    rows.push(['밤·낮', t]);
+  } else if (nb){
+    rows.push(['밤·낮', NIGHT_WORD['0']]);
+  }
+  if (zone && ZONE_WORD[zone]) rows.push(['갯벌 어디쯤', ZONE_WORD[zone][0] + ' — ' + ZONE_WORD[zone][1]]);
+  if (stage && stage !== 'any' && STAGE_WORD[stage]) rows.push(['어느 물때', STAGE_WORD[stage] + '에 잘 됩니다']);
+  if (spring !== undefined && SPRING_WORD[String(spring)]) rows.push(['사리·조금', SPRING_WORD[String(spring)] + '가 낫습니다']);
+  if (!rows.length) return '';
+  return `<section><h2>언제 나오나</h2>
+<dl class="traits">${rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('')}</dl>
+<p class="cap">조황·생태 자료에서 근거를 찾은 것만 적었습니다. 근거를 못 찾은 항목은 아예 비워 둡니다.</p></section>`;
+}
+/* 목록에 붙이는 작은 표시 */
+function nightMark(name){
+  const nb = TRAITS.SP_NIGHT[name];
+  if (!nb || nb[0] === 0) return '';
+  return nb[0] > 0 ? ' 🌙' : ' ☀';
+}
+
 function ensure(dir){ fs.mkdirSync(dir, { recursive:true }); }
 
 /* ── 공통 껍데기 ── */
@@ -169,6 +239,8 @@ ${s.ban.note ? `<p class="note">${esc(s.ban.note)}</p>` : ''}
 <p class="cap">색이 진할수록 제철입니다. 지역과 그 해 수온에 따라 앞뒤로 밀립니다.</p></section>`;
   }
 
+  body += traitBlock(s.n, s.kind === 'fish' ? 'fish' : 'haeru');
+
   if (s.rig){
     body += `<section><h2>준비물과 채비</h2>`;
     if (s.rig.t && s.rig.t.length)
@@ -298,11 +370,13 @@ ${p.fr[2] ? '· 차량 선적이 됩니다.' : '· 차는 두고 들어가야 �
 
   if (p.haeru.length){
     body += `<section><h2>해루질로 잡히는 것</h2>
-<ul class="chips lk">${p.haeru.map(n=>`<li><a href="../species/${slug(n)}.html">${esc(n)}</a></li>`).join('')}</ul></section>`;
+<ul class="chips lk">${p.haeru.map(n=>`<li><a href="../species/${slug(n)}.html">${esc(n)}${nightMark(n)}</a></li>`).join('')}</ul>
+<p class="cap">🌙 밤에 나옵니다 · ☀ 낮에 나옵니다 · 표시 없으면 밤낮 차이가 없거나 아직 자료가 없습니다.</p></section>`;
   }
   if (p.fish.length){
     body += `<section><h2>낚시 대상어</h2>
-<ul class="chips lk">${p.fish.map(n=>`<li><a href="../species/${slug(n)}.html">${esc(n)}</a></li>`).join('')}</ul></section>`;
+<ul class="chips lk">${p.fish.map(n=>`<li><a href="../species/${slug(n)}.html">${esc(n)}${nightMark(n)}</a></li>`).join('')}</ul>
+<p class="cap">🌙 밤에 뭅니다 · ☀ 낮에 뭅니다 · 표시 없으면 밤낮 차이가 없거나 아직 자료가 없습니다.</p></section>`;
   }
 
   if (p.spots && p.spots.length){
