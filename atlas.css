@@ -206,3 +206,12 @@ section p strong{color:var(--acc)}
 .jb-ch .joinbox-a{background:var(--acc2)}
 .jb-biz .joinbox-a{background:var(--acc)}
 .joinbox-a:hover{text-decoration:none;filter:brightness(1.07)}
+
+/* 언제 나오나 — 밤낮·물때 성질 */
+.traits{margin:0;display:grid;grid-template-columns:auto 1fr;gap:9px 15px;align-items:baseline}
+.traits dt{font-size:12.5px;font-weight:800;color:var(--acc);white-space:nowrap}
+.traits dd{margin:0;font-size:14px;line-height:1.75;color:#e0dac8}
+@media (max-width:460px){
+  .traits{grid-template-columns:1fr;gap:3px 0}
+  .traits dd{margin-bottom:9px}
+}
