@@ -775,7 +775,9 @@ function analyze_(p, ds, tide, wxRec, want){
       range: Math.round(range*100)/100, src: tide.src,
       sunrise: sun.rise, sunset: sun.set, dawn: tw.rise, dusk: tw.set,
       events: ev, floor: FLOOR_KO[p.f] || '',
-      ferry: p.isl ? ferryPlan_(lowT, hWx.wave, hWx.wind, p.fr ? p.fr[2] : 1) : null,
+      /* 다리로 연결된 곳(br:1)은 배 시간을 맞출 일이 없다. 「1박 필요」가 뜨면 안 된다.
+         강화 황산도처럼 차로 들어가는 자리에 배 이야기를 하던 것을 막는다. */
+      ferry: (p.isl && !p.br) ? ferryPlan_(lowT, hWx.wave, hWx.wind, p.fr ? p.fr[2] : 1) : null,
       vis: Math.round(vis.vis*100)/100, visQ: Math.round(visQ*100)/100, visWord: visWord,
       visLo: Math.round(vb2.lo*100)/100, visHi: Math.round(vb2.hi*100)/100, ssc: Math.round(vis.ssc),
       flatWidth: Math.round(width),

@@ -165,7 +165,7 @@ function apiPoint(id, ds, want, days){
   var an = analyze_(p, ds, tide, wx[gridKey_(p.la, p.lo)], want);
   return {
     point: { i:p.i, n:p.n, r:p.r||'', s:p.s, la:p.la, lo:p.lo, tag:p.tag||'',
-             floor: FLOOR_KO[p.f], isl: p.isl?1:0, fr: p.fr||null,
+             floor: FLOOR_KO[p.f], isl: p.isl?1:0, br: p.br?1:0, fr: p.fr||null,
              mil: milOf_(p), milNote: milNote_(milOf_(p)), kd: p.kd || '', f: p.f || '',
              auto: !!p.auto, approxCoord: !!p.approxCoord },
     ds: ds, meta: an.meta, haeru: an.haeru, fish: an.fish, want: an.want,
