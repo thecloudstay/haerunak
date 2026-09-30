@@ -33,7 +33,7 @@ function remoteJson_(name){
 
 /** 지점 추가·수정 — data/points-extra.json {"points":[{i,n,la,lo,...}]}
  *  같은 번호가 있으면 내장 지점 위에 덮어쓴다(부분 수정 가능). */
-function pool_(){
+function poolRaw_(){
   var j = remoteJson_('points-extra');
   var ex = (j && j.points) || [];
   if (!ex.length) return POINTS;
@@ -48,6 +48,29 @@ function pool_(){
     if (p.la && p.lo && p.mr !== undefined) out.push(p);
   }
   return out;
+}
+function pool_(){
+  var out = [];
+  poolRaw_().forEach(function(p){ var q = protAdj_(p); if (q && !q.pbDrop) out.push(q); });
+  return out;
+}
+
+/** 습지보호지역·국립공원·천연기념물 안은 해루질 추천에서 아예 뺀다 (2026-09-30 운영자 결정).
+ *  비어업인 채취가 법으로 막힌 곳이라 점수를 깎는 정도로는 안 된다. 낚시는 남긴다.
+ *  겸용(B)은 낚시 전용(F)으로 돌리고, 해루질 전용(H)은 낚시 거리도 없으니 목록에서 뺀다(pbDrop).
+ *  경계는 data/protect.json 의 원(중심·반경)으로 잡은 것이라 대략적이다 — 고치려면 그 파일을 고친다.
+ *  pb = 걸린 보호구역 이름(상세에서 「왜 해루질 자리가 아닌지」를 말할 때 쓴다) */
+var PROT_BAN_K = { wet: 1, park: 1, nat: 1 };
+function protAdj_(p){
+  if (!p || p.kd === 'F' || typeof protectNear_ !== 'function') return p;
+  var z = null;
+  try { z = protectNear_(p).filter(function(a){ return PROT_BAN_K[a.k]; })[0] || null; } catch(e){}
+  if (!z) return p;
+  var q = Object.assign({}, p);
+  q.pb = z.n;
+  if (p.kd === 'H') q.pbDrop = 1;
+  q.kd = 'F';
+  return q;
 }
 
 /** 금어기 보정 — data/ban-extra.json {"add":[규칙],"remove":["이름"],"meta":{asOf,warn}} */

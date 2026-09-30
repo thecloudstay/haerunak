@@ -123,8 +123,9 @@ function promote_(id){
 function anyPoint_(id){
   var p = pointById_(id);
   if (p) return p;
-  if (typeof pool_ === 'function'){
-    var pl = pool_();
+  if (typeof poolRaw_ === 'function' || typeof pool_ === 'function'){
+    /* 상세는 목록에서 빠진 자리(보호구역 해루질 전용 등)도 열려야 한다 — 거르기 전 목록에서 찾는다 */
+    var pl = typeof poolRaw_ === 'function' ? poolRaw_() : pool_();
     for (var k = 0; k < pl.length; k++) if (pl[k].i === id) return pl[k];
   }
   return promote_(id);

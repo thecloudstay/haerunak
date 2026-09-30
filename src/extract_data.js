@@ -39,6 +39,27 @@ function rj(n){ try { return JSON.parse(fs.readFileSync('ghup/data/'+n+'.json','
   if (sx) Object.keys(sx).forEach(k => { if (k[0] !== '_') g.SPOTS[k] = (g.SPOTS[k]||[]).concat(sx[k]); });
 })();
 
+/* 습지보호지역·국립공원·천연기념물 안은 해루질 자리에서 뺀다 — 엔진(Remote.gs protAdj_)과 같은 잣대.
+   정적 페이지(지점·도감)에도 「여기서 바지락」 같은 말이 남지 않게 채집물을 비우고 낚시 전용으로 돌린다.
+   해루질 전용(H)은 페이지째 뺀다. */
+(function protBan(){
+  const pr = rj('protect');
+  if (!pr) return;
+  const K = { wet:1, park:1, nat:1 };
+  const km = (a, b, c, d) => { const R = 6371, r = Math.PI/180, x = (c-a)*r, y = (d-b)*r;
+    const h = Math.sin(x/2)**2 + Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+  const hitA = p => (pr.areas||[]).find(a => a && a.la != null && K[a.k] && km(p.la, p.lo, a.la, a.lo) <= (a.r || 2) + 0.3)
+                || (pr.regions||[]).find(x => x && K[x.k] && String(p.r||'').indexOf(x.r) >= 0);
+  const hit = p => !!hitA(p);
+  let nB = 0, nH = 0;
+  g.POINTS = (g.POINTS||[]).map(p => {
+    if (p.kd === 'F' || !hit(p)) return p;
+    if (p.kd === 'H'){ nH++; return null; }
+    nB++; const a = hitA(p); return Object.assign({}, p, { kd:'F', sp:[], pb: (a && (a.n || a.t)) || '보호구역' });
+  }).filter(Boolean);
+  console.log('보호구역 해루질 제외 — 낚시 전용으로', nB, '곳, 목록에서 뺌', nH, '곳');
+})();
+
 const SEA = { W:'서해', S:'남해', E:'동해', J:'제주' };
 const FLOOR = g.FLOOR_KO || { sand:'모래', mud:'펄', rock:'암반', mix:'혼합', none:'' };
 const MON = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
@@ -88,7 +109,7 @@ const points = (g.POINTS || []).map(p => {
   return {
     i:p.i, n:p.n, r:p.r||'', sea:SEA[p.s]||'', seaCode:p.s,
     la:p.la, lo:p.lo, mr:p.mr, floor:FLOOR[p.f]||'', floorCode:p.f,
-    isl:!!p.isl, fr:p.fr||null, tag:p.tag||'',
+    isl:!!p.isl, fr:p.fr||null, tag:p.tag||'', pb:p.pb||'',
     haeru:h.slice(), fish:f.slice(),
     spots: (g.SPOTS && g.SPOTS[p.i]) ? g.SPOTS[p.i] : null
   };

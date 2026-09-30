@@ -341,6 +341,8 @@ function spotPage(p){
 <p class="kicker">${esc(p.r)} · ${esc(p.sea)}${p.isl ? ' · 섬' : ''}</p>`;
 
   if (p.tag) body += `<p class="lead">${esc(p.tag)}</p>`;
+  /* 습지보호지역·국립공원 안 — 비어업인 채취가 막혀 있어 해루질을 안내하지 않는다(2026-09-30) */
+  if (p.pb) body += `<p class="lead"><b>해루질 안내 안 함</b> — ${esc(p.pb)} 안이라 비어업인의 조개·해산물 채취가 법으로 막혀 있습니다(어촌계 허가 체험장만 예외). 낚시 정보만 싣습니다.</p>`;
 
   body += `<section><h2>이런 곳입니다</h2>
 <dl class="facts">
@@ -444,7 +446,7 @@ ${sp.w ? `<p class="warn sm">주의 — ${esc(sp.w)}</p>` : ''}
 </article>`;
 
   return shell({
-    title: `${p.n} 해루질·낚시 포인트 — ${p.r} | 해루낚`,
+    title: `${p.n} ${p.haeru && p.haeru.length ? '해루질·낚시' : '낚시'} 포인트 — ${p.r} | 해루낚`,
     desc: desc.slice(0, 155),
     url: `/spot/${p.i}.html`,
     depth: 1,

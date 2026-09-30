@@ -116,6 +116,8 @@ function apiBoard(ds, mode, opts){
  *  1 = 일반 강화·김포 해안(철책 통문이 일몰 후 닫힘, 야간 출입 자제)
  *  0 = 해당 없음. 좌표·지역명으로 판정해 지점마다 손으로 표시할 필요가 없다. */
 function milOf_(p){
+  /* 현장 확인으로 지역 규칙을 덮어쓴 자리 — 예: 석모도 석포리는 군 통제가 없다(운영자 확인 2026-09-30) */
+  if (p.mil !== undefined && p.mil !== null) return +p.mil;
   var r = String(p.r || ''), n = String(p.n || ''), la = +p.la || 0, lo = +p.lo || 0;
   if (/서해5도|백령|대청|소청|연평|우도/.test(n)) return 2;
   if (r.indexOf('강화') >= 0){
@@ -133,11 +135,28 @@ function milNote_(lv){
   return '';
 }
 
+/** 해루질 갈래 — 갯벌(flat)인가 갯바위(rock)인가. 화면의 「갯벌·갯바위」 단추가 이걸로 나눈다.
+ *  바닥 지형(f)이 암반이어도 후기로 모은 채집물이 바지락·낙지처럼 파는 것 위주면 실제로는 갯벌에서 하는 자리다
+ *  (진도 수품·사도·신시도처럼 항·섬 이름으로 잡힌 지점). 맨 앞 종이 파는 종이거나 파는 종이 절반 이상이면 갯벌로 본다.
+ *  f 는 그대로 둔다 — 낚시 쪽(갯바위 처오름 등)은 실제 해안 지형을 써야 한다. */
+var FLAT_SP_ = {
+  '바지락':1,'동죽':1,'백합':1,'가무락':1,'모시조개':1,'꼬막':1,'참꼬막':1,'새꼬막':1,'피조개':1,
+  '맛조개':1,'가리맛조개':1,'대맛':1,'홍맛':1,'개조개':1,'명주조개':1,'떡조개':1,'서해비단조개':1,
+  '키조개':1,'개불':1,'갯지렁이':1,'칠게':1,'낙지':1,'쏙':1,'골뱅이':1,'민챙이':1
+};
+function haeruKind_(p){
+  if (!p || p.f !== 'rock') return 'flat';
+  var sp = p.sp || (typeof SP_DEFAULT !== 'undefined' ? SP_DEFAULT[p.s + '|rock'] : null) || [];
+  if (!sp.length) return 'rock';
+  var nf = sp.filter(function(n){ return FLAT_SP_[n]; }).length;
+  return (FLAT_SP_[sp[0]] || nf * 2 >= sp.length) ? 'flat' : 'rock';
+}
+
 function packRow_(p, an, mode){
   var m = mode === 'fish' ? an.fish : an.haeru;
   return {
     i: p.i, n: p.n, r: p.r, s: p.s, la: p.la, lo: p.lo, tag: p.tag || '',
-    isl: p.isl ? 1 : 0, br: p.br ? 1 : 0, fr: p.fr || null, mil: milOf_(p), f: p.f || '', kd: p.kd || '',
+    isl: p.isl ? 1 : 0, br: p.br ? 1 : 0, fr: p.fr || null, mil: milOf_(p), f: p.f || '', kd: p.kd || '', hk: haeruKind_(p),
     prot: (typeof protectNear_ === 'function' && protectNear_(p).length) ? 1 : 0,
     /* 해경 야간 출입통제 갯벌이 붙어 있는 자리 — 목록 칩으로 먼저 보인다 */
     zn: (typeof zonesNear_ === 'function' && zonesNear_(p.la, p.lo, 1.2).some(function(z){ return /야간/.test(z.period||''); })) ? 1 : 0,
@@ -164,13 +183,14 @@ function apiPoint(id, ds, want, days){
   ds = ds || todayStr_();
   var p = anyPoint_(id);
   if (!p) return { error: '지점을 찾을 수 없습니다.' };
+  if (typeof protAdj_ === 'function') p = protAdj_(p) || p;   // 보호구역 안이면 낚시 전용으로 본다
   var tide = tideOf_(p, ds, true);
   var wx = fetchWeather_([p], ds);
   var an = analyze_(p, ds, tide, wx[gridKey_(p.la, p.lo)], want);
   return {
     point: { i:p.i, n:p.n, r:p.r||'', s:p.s, la:p.la, lo:p.lo, tag:p.tag||'',
              floor: FLOOR_KO[p.f], isl: p.isl?1:0, br: p.br?1:0, fr: p.fr||null,
-             mil: milOf_(p), milNote: milNote_(milOf_(p)), kd: p.kd || '', f: p.f || '',
+             mil: milOf_(p), milNote: milNote_(milOf_(p)), kd: p.kd || '', f: p.f || '', pb: p.pb || '', hk: haeruKind_(p),
              auto: !!p.auto, approxCoord: !!p.approxCoord },
     ds: ds, meta: an.meta, haeru: an.haeru, fish: an.fish, want: an.want,
     spots: spotsOf_(p.i),

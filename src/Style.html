@@ -353,6 +353,11 @@ body.map-sat .leaflet-container{background:#0b1a22}
   display:flex;align-items:center;gap:5px;transition:color .25s;
 }
 .seg-btn span{font-size:13px}
+/* 세 칸(갯벌·갯바위·낚시)이 되면서 좁은 휴대폰에서도 한 줄에 들어가게 여백을 줄인다 */
+#seg{width:max-content}
+#seg .seg-btn{padding:8px 13px;white-space:nowrap}
+/* 갯바위 해루질에서는 펄·모래·혼합 지형 칩이 뜻이 없다 */
+body.hk-rock .basebtn.fl3, body.hk-rock .eosw .bsep{display:none}
 .seg-btn.active{color:#04121c}
 .seg-pill{
   position:absolute;z-index:1;top:4px;left:4px;height:calc(100% - 8px);
@@ -1276,7 +1281,7 @@ body.has-ticker .pick.hasWant ~ .pick-restore, body.has-ticker .pick-restore.has
   .topbar{left:12px;right:auto;width:392px;transform:none}
   .datestrip{left:454px;right:436px;top:calc(16px + var(--safeT));z-index:17;justify-content:flex-start}
   .seg{left:12px;right:auto;transform:none;top:calc(104px + var(--safeT))}
-  .filters{left:250px;right:12px;top:calc(111px + var(--safeT));padding:0;justify-content:flex-start;max-width:none;z-index:19}
+  .filters{left:262px;right:12px;top:calc(111px + var(--safeT));padding:0;justify-content:flex-start;max-width:none;z-index:19}
   .wantbar{left:12px;right:auto;width:368px;top:calc(150px + var(--safeT))}
   /* 원픽 — 오른쪽 위 카드 */
   .pick{left:auto;right:12px;width:400px;top:calc(16px + var(--safeT));transform:none}
