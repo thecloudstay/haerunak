@@ -1258,11 +1258,18 @@ function renderPick(){
     '내 위치에서 ' + (top._d < 10 ? top._d.toFixed(1) : Math.round(top._d)) + 'km'));
   c.appendChild(el('span','chip hot', top.mul + ' · 조차 ' + top.range + 'm'));
   if (top.win) c.appendChild(el('span','chip hot', hm(top.win[0]) + '~' + hm(top.win[1])));
-  if (S.mode === 'haeru' && top.vis != null)
-    c.appendChild(el('span','chip', '시야 ' + (top.vis >= 1 ? top.vis.toFixed(1) + 'm' : Math.round(top.vis*100) + 'cm')));
+  if (S.mode === 'haeru' && top.vis != null && !TO){
+    if (top.sight) c.appendChild(el('span','chip', '시야 ' + (top.vis >= 1 ? top.vis.toFixed(1) + 'm' : Math.round(top.vis*100) + 'cm')));
+    else if (top.flat >= 150) c.appendChild(el('span','chip', '갯벌 ' + (top.flat >= 1000 ? (top.flat/1000).toFixed(1) + 'km' : Math.round(top.flat/10)*10 + 'm') + ' 드러남'));
+  }
+  /* 과태료·통제가 걸린 자리는 카드에서 먼저 보여야 한다 — 목록까지 안 내려가는 사람이 많다 */
+  if (top.zn) c.appendChild(el('span','chip warn', '해경 야간 출입통제 갯벌'));
+  if (top.mil) c.appendChild(el('span','chip warn', top.mil >= 2 ? '군 통제 · 야간 금지' : '군 통제 해안'));
+  if (top.prot) c.appendChild(el('span','chip warn', '보호·제한구역 — 채취 확인'));
   if (S.mode === 'fish' && top.cur != null)
     c.appendChild(el('span','chip', '조류 ' + top.cur.toFixed(1) + '노트'));
-  if (top.isl && top.fr) c.appendChild(el('span','chip', '배 ' + top.fr[0] + ' ' + top.fr[1] + '분'));
+  if (top.isl && top.fr && !top.br) c.appendChild(el('span','chip', '배 ' + top.fr[0] + ' ' + top.fr[1] + '분'));
+  else if (top.isl && top.br) c.appendChild(el('span','chip', '다리로 가는 섬'));
   (top.targets||[]).slice(0,3).forEach(function(t){ c.appendChild(el('span','chip', t)); });
   (top.banned||[]).slice(0,1).forEach(function(t){ c.appendChild(el('span','chip warn', t + ' 금어기')); });
   if (top.warn && top.warn.length) c.appendChild(el('span','chip warn', top.warn[0]));
@@ -1348,9 +1355,10 @@ function renderList(){
     var top = el('div','row-top');
     if (favs().indexOf(r.i) >= 0) top.appendChild(el('span','row-fav','★'));
     top.appendChild(el('span','row-name', r.n));
-    if (r.isl) top.appendChild(el('span','row-isl', r.fr ? '배 '+r.fr[1]+'분' : '섬'));
+    if (r.isl) top.appendChild(el('span','row-isl', r.br ? '다리' : (r.fr ? '배 '+r.fr[1]+'분' : '섬')));
     if (r.mil) top.appendChild(el('span','row-isl row-mil', r.mil >= 2 ? '군통제·야간금지' : '군통제'));
     if (r.prot) top.appendChild(el('span','row-isl row-prot', '보호구역'));
+    if (r.zn) top.appendChild(el('span','row-isl row-mil', '야간 출입통제'));
     if (r.kd === 'B') top.appendChild(el('span','row-isl row-kd', '겸용'));
     top.appendChild(el('span','row-reg', r.r));
     if (r._d != null) top.appendChild(el('span','row-dist', (r._d < 10 ? r._d.toFixed(1) : Math.round(r._d)) + 'km'));
@@ -1361,8 +1369,12 @@ function renderList(){
 
     var ch = el('div','row-chips');
     var visChip = null;
-    if (S.mode === 'haeru' && r.vis != null)
-      visChip = el('span', 'chip' + (S.sort==='vis' ? ' vis-on' : ''), visLabel_(r.vis, r.s, r.visQ, r.visWord));
+    /* 시야는 물속을 들여다보며 잡는 자리에서만 뜻이 있다. 호미로 파는 갯벌엔 드러나는 폭이 성패라 그걸 보여 준다.
+       예보 밖 날짜(물때만)는 기상 없이 낸 기본값이라 시야를 내걸지 않는다. */
+    if (S.mode === 'haeru' && r.vis != null && !tideOnly_()){
+      if (r.sight || S.sort === 'vis') visChip = el('span', 'chip' + (S.sort==='vis' ? ' vis-on' : ''), visLabel_(r.vis, r.s, r.visQ, r.visWord));
+      else if (r.flat >= 150) visChip = el('span', 'chip', '갯벌 ' + (r.flat >= 1000 ? (r.flat/1000).toFixed(1) + 'km' : Math.round(r.flat/10)*10 + 'm') + ' 드러남');
+    }
     if (visChip && S.sort === 'vis') ch.appendChild(visChip);   // 시야순일 땐 맨 앞에
     if (r.win) ch.appendChild(el('span','chip hot', hm(r.win[0])+'~'+hm(r.win[1])));
     ch.appendChild(el('span','chip', r.mul));
@@ -2117,7 +2129,14 @@ var HAERU_WAY = {
 
 /* 대상 — 지금 시간대에 나오는 것부터 */
   var s6 = el('div','sec');
-  var 밤 = isNight_(meta);
+  /* 「지금」이 아니라 「추천 시간대」 기준이다 — 낮에 내일 밤 계획을 보는 사람에게
+     「지금은 낮입니다」라고 하면 야행성 대상이 흐려져 정반대로 읽힌다. */
+  var 밤 = isNight_(meta), 창시각 = null;
+  if (m.window){
+    var wm = ((m.window[0] + m.window[1]) / 2) % 24;
+    창시각 = hm(Math.round(wm * 60));
+    밤 = (meta && meta.sunrise != null && meta.sunset != null) ? (wm < meta.sunrise || wm > meta.sunset) : (wm < 6 || wm > 18.5);
+  }
   s6.appendChild(el('div','sec-t', S.mode==='fish' ? '이 시기 노릴 어종' : '이 시기 채집물'));
   var ch = el('div','chips');
   /* 지금 나오는 것을 앞으로 당긴다. 순서만 바꿀 뿐 빼지는 않는다 —
@@ -2154,7 +2173,8 @@ var HAERU_WAY = {
   }
   if (맞음 || 아님){
     s6.appendChild(el('div','bite-note',
-      (밤 ? '지금은 <b>밤</b>입니다. 🌙 표시가 지금 나오는 것' : '지금은 <b>낮</b>입니다. ☀ 표시가 지금 나오는 것')
+      (창시각 ? '추천 시간대(' + 창시각 + ' 전후)는 <b>' + (밤 ? '밤' : '낮') + '</b>입니다. ' : (밤 ? '지금은 <b>밤</b>입니다. ' : '지금은 <b>낮</b>입니다. '))
+      + (밤 ? '🌙 표시가 그때 나오는 것' : '☀ 표시가 그때 나오는 것')
       + (아님 ? ', 흐린 것은 반대 시간대에 잘 나오는 것입니다.' : '입니다.')
       + ' <span class="bite-x">표시 없는 종은 밤낮 차이가 없거나 아직 자료가 없습니다.</span>'));
   }
@@ -3479,6 +3499,13 @@ function mtBuild_(){
   d.querySelector('#mtSel').onchange = function(){ mtLoad_(+this.value); };
 }
 function mtClose_(){ if (MT.el) MT.el.hidden = true; }
+/* Esc — 열려 있는 것부터 닫는다: 물때표 → 찾기 → 상세 */
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Escape') return;
+  if (MT.el && !MT.el.hidden){ mtClose_(); return; }
+  var fd = $('finder'); if (fd && !fd.hidden){ try { closeFinder(); } catch(x){} return; }
+  var dt = $('detail'); if (dt && !dt.hidden){ try { closeDetail(); } catch(x){} }
+});
 function openMultae(forceId, forceName){
   mtBuild_();
   var sel = MT.el.querySelector('#mtSel');

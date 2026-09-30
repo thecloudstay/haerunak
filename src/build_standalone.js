@@ -336,15 +336,20 @@ const RUNSHIM=`
 window.google={script:{run:{
   withSuccessHandler:function(f){var o=Object.create(this);o._s=f;return o;},
   withFailureHandler:function(f){var o=Object.create(this);o._f=f;return o;},
-  _call:function(fn,args,ds){var s=this._s,f=this._f;
+  _call:function(fn,args,ds,days){var s=this._s,f=this._f;
     var go=function(){
       try{ var r=fn.apply(null,args); s&&s(r); }
       catch(e){ console.error(e); f&&f({message:e.message}); }
     };
-    if (ds){ Promise.all([ensureWeather(ds), ensureRemote(), ensureTide(ds)]).then(function(rs){ updateNote(rs[0]); setTimeout(go,40); }); }
+    if (ds){
+      /* 상세·물때표는 15일치를 계산한다 — 그 날들의 공식 물때를 먼저 다 받아 둔다.
+         하루치만 받고 계산하면 3일째부터 자체 계산값이 섞여 물때표 숫자가 갈라진다. */
+      var tj=[ensureTide(ds)];
+      if (days){ var b=new Date(ds+'T00:00:00+09:00'); for (var k=1;k<days;k++){ var dd=new Date(b.getTime()+k*86400000+9*36e5).toISOString().slice(0,10); tj.push(ensureTide(dd)); } }
+      Promise.all([ensureWeather(ds), ensureRemote()].concat(tj)).then(function(rs){ updateNote(rs[0]); setTimeout(go,40); }); }
     else setTimeout(go,100);},
   apiBoard:function(ds,mode,o){this._call(apiBoard,[ds,mode,o],ds);},
-  apiPoint:function(id,ds,w){this._call(apiPoint,[id,ds,w,15],ds);},
+  apiPoint:function(id,ds,w){this._call(apiPoint,[id,ds,w,15],ds,15);},
   apiSpecies:function(ds,m){this._call(apiSpecies,[ds,m]);},
   apiSearch:function(q){this._call(apiSearch,[q]);},
   apiZones:function(){this._call(apiZones,[]);},

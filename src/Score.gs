@@ -115,7 +115,7 @@ var SP_NIGHT = {
   /* ── 낚시 ── */
   '붕장어':[2,'완전히 어두운 뒤',0], '갈치':[2,'한밤~새벽',1], '한치':[2,'해진 뒤~심야',1],
   '농어':[1,'해진 뒤~심야',0], '우럭':[1,'',0], '감성돔':[1,'초저녁·자정·새벽여명',0],
-  '벵에돔':[1,'해질녘 30분~1시간',0], '민어':[1,'해질녘~해진 뒤 1~2시간',0],
+  '벵에돔':[0,'낮이 기본, 여름엔 해질녘·밤도 됨',0], '민어':[1,'해질녘~해진 뒤 1~2시간',0],
   '고등어':[1,'물돌이',1], '전갱이':[1,'물돌이',1], '멸치':[1,'저녁~밤',1],
   '무늬오징어':[1,'해질녘~밤',1], '도루묵':[1,'밤(11~12월 산란기)',0],
   '문어':[1,'',0], '낙지':[1,'밤 간조',0], '꽃게':[1,'',0],
@@ -471,9 +471,11 @@ function analyze_(p, ds, tide, wxRec, want){
   else if (visQ < 0.18) hWarn.push('수중 시야 ' + visTxt + ' — 이 바다 기준으로도 ' + visWord);
   if (vis.R > 1.4) hWarn.push('파랑이 바닥을 흔들어 흙탕물');
   /* 간조가 대낮이면 달빛 이야기는 뜻이 없다 — 「대낮이라 숨었다」와 같이 뜨면 앞뒤가 안 맞는다 */
-  if (hDay < 1){
-    if (lux < 0.02) hWhy.push('달 없는 밤 — 문어·낙지 활동 좋음');
-    else if (lux > 0.18) hWarn.push('달이 밝아 야행성 대상이 숨음');
+  if (hDay === 0){
+    var hNoct = hSeason.slice(0, 4).map(function(t){ return t.n; }).filter(isNocturnal_);
+    if (lux < 0.02) hWhy.push(hNoct.length ? '달 없는 밤 — ' + hNoct.slice(0,2).join('·') + ' 활동 좋음' : '달 없는 어두운 밤');
+    else if (lux > 0.18 && hNoct.length)
+      hWarn.push('달이 밝아 ' + withJosa_(hNoct.slice(0,2).join('·'), '은') + ' 평소보다 덜 나옵니다' + (lux > 0.5 ? ' — 그림자 쪽·물가 끝을 노리세요' : ''));
   }
   // 낮 물때에 야행성 대상을 노리고 나가면 헛걸음이다 — 분명히 적는다
   if (hDay >= 1 && hNightOff.length)
@@ -725,7 +727,7 @@ function analyze_(p, ds, tide, wxRec, want){
      낙지·문어·주꾸미·꽃게는 낮에 펄과 돌 밑에 숨어 있어, 물이 아무리 잘 빠져도
      대낮에 걸어다녀서는 나오지 않는다. 점수에만 반영하고 목록은 그대로 두면
      "낮 10시에 꽃게" 같은 헛걸음 추천이 나간다. */
-  var hSplit = splitByBan_(demoteMurky_(demoteNocturnal_(hSeason, lowT, sun), visQ).slice(0, 6), mo, d, p.r);
+  var hSplit = splitByBan_(demoteMoonlit_(demoteMurky_(demoteNocturnal_(hSeason, lowT, sun), visQ), lowT, sun, lux).slice(0, 6), mo, d, p.r);
   var fSplit = splitByBan_(fSeason.slice(0, 6), mo, d, p.r);
   var hTargets = hSplit.ok.slice(0, 4), fTargets = fSplit.ok.slice(0, 4);
   if (!hTargets.length && hSplit.banned.length) hTargets = [];
@@ -757,6 +759,39 @@ function analyze_(p, ds, tide, wxRec, want){
         if (night_(fMid)) fWarn.unshift('군 통제 해안 — 야간 출입 가능 여부를 통문·어촌계에 확인하세요');
       }
     }
+  }
+
+  /* ── 해경 출입통제구역(연안사고예방법) ─────────
+     곰섬·하나개·구봉도·독산처럼 「야간 출입 금지」로 고시된 갯벌이 있다. 위반은 과태료(100만원 이하)고
+     지정 사유가 전부 고립·익수 사고다. 밤 간조를 골라 놓고 이런 자리를 1위로 올리면 안 된다.
+     군 통제와 같은 잣대(28점)로 내린다. 「연중」 전면 통제(방파제 테트라포드 등)는 낚시 쪽에 강하게 알린다. */
+  if (typeof zonesNear_ === 'function' && sun.rise !== null && sun.set !== null){
+    try {
+      var zn = zonesNear_(p.la, p.lo, 1.2);
+      var nightZ_ = function(t){ return t !== null && t !== undefined && (t < sun.rise - 0.5 || t > sun.set + 0.5); };
+      var zMidH = hWindow ? (hWindow[0] + hWindow[1]) / 2 : null;
+      var zMidF = fWindow ? (fWindow[0] + fWindow[1]) / 2 : null;
+      var zNight = zn.filter(function(z){ return /야간/.test(z.period || ''); });
+      var zFull  = zn.filter(function(z){ return !/야간/.test(z.period || '') && z.km <= 0.7; });
+      if (zNight.length && nightZ_(zMidH)){
+        hScore = Math.min(hScore, 28);
+        hPre = '야간 출입통제 갯벌이라 이 물때엔 못 들어갑니다. ';
+        hWarn.unshift('해경 출입통제 — ' + zNight[0].n + '은 일몰 후 30분~일출 전 30분 출입 금지(과태료). 낮 간조인 날을 고르세요');
+      } else if (zNight.length){
+        hWarn.push('해경 출입통제 — ' + zNight[0].n + '은 야간 출입 금지. 해 지기 전에 나오세요');
+      }
+      if (zNight.length && nightZ_(zMidF)) fWarn.unshift('해경 출입통제 — ' + zNight[0].n + ' 일대는 야간 출입 금지(과태료)');
+      if (zFull.length) fWarn.unshift('해경 출입통제 — ' + zFull[0].n + '은 연중 출입 금지(과태료 100만원 이하). 그 구간은 피하세요');
+    } catch(e){}
+  }
+  /* ── 보호·제한구역 ─────────
+     습지보호지역·국립공원·천연기념물은 비어업인 채취가 법으로 막혀 있다(어촌계·허가 체험장만 예외).
+     점수는 두되 결론 문장 머리에 먼저 말한다 — 원픽 카드만 보고 떠나는 사람이 많다. */
+  if (typeof protectNear_ === 'function'){
+    try {
+      var pz = protectNear_(p).filter(function(z){ return z.k === 'wet' || z.k === 'park' || z.k === 'nat'; });
+      if (pz.length) hPre = hPre + (pz[0].t || '보호구역') + ' — 비어업인 채취 제한, 어촌계·관리청 확인 후 들어가세요. ';
+    } catch(e){}
   }
 
   /* ── 어종 지정 검색 보정 ────────────────── */
@@ -801,17 +836,18 @@ function analyze_(p, ds, tide, wxRec, want){
       banMeta: (typeof banMetaNow_==='function' ? banMetaNow_() : BAN_META)
     },
     haeru: {
-      score: Math.max(0, Math.min(100, hScore)), raw: Math.round(Math.min(hRaw,hCap)*100)/100,
+      score: Math.max(0, Math.min(100, hScore)), raw: Math.max(0, Math.min(100, hScore)) + (Math.round(Math.min(hRaw,hCap)*100)/100 % 1),
+      sight: sightMain ? 1 : 0, flat: Math.round(width),
       grade: grade_(hScore), window: hWindow, lowTime: lowT, lowLevel: nl ? nl.ev.lv : null,
       why: hWhy, warn: hWarn, targets: hTargets, bannedTargets: hSplit.banned,
       parts: { 시야: Math.round(sVis), 노출: Math.round(sExpo), 타이밍: Math.round(sTime),
                안전: Math.round(sSafe), 활성: Math.round(sLive) },
       partsMax: { 시야: Math.round(32*vw), 노출: Math.round(26 + 32*(1 - vw)),
                   타이밍: 18, 안전: 16, 활성: 8 },
-      verdict: hPre + verdictHaeru_(p, hScore, hWindow, hTargets, vis, hSplit.banned)
+      verdict: hPre + verdictHaeru_(p, hScore, hWindow, hTargets, vis, hSplit.banned, { width: width })
     },
     fish: {
-      score: Math.max(0, Math.min(100, fScore)), raw: Math.round(Math.min(fRaw,fCap)*100)/100,
+      score: Math.max(0, Math.min(100, fScore)), raw: Math.max(0, Math.min(100, fScore)) + (Math.round(Math.min(fRaw,fCap)*100)/100 % 1),
       grade: grade_(fScore), window: fWindow, pivot: fo.ev ? { k: fo.ev.k, t: fo.ev.t } : null,
       why: fWhy, warn: fWarn, targets: fTargets, bannedTargets: fSplit.banned,
       parts: { 피딩: Math.round(sFeed), 조류: Math.round(sFlow), 해상: Math.round(sSea),
@@ -890,17 +926,24 @@ function grade_(s){
   return 'D';
 }
 
-function verdictHaeru_(p, s, win, tg, vis, banned){
+function verdictHaeru_(p, s, win, tg, vis, banned, extra){
   if (banned && banned.length && !tg.length)
     return banned[0].n + ' 금어기라 오늘 이 자리는 의미가 없습니다.';
   // 흐린 물·낮 물때로 강등된 대상은 결론 문장에서 뺀다 — 앞세워 놓고 헛걸음시키지 않는다
   var solid = tg.filter(function(t){ return !t.murk && !t.night; });
-  var names = (solid.length ? solid : tg).slice(0,2).map(function(t){ return t.n; }).join('·');
+  var lead = (solid.length ? solid : tg).slice(0,2);
+  var names = lead.map(function(t){ return t.n; }).join('·');
   if (!win) return p.n + ' — 오늘은 물이 안 빠져서 들어갈 자리가 없습니다.';
   var t = fmtRange_(win[0], win[1]);
-  var v = (vis.q != null)
-    ? (vis.q >= 0.6 ? ' 물도 이 바다치고 맑은 편입니다.' : (vis.q < 0.18 ? ' 다만 물이 많이 탁합니다.' : ''))
-    : '';
+  /* 물색 이야기는 물속을 들여다보며 잡는 대상일 때만 한다.
+     호미로 파는 자리에서 「시야 11cm인데 맑은 편」이라고 하면 읽는 사람이 갸웃한다.
+     그런 자리에서는 얼마나 드러나느냐가 성패라 그쪽을 말한다. */
+  var sightish = lead.some(function(x){ return SIGHT_HUNT[x.n] || (p.f === 'rock' && !DIG_[x.n]); });
+  var v = '';
+  if (sightish && vis.q != null)
+    v = vis.q >= 0.6 ? ' 물도 이 바다치고 맑은 편입니다.' : (vis.q < 0.18 ? ' 다만 물이 많이 탁합니다.' : '');
+  else if (extra && extra.width >= 800 && s >= 76)
+    v = ' 갯벌이 ' + (extra.width >= 1000 ? (extra.width/1000).toFixed(1) + 'km' : Math.round(extra.width/10)*10 + 'm') + ' 넘게 드러납니다.';
   if (s >= 88) return t + '에 들어가서 ' + names + ' 담으면 됩니다.' + v;
   if (s >= 76) return t + ' 사이에 ' + names + ' 노리세요.' + v;
   if (s >= 62) return t + '에 ' + names + ' 정도는 봅니다. 무난한 수준.';
@@ -961,6 +1004,21 @@ function demoteNocturnal_(list, lowT, sun){
   var out = list.map(function(t){
     if (!isNocturnal_(t.n)) return t;
     return { n: t.n, v: Math.max(0.4, t.v * (dl >= 1 ? 0.34 : 0.7)), k: (t.k != null ? t.k * (dl >= 1 ? 0.34 : 0.7) : undefined), night: 1 };
+  });
+  out.sort(function(a, b){ return (b.k != null ? b.k : b.v) - (a.k != null ? a.k : a.v); });
+  return out;
+}
+
+/* 달이 밝은 밤 — 낙지·문어는 달빛 아래서 덜 나온다는 게 해루질꾼들 공통 경험이다.
+   경고만 띄우고 순위는 그대로 두면 「달이 밝아 숨음」 옆에 낙지가 1순위로 서는 앞뒤 안 맞는 화면이 된다.
+   밤 물때(dl 0)일 때만, 달빛 조도가 있으면 야행성 대상을 한 칸 뒤로 보낸다. 지우지는 않는다. */
+function demoteMoonlit_(list, lowT, sun, lux){
+  var dl = daylightAt_(lowT, sun);
+  if (dl > 0 || !(lux > 0.18)) return list;
+  var f = lux > 0.5 ? 0.7 : 0.82;
+  var out = list.map(function(t){
+    if (!isNocturnal_(t.n)) return t;
+    return { n: t.n, v: Math.max(0.4, t.v * f), k: (t.k != null ? t.k * f : undefined), moon: 1, sig: t.sig };
   });
   out.sort(function(a, b){ return (b.k != null ? b.k : b.v) - (a.k != null ? a.k : a.v); });
   return out;

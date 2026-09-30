@@ -137,9 +137,13 @@ function packRow_(p, an, mode){
   var m = mode === 'fish' ? an.fish : an.haeru;
   return {
     i: p.i, n: p.n, r: p.r, s: p.s, la: p.la, lo: p.lo, tag: p.tag || '',
-    isl: p.isl ? 1 : 0, fr: p.fr || null, mil: milOf_(p), f: p.f || '', kd: p.kd || '',
+    isl: p.isl ? 1 : 0, br: p.br ? 1 : 0, fr: p.fr || null, mil: milOf_(p), f: p.f || '', kd: p.kd || '',
     prot: (typeof protectNear_ === 'function' && protectNear_(p).length) ? 1 : 0,
+    /* 해경 야간 출입통제 갯벌이 붙어 있는 자리 — 목록 칩으로 먼저 보인다 */
+    zn: (typeof zonesNear_ === 'function' && zonesNear_(p.la, p.lo, 1.2).some(function(z){ return /야간/.test(z.period||''); })) ? 1 : 0,
     score: m.score, raw: m.raw, grade: m.grade,
+    /* 해루질 — 눈으로 찾는 자리인지(시야가 뜻이 있는지), 드러나는 갯벌 폭(m) */
+    sight: (mode === 'fish') ? 1 : (an.haeru.sight ? 1 : 0), flat: an.haeru.flat || 0,
     win: m.window ? [Math.round(m.window[0]*60), Math.round(m.window[1]*60)] : null,
     targets: m.targets.map(function(t){ return t.n; }),
     banned: (m.bannedTargets || []).map(function(t){ return t.n; }),
