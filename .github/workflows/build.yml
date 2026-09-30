@@ -44,5 +44,11 @@ jobs:
           git config user.name  "haerunak-bot"
           git config user.email "bot@haerunak.com"
           git commit -m "사이트 빌드 $(TZ=Asia/Seoul date +'%Y-%m-%d %H:%M')"
-          git pull --rebase --autostash origin main || true
-          git push
+          # 같은 push 로 「전송량 점검」도 함께 돌아 몇 초 차이로 먼저 커밋하면 push 가 튕긴다
+          # (2026-09-30 실패 원인). 받아서 다시 얹고 올리기를 몇 번 되풀이한다.
+          for i in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin main && git push; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 6))
+          done
+          echo "다섯 번 올려 봤지만 실패"; exit 1

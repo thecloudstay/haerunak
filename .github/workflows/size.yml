@@ -37,6 +37,11 @@ jobs:
           if [ -n "$(git status --porcelain 전송량점검.md)" ]; then
             git add 전송량점검.md
             git commit -m "전송량 점검 갱신"
-            git pull --rebase --autostash origin main || true
-            git push
+            # 「사이트 빌드」와 같은 push 로 함께 돌아 서로 튕길 수 있다 — 되풀이해 올린다
+            for i in 1 2 3 4 5; do
+              if git pull --rebase --autostash origin main && git push; then exit 0; fi
+              git rebase --abort 2>/dev/null || true
+              sleep $((i * 6))
+            done
+            echo "다섯 번 올려 봤지만 실패"; exit 1
           fi
