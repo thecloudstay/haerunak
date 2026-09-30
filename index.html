@@ -366,6 +366,11 @@ body.map-sat .leaflet-container{background:#0b1a22}
   display:flex;align-items:center;gap:5px;transition:color .25s;
 }
 .seg-btn span{font-size:13px}
+/* 세 칸(갯벌·갯바위·낚시)이 되면서 좁은 휴대폰에서도 한 줄에 들어가게 여백을 줄인다 */
+#seg{width:max-content}
+#seg .seg-btn{padding:8px 13px;white-space:nowrap}
+/* 갯바위 해루질에서는 펄·모래·혼합 지형 칩이 뜻이 없다 */
+body.hk-rock .basebtn.fl3, body.hk-rock .eosw .bsep{display:none}
 .seg-btn.active{color:#04121c}
 .seg-pill{
   position:absolute;z-index:1;top:4px;left:4px;height:calc(100% - 8px);
@@ -1292,7 +1297,7 @@ body.has-ticker .pick.hasWant ~ .pick-restore, body.has-ticker .pick-restore.has
   .topbar{left:12px;right:auto;width:392px;transform:none}
   .datestrip{left:454px;right:436px;top:calc(16px + var(--safeT));z-index:17;justify-content:flex-start}
   .seg{left:12px;right:auto;transform:none;top:calc(104px + var(--safeT))}
-  .filters{left:250px;right:12px;top:calc(111px + var(--safeT));padding:0;justify-content:flex-start;max-width:none;z-index:19}
+  .filters{left:262px;right:12px;top:calc(111px + var(--safeT));padding:0;justify-content:flex-start;max-width:none;z-index:19}
   .wantbar{left:12px;right:auto;width:368px;top:calc(150px + var(--safeT))}
   /* 원픽 — 오른쪽 위 카드 */
   .pick{left:auto;right:12px;width:400px;top:calc(16px + var(--safeT));transform:none}
@@ -1511,7 +1516,8 @@ body.map-kakao .dchip span{color:#b5cad8}
 
 <!-- 모드 토글 -->
 <div class="seg glass" id="seg">
-  <button class="seg-btn active" data-mode="haeru"><span>🔦</span>해루질</button>
+  <button class="seg-btn active" data-mode="haeru" data-hk="flat" title="갯벌 해루질 — 조개·낙지·게"><span>🔦</span>갯벌</button>
+  <button class="seg-btn" data-mode="haeru" data-hk="rock" title="갯바위 해루질 — 굴·홍합·거북손·고둥"><span>🪨</span>갯바위</button>
   <button class="seg-btn" data-mode="fish"><span>🎣</span>낚시</button>
   <div class="seg-pill"></div>
 </div>
@@ -2130,7 +2136,7 @@ var POINTS = [
   {i:1620, n:'선두항', r:'인천 강화', s:'W', la:37.5955, lo:126.512, kd:'B', sig:['백합'], mr:6.01, hi:4.5, f:'mud', br:1, fx:['숭어','망둥어','농어'], sp:['백합','낙지','바지락','동죽'], tag:'선두리 수로·선착장, 봄~가을 원투·훌치기'},
   {i:1621, n:'창후항 방파제', r:'인천 강화', s:'W', la:37.7698, lo:126.354, kd:'B', mr:5.4, hi:5.2, f:'mud', br:1, fx:['숭어','망둥어'], sp:['백합','낙지','바지락','동죽'], tag:'교동수로 구 도선장, 봄 4~6월 훌치기'},
   {i:1622, n:'어류정항', r:'인천 강화', s:'W', la:37.64504, lo:126.34429, kd:'B', mr:5.54, hi:5, f:'mix', isl:1, br:1, fx:['숭어','망둥어','우럭','농어','붕장어'], sp:['바지락','낙지','굴'], tag:'석모도 남서단, 가을 썰물 방파제 찌·원투'},
-  {i:1623, n:'석모도 석포리 선착장', r:'인천 강화', s:'W', la:37.69403, lo:126.36762, kd:'B', mr:5.4, hi:5, f:'mud', isl:1, br:1, fx:['숭어','망둥어','밴댕이'], sp:['바지락','낙지','동죽'], tag:'구 외포리행 도선장, 봄~초겨울 찌·원투'},
+  {i:1623, n:'석모도 석포리 선착장', r:'인천 강화', s:'W', la:37.69403, lo:126.36762, kd:'B', mil:0, mr:5.4, hi:5, f:'mud', isl:1, br:1, fx:['숭어','망둥어','밴댕이'], sp:['바지락','낙지','동죽'], tag:'구 외포리행 도선장, 봄~초겨울 찌·원투'},
   {i:1624, n:'석모도 하리선착장', r:'인천 강화', s:'W', la:37.72823, lo:126.28777, kd:'B', mr:5.27, hi:5.2, f:'mud', isl:1, br:1, fx:['숭어','망둥어','농어','밴댕이'], sp:['바지락','낙지','동죽'], tag:'미법도행 선착장, 물골 발달, 봄~가을'},
   {i:1626, n:'교동 남산포', r:'인천 강화', s:'W', la:37.76298, lo:126.29096, kd:'B', mr:5.4, hi:5.2, f:'mud', isl:1, br:1, fx:['숭어','농어','망둥어'], sp:['낙지','바지락','동죽'], tag:'읍내리 남쪽 옛 포구 석축, 봄 훌치기'},
 // ── 남해 서부 (전남 여수·고흥·완도·진도·신안) — 2026-09 딥서치 추가 ──
@@ -4055,7 +4061,7 @@ function remoteJson_(name){
 
 /** 지점 추가·수정 — data/points-extra.json {"points":[{i,n,la,lo,...}]}
  *  같은 번호가 있으면 내장 지점 위에 덮어쓴다(부분 수정 가능). */
-function pool_(){
+function poolRaw_(){
   var j = remoteJson_('points-extra');
   var ex = (j && j.points) || [];
   if (!ex.length) return POINTS;
@@ -4070,6 +4076,29 @@ function pool_(){
     if (p.la && p.lo && p.mr !== undefined) out.push(p);
   }
   return out;
+}
+function pool_(){
+  var out = [];
+  poolRaw_().forEach(function(p){ var q = protAdj_(p); if (q && !q.pbDrop) out.push(q); });
+  return out;
+}
+
+/** 습지보호지역·국립공원·천연기념물 안은 해루질 추천에서 아예 뺀다 (2026-09-30 운영자 결정).
+ *  비어업인 채취가 법으로 막힌 곳이라 점수를 깎는 정도로는 안 된다. 낚시는 남긴다.
+ *  겸용(B)은 낚시 전용(F)으로 돌리고, 해루질 전용(H)은 낚시 거리도 없으니 목록에서 뺀다(pbDrop).
+ *  경계는 data/protect.json 의 원(중심·반경)으로 잡은 것이라 대략적이다 — 고치려면 그 파일을 고친다.
+ *  pb = 걸린 보호구역 이름(상세에서 「왜 해루질 자리가 아닌지」를 말할 때 쓴다) */
+var PROT_BAN_K = { wet: 1, park: 1, nat: 1 };
+function protAdj_(p){
+  if (!p || p.kd === 'F' || typeof protectNear_ !== 'function') return p;
+  var z = null;
+  try { z = protectNear_(p).filter(function(a){ return PROT_BAN_K[a.k]; })[0] || null; } catch(e){}
+  if (!z) return p;
+  var q = Object.assign({}, p);
+  q.pb = z.n;
+  if (p.kd === 'H') q.pbDrop = 1;
+  q.kd = 'F';
+  return q;
 }
 
 /** 금어기 보정 — data/ban-extra.json {"add":[규칙],"remove":["이름"],"meta":{asOf,warn}} */
@@ -5576,8 +5605,9 @@ function promote_(id){
 function anyPoint_(id){
   var p = pointById_(id);
   if (p) return p;
-  if (typeof pool_ === 'function'){
-    var pl = pool_();
+  if (typeof poolRaw_ === 'function' || typeof pool_ === 'function'){
+    /* 상세는 목록에서 빠진 자리(보호구역 해루질 전용 등)도 열려야 한다 — 거르기 전 목록에서 찾는다 */
+    var pl = typeof poolRaw_ === 'function' ? poolRaw_() : pool_();
     for (var k = 0; k < pl.length; k++) if (pl[k].i === id) return pl[k];
   }
   return promote_(id);
@@ -6272,6 +6302,8 @@ function apiBoard(ds, mode, opts){
  *  1 = 일반 강화·김포 해안(철책 통문이 일몰 후 닫힘, 야간 출입 자제)
  *  0 = 해당 없음. 좌표·지역명으로 판정해 지점마다 손으로 표시할 필요가 없다. */
 function milOf_(p){
+  /* 현장 확인으로 지역 규칙을 덮어쓴 자리 — 예: 석모도 석포리는 군 통제가 없다(운영자 확인 2026-09-30) */
+  if (p.mil !== undefined && p.mil !== null) return +p.mil;
   var r = String(p.r || ''), n = String(p.n || ''), la = +p.la || 0, lo = +p.lo || 0;
   if (/서해5도|백령|대청|소청|연평|우도/.test(n)) return 2;
   if (r.indexOf('강화') >= 0){
@@ -6289,11 +6321,28 @@ function milNote_(lv){
   return '';
 }
 
+/** 해루질 갈래 — 갯벌(flat)인가 갯바위(rock)인가. 화면의 「갯벌·갯바위」 단추가 이걸로 나눈다.
+ *  바닥 지형(f)이 암반이어도 후기로 모은 채집물이 바지락·낙지처럼 파는 것 위주면 실제로는 갯벌에서 하는 자리다
+ *  (진도 수품·사도·신시도처럼 항·섬 이름으로 잡힌 지점). 맨 앞 종이 파는 종이거나 파는 종이 절반 이상이면 갯벌로 본다.
+ *  f 는 그대로 둔다 — 낚시 쪽(갯바위 처오름 등)은 실제 해안 지형을 써야 한다. */
+var FLAT_SP_ = {
+  '바지락':1,'동죽':1,'백합':1,'가무락':1,'모시조개':1,'꼬막':1,'참꼬막':1,'새꼬막':1,'피조개':1,
+  '맛조개':1,'가리맛조개':1,'대맛':1,'홍맛':1,'개조개':1,'명주조개':1,'떡조개':1,'서해비단조개':1,
+  '키조개':1,'개불':1,'갯지렁이':1,'칠게':1,'낙지':1,'쏙':1,'골뱅이':1,'민챙이':1
+};
+function haeruKind_(p){
+  if (!p || p.f !== 'rock') return 'flat';
+  var sp = p.sp || (typeof SP_DEFAULT !== 'undefined' ? SP_DEFAULT[p.s + '|rock'] : null) || [];
+  if (!sp.length) return 'rock';
+  var nf = sp.filter(function(n){ return FLAT_SP_[n]; }).length;
+  return (FLAT_SP_[sp[0]] || nf * 2 >= sp.length) ? 'flat' : 'rock';
+}
+
 function packRow_(p, an, mode){
   var m = mode === 'fish' ? an.fish : an.haeru;
   return {
     i: p.i, n: p.n, r: p.r, s: p.s, la: p.la, lo: p.lo, tag: p.tag || '',
-    isl: p.isl ? 1 : 0, br: p.br ? 1 : 0, fr: p.fr || null, mil: milOf_(p), f: p.f || '', kd: p.kd || '',
+    isl: p.isl ? 1 : 0, br: p.br ? 1 : 0, fr: p.fr || null, mil: milOf_(p), f: p.f || '', kd: p.kd || '', hk: haeruKind_(p),
     prot: (typeof protectNear_ === 'function' && protectNear_(p).length) ? 1 : 0,
     /* 해경 야간 출입통제 갯벌이 붙어 있는 자리 — 목록 칩으로 먼저 보인다 */
     zn: (typeof zonesNear_ === 'function' && zonesNear_(p.la, p.lo, 1.2).some(function(z){ return /야간/.test(z.period||''); })) ? 1 : 0,
@@ -6320,13 +6369,14 @@ function apiPoint(id, ds, want, days){
   ds = ds || todayStr_();
   var p = anyPoint_(id);
   if (!p) return { error: '지점을 찾을 수 없습니다.' };
+  if (typeof protAdj_ === 'function') p = protAdj_(p) || p;   // 보호구역 안이면 낚시 전용으로 본다
   var tide = tideOf_(p, ds, true);
   var wx = fetchWeather_([p], ds);
   var an = analyze_(p, ds, tide, wx[gridKey_(p.la, p.lo)], want);
   return {
     point: { i:p.i, n:p.n, r:p.r||'', s:p.s, la:p.la, lo:p.lo, tag:p.tag||'',
              floor: FLOOR_KO[p.f], isl: p.isl?1:0, br: p.br?1:0, fr: p.fr||null,
-             mil: milOf_(p), milNote: milNote_(milOf_(p)), kd: p.kd || '', f: p.f || '',
+             mil: milOf_(p), milNote: milNote_(milOf_(p)), kd: p.kd || '', f: p.f || '', pb: p.pb || '', hk: haeruKind_(p),
              auto: !!p.auto, approxCoord: !!p.approxCoord },
     ds: ds, meta: an.meta, haeru: an.haeru, fish: an.fish, want: an.want,
     spots: spotsOf_(p.i),
@@ -6820,13 +6870,31 @@ try {
 } catch(e){}
 var S = {
   ds: BOOT.today, mode: 'haeru', rows: [], sort: 'score', filter: 'all', want: null,
-  fmode: 'haeru', sel: null, me: null, markers: {}, loading: false, cur: null,
+  fmode: 'haeru', hk: 'flat', sel: null, me: null, markers: {}, loading: false, cur: null,
   near: false, rad: 60, meMk: null
 };
 var $ = function(id){ return document.getElementById(id); };
 var el = function(t, c, h){ var e = document.createElement(t); if(c) e.className = c; if(h!=null) e.innerHTML = h; return e; };
 var WD = ['일','월','화','수','목','금','토'];
 var MODE_NAME = { haeru:'해루질', fish:'낚시' };
+/* 해루질은 갯벌과 갯바위로 나눠 본다 — 조개 캐러 갔다가 갯바위를 만나면 헛걸음이다(2026-09-30).
+   서버는 해루질 한 번만 계산하고, 받은 목록을 바닥 지형으로 나누기만 한다. */
+function modeName_(){
+  if (S.mode === 'fish') return MODE_NAME.fish;
+  return S.hk === 'rock' ? '갯바위 해루질' : '갯벌 해루질';
+}
+function kindOf_(r){ return r.hk || (r.f === 'rock' ? 'rock' : 'flat'); }   // 서버가 채집물로 가른 값(hk)이 먼저
+function kindOk_(r){
+  if (S.mode !== 'haeru') return true;
+  return kindOf_(r) === (S.hk === 'rock' ? 'rock' : 'flat');
+}
+function segSync_(){
+  $('seg').querySelectorAll('.seg-btn').forEach(function(x){
+    x.classList.toggle('active', x.dataset.mode === S.mode && (S.mode === 'fish' || (x.dataset.hk || 'flat') === S.hk));
+  });
+  document.body.classList.toggle('hk-rock', S.mode === 'haeru' && S.hk === 'rock');
+  try { movePill(); } catch(e){}
+}
 
 function toast(msg, ms){
   var t = $('toast'); t.textContent = msg; t.hidden = false;
@@ -7821,6 +7889,14 @@ function load(){
       }
       S.rowsAll = res.rows;
       applyFloor_();
+      /* 어종을 골랐는데 지금 칸(갯벌·갯바위)에 하나도 없으면 다른 칸으로 옮겨 준다 — 거북손을 찾으면서 갯벌에 머물면 빈 화면이다 */
+      if (S.mode === 'haeru' && S.want && !S.rows.length){
+        var oth = S.hk === 'rock' ? 'flat' : 'rock';
+        if (res.rows.some(function(r){ return kindOf_(r) === oth; })){
+          S.hk = oth; segSync_(); applyFloor_();
+          toast(S.want + ' — ' + (oth === 'rock' ? '갯바위' : '갯벌') + ' 해루질 자리로 옮겼습니다', 2600);
+        }
+      }
       S.shown = res.shown; S.total = res.total;
       S.gen = res.generated;
       render();
@@ -8034,7 +8110,7 @@ function render(){
     ? '물때만 · 점수는 7일 이내 제공'
     : (S.near
         ? '내 주변 ' + (S.rad ? S.rad + 'km · ' : '') + S.rows.length + '곳'
-        : MODE_NAME[S.mode] + ' · ' + S.rows.length + '곳'
+        : modeName_() + ' · ' + S.rows.length + '곳'
           + (S.total && S.rows.length < S.total ? ' / ' + S.total : '') + ' 분석');
   $('wantbar').hidden = !S.want;
   $('pick').classList.toggle('hasWant', !!S.want);
@@ -8155,7 +8231,7 @@ function renderList(){
   syncSortBtns();
   var l = $('list'); l.innerHTML = '';
   var arr = sorted();
-  $('sheetTitle').textContent = (S.near ? '내 주변 ' : '') + MODE_NAME[S.mode] + ' ' +
+  $('sheetTitle').textContent = (S.near ? '내 주변 ' : '') + modeName_() + ' ' +
     (S.sort==='near' ? '가까운 순' : S.sort==='time' ? '시간 빠른 순'
      : S.sort==='vis' ? '시야 좋은 순' : '추천 순위')
     + (S.near && S.rad ? ' · 반경 ' + S.rad + 'km' : '');
@@ -8164,6 +8240,7 @@ function renderList(){
     var inBest = arr.reduce(function(m,r){ return r.raw > m.raw ? r : m; }, arr[0]);
     var out = null;
     (S.rowsAll || []).forEach(function(r){
+      if (!kindOk_(r)) return;
       if (r._d == null || (S.rad && r._d <= S.rad)) return;
       if (!out || r.raw > out.raw) out = r;
     });
@@ -8990,12 +9067,17 @@ var HAERU_WAY = {
   /* 이 자리 해루질이 어떤 방식인지 — 조개 캐러 갔다가 갯바위를 만나면 안 된다 */
   if (S.mode === 'haeru'){
     var kdv = d.point.kd || '';
-    if (kdv && kdv.indexOf('H') < 0 && kdv !== 'B'){
+    if (d.point.pb){
+      /* 습지보호지역·국립공원 안 — 비어업인 채취가 막혀 있어 해루질 추천에서 뺀 자리 */
+      s6.appendChild(el('div','hway off',
+        '<b>여기는 해루질을 안내하지 않습니다</b> ' + String(d.point.pb).replace(/[<>&"]/g,'') + ' 안이라 비어업인의 조개·해산물 채취가 법으로 막혀 있습니다(어촌계 허가 체험장만 예외). 낚시로 보세요.'));
+    } else if (kdv && kdv.indexOf('H') < 0 && kdv !== 'B'){
       /* 낚시 자리로 분류된 곳이다. 해루질 눈으로 보고 있으면 그것부터 말해 준다 */
       s6.appendChild(el('div','hway off',
         '<b>여기는 해루질 자리가 아닙니다</b> 방파제·항구이거나 물이 빠져도 걸어 들어갈 갯벌이 없는 자리입니다. 낚시로 보세요.'));
     } else {
-      var way = HAERU_WAY[d.point.f];
+      /* 바닥은 암반이어도 채집물이 파는 조개 위주면 갯벌 쪽으로 분류된 자리다 — 「갯바위 채취」라 하면 안 맞는다 */
+      var way = HAERU_WAY[(d.point.hk === 'flat' && d.point.f === 'rock') ? 'mix' : d.point.f];
       if (way) s6.appendChild(el('div','hway','<b>' + way[0] + '</b> ' + way[1]));
     }
   }
@@ -9720,9 +9802,18 @@ function movePill(){
 $('seg').addEventListener('click', function(e){
   var b = e.target.closest('.seg-btn');
   if (!b || b.classList.contains('active')) return;
-  $('seg').querySelectorAll('.seg-btn').forEach(function(x){ x.classList.remove('active'); });
-  b.classList.add('active'); movePill();
-  S.mode = b.dataset.mode;
+  var nm = b.dataset.mode, prev = S.mode;
+  S.mode = nm;
+  if (nm === 'haeru') S.hk = b.dataset.hk || 'flat';
+  segSync_();
+  if (nm === prev && S.rowsAll){
+    applyFloor_();
+    try { flatDraw_(); } catch(err){}
+    S._moved = false;
+    render();
+    if (!S.rows.length) toast(S.hk === 'rock' ? '이 조건에 갯바위 해루질 자리가 없습니다' : '이 조건에 갯벌 해루질 자리가 없습니다');
+    return;
+  }
   load();
 });
 
@@ -10024,8 +10115,9 @@ map.on('dragstart', function(){ setPickMini(true); });   // 지도를 만지면 
    서버를 다시 부르지 않는다. 받은 목록을 바닥 지형으로 거르기만 하면 되고, 그래야 토글이 즉시 반응한다. */
 S.floors = {};
 function applyFloor_(){
-  var on = Object.keys(S.floors).filter(function(k){ return S.floors[k]; });
-  var all = S.rowsAll || [];
+  /* 펄·모래·혼합 칩은 갯벌 쪽에서만 뜻이 있다 — 갯바위 해루질에서는 무시한다 */
+  var on = (S.mode === 'haeru' && S.hk === 'rock') ? [] : Object.keys(S.floors).filter(function(k){ return S.floors[k]; });
+  var all = (S.rowsAll || []).filter(kindOk_);
   var a = on.length ? all.filter(function(r){ return on.indexOf(r.f) >= 0; }) : all.slice();
   /* 내 위치를 알고 있으면 거리를 늘 달아 둔다 — 목록·원픽 어디서나 바로 쓴다 */
   if (S.me) a.forEach(function(r){ r._d = dist(S.me[0], S.me[1], r.la, r.lo); });
@@ -10247,10 +10339,7 @@ function pickWant(name){
   S.want = name;
   if (name && S.fmode !== S.mode){
     S.mode = S.fmode;
-    $('seg').querySelectorAll('.seg-btn').forEach(function(x){
-      x.classList.toggle('active', x.dataset.mode === S.mode);
-    });
-    movePill();
+    segSync_();
   }
   closeFinder();
   S._moved = false;
