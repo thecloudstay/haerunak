@@ -55,7 +55,8 @@ const _FXD = {'W':['우럭','망둥어','숭어'],'S':['감성돔','볼락','우
 function chips(a){ return (a||[]).slice(0,6).map(x=>'<span class="chip">'+x+'</span>').join(''); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-const TPL = fs.readFileSync('tide_template.html','utf8');
+const GA_TAGS = require('./analytics.js').analyticsTags();   // 지역 물때 쪽에도 방문 집계
+const TPL = fs.readFileSync('tide_template.html','utf8').replace('</head>', GA_TAGS+'</head>');
 let made = [];
 REGIONS.forEach(R => {
   const pts = P.filter(R.m);
@@ -125,7 +126,7 @@ let idxBody = '';
     + bySea[sea].map(m=>'<a class="rcard" href="/tide/'+m.slug+'/"><b>'+esc(m.name)+' 물때표</b><span>'+esc(m.kw)+'</span><em>'+m.n+'개 포인트</em></a>').join('')
     + '</div>';
 });
-const idxTpl = fs.readFileSync('tide_index_template.html','utf8');
+const idxTpl = fs.readFileSync('tide_index_template.html','utf8').replace('</head>', GA_TAGS+'</head>');
 fs.writeFileSync('ghup/tide/index.html', idxTpl.replace('__BODY__', idxBody).replace(/__NREG__/g, made.length));
 
 // ── sitemap 갱신: 기존에서 /tide/ 항목 제거 후 재추가 ──

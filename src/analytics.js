@@ -1,6 +1,6 @@
 /* 방문자 집계 — 측정 ID 만 넣으면 전 페이지에 붙는다.
    빈 문자열이면 아무것도 붙지 않는다 (지금 상태). */
-const GA_ID = '';          // 예: 'G-XXXXXXXXXX'  ← 구글 애널리틱스
+const GA_ID = 'G-JKNG5FXD4K';          // 예: 'G-XXXXXXXXXX'  ← 구글 애널리틱스
 const CF_TOKEN = '';       // 예: '3e1c...'        ← 클라우드플레어 (둘 중 하나만 써도 된다)
 
 function analyticsTags(){

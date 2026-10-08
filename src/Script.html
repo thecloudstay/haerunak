@@ -353,7 +353,7 @@ eoCtl.onAdd = function(){
   var d = L.DomUtil.create('div','basesw eosw');
   d.innerHTML = '<button class="basebtn on fl" id="flBtn" type="button">갯벌</button>'
               + '<button class="basebtn cl" id="clBtn" type="button">해안 재질</button>'
-              + '<button class="basebtn on" id="eoBtn" type="button">어장</button>'
+              + '<button class="basebtn on" id="eoBtn" type="button" title="면허 어장 구역 — 구역을 누르면(컴퓨터는 마우스를 올리면) 어떤 어장인지 나옵니다">어장</button>'
               + '<button class="basebtn gg' + (GG_ON ? ' on' : '') + '" id="ggBtn" type="button">갯골</button>'
               + '<button class="basebtn rk' + (RK_ON ? ' on' : '') + '" id="rkBtn" type="button">갯바위</button>'
               + '<button class="basebtn ac" id="acBtn" type="button">사고</button>'
@@ -395,6 +395,7 @@ eoCtl.onAdd = function(){
       t.className = 'basebtn' + (EO_ON ? ' on' : '');
       if (EO_ON && map.getZoom() < EO_MINZ) toast('지도를 확대하면 어장 구역이 보입니다');
       eoVis_();
+      try { legDraw_(); } catch(err){}
       try { localStorage.setItem('hrn_eo', EO_ON ? '1' : '0'); } catch(err){}
     } else if (t && t.id === 'ggBtn'){
       GG_ON = !GG_ON;
@@ -598,10 +599,47 @@ function eoRefresh_(){
     .then(function(j){ EO_IDX = j || {cells:[]}; load(); })
     .catch(function(){ EO_IDX = {cells:[]}; });
 }
+/* 어장 안내 — 색 구역이 「눌러 보면 정보가 나오는 것」임을 모르는 사람이 많다.
+   ① 어장이 처음 보일 때 한 번 알림(방문당 1회, 통틀어 최대 3회 — hrn_eohint)
+   ② 컴퓨터는 마우스를 올리면 짧은 설명 + 테두리 강조 */
+var EO_HINTED = false;
+function eoHint_(){
+  if (EO_HINTED) return;
+  EO_HINTED = true;
+  var n = 0;
+  try { n = +(localStorage.getItem('hrn_eohint') || 0); } catch(e){}
+  if (n >= 3) return;
+  try { localStorage.setItem('hrn_eohint', String(n + 1)); } catch(e){}
+  setTimeout(function(){
+    toast(PHONE ? '색칠된 어장 구역을 누르면 어떤 어장인지·캐도 되는지 나옵니다'
+                : '색칠된 어장 구역에 마우스를 올리거나 누르면 어장 정보가 나옵니다', 4200);
+  }, 900);
+}
+var EO_HOVER = null;
+function eoHoverOff_(){
+  if (!EO_HOVER) return;
+  try { EO_HOVER.setStyle({ weight: brightMap_() ? 1.2 : 1, opacity: brightMap_() ? .75 : .55 }); } catch(e){}
+  try { EO_HOVER.closeTooltip(); EO_HOVER.unbindTooltip(); } catch(e){}
+  EO_HOVER = null;
+}
+if (!PHONE){
+  EO_LAYER.on('mouseover', function(e){
+    var l = e.layer; if (!l || !l._eo) return;
+    if (EO_HOVER !== l) eoHoverOff_();
+    EO_HOVER = l;
+    l.setStyle({ weight: 3, opacity: 1 });
+    var f = l._eo;
+    var tip = '<b>' + EO_NAME[f.k] + '</b>' + (f.f ? ' · ' + f.f : '')
+            + (f.k === 'M' ? '<br><span style="color:#e0563a">조개·해조류 채취 금지 구역</span>' : '')
+            + '<br><span style="color:#888">눌러서 자세히</span>';
+    l.bindTooltip(tip, { sticky: true, direction: 'top', opacity: .95 }).openTooltip(e.latlng);
+  });
+  EO_LAYER.on('mouseout', eoHoverOff_);
+}
 function eoVis_(){
   var show = EO_ON && map.getZoom() >= EO_MINZ;
-  if (show){ if (!map.hasLayer(EO_LAYER)) EO_LAYER.addTo(map); eoRefresh_(); }
-  else { if (map.hasLayer(EO_LAYER)) map.removeLayer(EO_LAYER); }
+  if (show){ if (!map.hasLayer(EO_LAYER)) EO_LAYER.addTo(map); eoRefresh_(); eoHint_(); }
+  else { eoHoverOff_(); if (map.hasLayer(EO_LAYER)) map.removeLayer(EO_LAYER); }
 }
 map.on('moveend zoomend', eoVis_);
 
@@ -713,6 +751,8 @@ function flatDraw_(){
       pg.addTo(FLAT_LAYER);
     });
   });
+  /* 다시 그린 갯벌이 어장·갯골 위를 덮으면 어장을 누를 수 없다 — 맨 밑으로 보낸다 */
+  try { FLAT_LAYER.eachLayer(function(l){ if (l.bringToBack) l.bringToBack(); }); } catch(e){}
 }
 FLAT_LAYER.on('click', function(e){
   var l = e.layer || e.target;
@@ -3924,6 +3964,13 @@ function legHtml_(){
     ['mud','mix','sand'].forEach(function(k){
       var c = FLAT_COL[k]; if (!c) return;
       rows.push('<span><i style="background:' + (bright ? c.l : c.d) + '"></i>' + c.ko + '</span>');
+    });
+  }
+  if (typeof EO_ON !== 'undefined' && EO_ON && map.getZoom() >= EO_MINZ){
+    rows.push('<b>어장 (구역을 누르면 정보)</b>');
+    [['M','마을어업 · 채취 금지'],['P','양식장'],['J','정치망']].forEach(function(a){
+      var c = eoStyleOf_(a[0]).c;
+      rows.push('<span><i style="background:' + c + ';opacity:.85"></i>' + a[1] + '</span>');
     });
   }
   if (typeof CL_ON !== 'undefined' && CL_ON && map.getZoom() >= CL_MINZ){
