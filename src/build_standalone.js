@@ -420,7 +420,10 @@ idx = idx.replace('</head>', [
   '<meta property="og:description" content="\ubb3c\ub54c \ubcf4\uae30 \uc9dc\uc99d\ub098\ub294 \uc0ac\ub78c\uc744 \uc704\ud55c \uc571. \uc9c0\ub3c4\uc5d0\uc11c \uacb0\ub860\ub9cc \ubd05\ub2c8\ub2e4.">',
   '<meta property="og:url" content="https://haerunak.com/">',
   '<meta property="og:locale" content="ko_KR">',
-  '<meta name="twitter:card" content="summary">',
+  '<meta property="og:image" content="https://haerunak.com/og.png">',
+  '<meta property="og:image:width" content="1200">',
+  '<meta property="og:image:height" content="630">',
+  '<meta name="twitter:card" content="summary_large_image">',
   '</head>'
 ].join('\n'));
 

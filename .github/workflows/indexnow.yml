@@ -1,0 +1,48 @@
+# 해루낚 — 색인 가속(IndexNow). 매일 새벽 지난 하루 동안 바뀐 쪽을 네이버·빙에 알린다.
+# 키 파일: 저장소 루트 1fd332934c310ac5ca8e711b71445b0e.txt (지우면 제출이 거부된다)
+name: 색인 제출
+
+on:
+  schedule:
+    - cron: '23 21 * * *'   # 한국 시각 매일 06:23
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "사이트 지도 전체 제출 (true/false)"
+        default: "false"
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 200
+      - name: 바뀐 쪽 모아 제출
+        env:
+          KEY: 1fd332934c310ac5ca8e711b71445b0e
+          ALL: ${{ github.event.inputs.all }}
+        run: |
+          set -e
+          if [ "$ALL" = "true" ]; then
+            grep -o '<loc>[^<]*</loc>' sitemap.xml | sed 's#</\?loc>##g' > urls.txt
+          else
+            git log --since='26 hours ago' --name-only --pretty=format: -- '*.html' \
+              | grep -v '^src/' | sort -u | grep . \
+              | sed -e 's#index\.html$##' -e 's#^#https://haerunak.com/#' > urls.txt || true
+          fi
+          N=$(wc -l < urls.txt); echo "제출할 쪽 $N 개"
+          [ "$N" -gt 0 ] || exit 0
+          python3 - <<'PY'
+          import json, os, urllib.request
+          urls = [u.strip() for u in open('urls.txt', encoding='utf-8') if u.strip()][:10000]
+          body = json.dumps({"host": "haerunak.com", "key": os.environ["KEY"],
+                             "keyLocation": "https://haerunak.com/%s.txt" % os.environ["KEY"],
+                             "urlList": urls}).encode()
+          for ep in ("https://searchadvisor.naver.com/indexnow", "https://api.indexnow.org/indexnow"):
+              req = urllib.request.Request(ep, data=body, headers={"Content-Type": "application/json; charset=utf-8"})
+              try:
+                  r = urllib.request.urlopen(req, timeout=30); print(ep, r.status)
+              except Exception as e:
+                  print(ep, "실패", e)
+          PY

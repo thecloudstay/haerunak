@@ -121,7 +121,8 @@ function shell(o){
 <meta property="og:description" content="${esc(o.desc)}">
 <meta property="og:url" content="${canon}">
 <meta property="og:locale" content="ko_KR">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://haerunak.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#05141f">
 ${verifyTags()}
 <link rel="icon" type="image/svg+xml" href="${o.depth === 0 ? '' : '../'}icon.svg">
