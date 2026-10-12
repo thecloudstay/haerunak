@@ -1329,6 +1329,8 @@ function renderPick(){
     else if (top.flat >= 150) c.appendChild(el('span','chip', '갯벌 ' + (top.flat >= 1000 ? (top.flat/1000).toFixed(1) + 'km' : Math.round(top.flat/10)*10 + 'm') + ' 드러남'));
   }
   /* 과태료·통제가 걸린 자리는 카드에서 먼저 보여야 한다 — 목록까지 안 내려가는 사람이 많다 */
+  if (top.mine >= 2) c.appendChild(el('span','chip warn', '유실지뢰 · 해안 출입통제'));
+  else if (top.mine) c.appendChild(el('span','chip warn', '유실지뢰 주의'));
   if (top.zn) c.appendChild(el('span','chip warn', '해경 야간 출입통제 갯벌'));
   if (top.mil) c.appendChild(el('span','chip warn', top.mil >= 2 ? '군 통제 · 야간 금지' : '군 통제 해안'));
   if (top.prot) c.appendChild(el('span','chip warn', '보호·제한구역 — 채취 확인'));
@@ -1426,6 +1428,7 @@ function renderList(){
     if (r.mil) top.appendChild(el('span','row-isl row-mil', r.mil >= 2 ? '군통제·야간금지' : '군통제'));
     if (r.prot) top.appendChild(el('span','row-isl row-prot', '보호구역'));
     if (r.zn) top.appendChild(el('span','row-isl row-mil', '야간 출입통제'));
+    if (r.mine >= 2) top.appendChild(el('span','row-isl row-mil', '지뢰 통제'));
     if (r.kd === 'B') top.appendChild(el('span','row-isl row-kd', '겸용'));
     top.appendChild(el('span','row-reg', r.r));
     if (r._d != null) top.appendChild(el('span','row-dist', (r._d < 10 ? r._d.toFixed(1) : Math.round(r._d)) + 'km'));
@@ -1731,6 +1734,15 @@ function renderDetail(d){
         '<b>🛡 보호·제한구역 — 채취·낚시 전에 확인</b> 경계는 대략적입니다. 현장 팻말과 관리청 고시가 우선입니다.' + ph);
     pb.setAttribute('data-rk','82');   /* 보호구역 — 경고 묶음 */
     b.appendChild(pb);
+  }
+
+  /* 북한 유실지뢰 — 서도면은 해안 출입통제, 그 밖의 강화는 주의 */
+  if (d.point.mine){
+    var nb = el('div','dt-verdict bad mil-box' + (d.point.mine >= 2 ? ' mil2' : ''),
+        '<b>' + (d.point.mine >= 2 ? '⚠ 북한 유실지뢰 — 해안 출입통제 중' : '⚠ 유실지뢰 주의 — 낯선 물체 만지지 말 것') + '</b> '
+      + (d.point.mineNote || ''));
+    nb.setAttribute('data-rk','81');   /* 지뢰 — 경고 묶음 맨 앞 */
+    b.appendChild(nb);
   }
 
   /* 접경지역 군 통제 — 강화·김포·서해5도. 통문 시간을 모르고 가면 못 들어가거나 못 나온다 */

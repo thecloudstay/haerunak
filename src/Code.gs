@@ -135,6 +135,26 @@ function milNote_(lv){
   return '';
 }
 
+/** 북한 유실지뢰 — 2026년 7월 집중호우 뒤 강화 해안에서 목함·대인지뢰가 잇달아 발견됐다
+ *  (7/24 말도 첫 발견 → 8/10 기준 16발, 10/8 주문도 대빈창해수욕장 17번째, 해병대 2사단 현장 폭파).
+ *  서도면(주문도·볼음도·아차도·서검도·미법도)은 「해안가 전역 출입통제」 팻말이 서 있고 해제 날짜가 없다.
+ *  2 = 서도면 섬 — 해안 출입통제, 추천에서 내린다
+ *  1 = 그 밖의 강화 해안 — 의심 물체 주의 안내만
+ *  해제되면 MINE_ON 을 false 로 바꾸거나 MINE_LV2 에서 섬 이름을 뺀다. (확인일 2026-10-13) */
+var MINE_ON  = true;
+var MINE_LV2 = /주문도|볼음도|아차도|서검도|미법도/;
+var MINE_CHECKED = '2026-10-13';
+function mineOf_(p){
+  if (!MINE_ON) return 0;
+  if (String(p.r || '').indexOf('강화') < 0) return 0;
+  return MINE_LV2.test(String(p.n || '')) ? 2 : 1;
+}
+function mineNote_(lv){
+  if (lv >= 2) return '북한 유실지뢰가 잇달아 발견돼(10월 8일 주문도 대빈창해수욕장 포함, 올해 강화에서만 17발) 서도면 섬 해안은 「해안가 전역 출입통제」 중입니다. 해제 날짜가 정해지지 않았으니 서도면사무소·해병대에 해제 여부를 확인하기 전에는 갯벌·해변에 들어가지 마세요. (' + MINE_CHECKED + ' 확인)';
+  if (lv >= 1) return '올여름 집중호우 뒤 강화 해안 곳곳에서 북한 유실지뢰(나무 상자·원통형)가 발견됐습니다. 갯벌·해변에서 처음 보는 상자나 물체는 절대 만지거나 옮기지 말고 그 자리를 벗어나 112·119 또는 군부대에 신고하세요.';
+  return '';
+}
+
 /** 해루질 갈래 — 갯벌(flat)인가 갯바위(rock)인가. 화면의 「갯벌·갯바위」 단추가 이걸로 나눈다.
  *  바닥 지형(f)이 암반이어도 후기로 모은 채집물이 바지락·낙지처럼 파는 것 위주면 실제로는 갯벌에서 하는 자리다
  *  (진도 수품·사도·신시도처럼 항·섬 이름으로 잡힌 지점). 맨 앞 종이 파는 종이거나 파는 종이 절반 이상이면 갯벌로 본다.
@@ -156,7 +176,7 @@ function packRow_(p, an, mode){
   var m = mode === 'fish' ? an.fish : an.haeru;
   return {
     i: p.i, n: p.n, r: p.r, s: p.s, la: p.la, lo: p.lo, tag: p.tag || '',
-    isl: p.isl ? 1 : 0, br: p.br ? 1 : 0, fr: p.fr || null, mil: milOf_(p), f: p.f || '', kd: p.kd || '', hk: haeruKind_(p),
+    isl: p.isl ? 1 : 0, br: p.br ? 1 : 0, fr: p.fr || null, mil: milOf_(p), mine: mineOf_(p), f: p.f || '', kd: p.kd || '', hk: haeruKind_(p),
     prot: (typeof protectNear_ === 'function' && protectNear_(p).length) ? 1 : 0,
     /* 해경 야간 출입통제 갯벌이 붙어 있는 자리 — 목록 칩으로 먼저 보인다 */
     zn: (typeof zonesNear_ === 'function' && zonesNear_(p.la, p.lo, 1.2).some(function(z){ return /야간/.test(z.period||''); })) ? 1 : 0,
@@ -190,7 +210,7 @@ function apiPoint(id, ds, want, days){
   return {
     point: { i:p.i, n:p.n, r:p.r||'', s:p.s, la:p.la, lo:p.lo, tag:p.tag||'',
              floor: FLOOR_KO[p.f], isl: p.isl?1:0, br: p.br?1:0, fr: p.fr||null,
-             mil: milOf_(p), milNote: milNote_(milOf_(p)), kd: p.kd || '', f: p.f || '', pb: p.pb || '', hk: haeruKind_(p),
+             mil: milOf_(p), milNote: milNote_(milOf_(p)), mine: mineOf_(p), mineNote: mineNote_(mineOf_(p)), kd: p.kd || '', f: p.f || '', pb: p.pb || '', hk: haeruKind_(p),
              auto: !!p.auto, approxCoord: !!p.approxCoord },
     ds: ds, meta: an.meta, haeru: an.haeru, fish: an.fish, want: an.want,
     spots: spotsOf_(p.i),

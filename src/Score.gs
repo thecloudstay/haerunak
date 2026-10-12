@@ -794,6 +794,22 @@ function analyze_(p, ds, tide, wxRec, want){
     } catch(e){}
   }
 
+  /* ── 북한 유실지뢰 ─────────
+     서도면 섬은 해안 전역 출입통제(해제일 없음) — 추천에서 내리고 결론 머리에 먼저 말한다.
+     그 밖의 강화는 점수는 두고 주의만 붙인다. */
+  if (typeof mineOf_ === 'function'){
+    var mineLv = mineOf_(p);
+    if (mineLv >= 2){
+      hScore = Math.min(hScore, 20); fScore = Math.min(fScore, 24);
+      hPre = '유실지뢰로 해안 출입통제 중 — 해제 확인 전엔 들어가지 마세요. ' + hPre;
+      fPre = '유실지뢰로 해안 출입통제 중 — 해제 확인 전엔 들어가지 마세요. ' + fPre;
+      hWarn.unshift('북한 유실지뢰 발견 — 서도면 해안 전역 출입통제, 해제 날짜 없음');
+      fWarn.unshift('북한 유실지뢰 발견 — 서도면 해안 전역 출입통제, 해제 날짜 없음');
+    } else if (mineLv >= 1){
+      hWarn.push('강화 해안 유실지뢰 주의 — 낯선 상자·물체는 만지지 말고 112 신고');
+    }
+  }
+
   /* ── 어종 지정 검색 보정 ────────────────── */
   var wantInfo = null;
   if (want){
