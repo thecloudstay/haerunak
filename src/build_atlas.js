@@ -523,6 +523,37 @@ D.points.forEach(p => {
 
 fs.writeFileSync(path.join(OUT,'species','index.html'), speciesIndex()); n++;
 fs.writeFileSync(path.join(OUT,'spot','index.html'), spotIndex()); n++;
+
+/* 목록에서 뺀 지점·어종의 옛 쪽 정리
+   지점·어종을 자료에서 빼도 예전에 만든 쪽 파일은 그대로 남아 검색에 옛 내용으로 걸린다.
+   이번에 만들지 않은 쪽 중 아직 색인 금지가 아닌 것은 색인 금지 + 목록으로 이동하는 쪽으로 바꾼다.
+   (손으로 만든 이동 쪽은 이미 색인 금지라 건드리지 않는다) */
+(function retireOrphans(){
+  const made = {
+    spot: new Set(D.points.map(p => p.i + '.html').concat(['index.html'])),
+    species: new Set(D.species.map(s => decodeURIComponent(slug(s.n)) + '.html').concat(['index.html'])),
+  };
+  const word = { spot: '지점', species: '어종' };
+  let r = 0;
+  Object.keys(made).forEach(dir => {
+    fs.readdirSync(path.join(OUT, dir)).forEach(f => {
+      if (!f.endsWith('.html') || made[dir].has(f)) return;
+      const fp = path.join(OUT, dir, f);
+      if (/name="robots"[^>]*noindex/.test(fs.readFileSync(fp, 'utf8'))) return;
+      fs.writeFileSync(fp, `<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow">
+<meta http-equiv="refresh" content="0; url=/${dir}/">
+<link rel="canonical" href="${SITE}/${dir}/">
+<title>목록에서 뺀 ${word[dir]} | 해루낚</title></head>
+<body><p>이 ${word[dir]}은 해루낚 목록에서 뺐습니다. <a href="/${dir}/">${word[dir]} 목록으로 이동</a></p></body></html>
+`);
+      r++;
+    });
+  });
+  if (r) console.log('목록에서 뺀 옛 쪽', r, '개 정리');
+})();
 urls.unshift({ loc: `${SITE}/spot/`, pri: '0.9' });
 urls.unshift({ loc: `${SITE}/species/`, pri: '0.9' });
 urls.push({ loc: `${SITE}/method/`, pri: '0.8' });
