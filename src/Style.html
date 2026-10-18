@@ -259,7 +259,10 @@ body.map-sat .leaflet-container{background:#0b1a22}
 /* ── 어종 도감 팝업 (2026-10-18) ── */
 .icon-btn.icon-dg{background:rgba(53,208,255,.13);color:var(--acc2)}
 .dgcard{width:min(760px,100%);height:min(88vh,820px)}
-.dghead{flex-wrap:wrap}
+.dghead{flex-wrap:nowrap}
+.dghead h3{flex:0 0 auto;white-space:nowrap}
+#dgwrap [hidden]{display:none!important}
+.dghead .mtx{margin-left:auto;flex:0 0 auto}
 .dghead input{flex:1 1 180px;min-width:0;background:#0a2436;color:#d7e8f2;border:1px solid rgba(140,200,235,.35);
   border-radius:10px;padding:8px 11px;font-family:inherit;font-size:14px}
 .dgback{-webkit-appearance:none;appearance:none;border:0;background:rgba(255,255,255,.08);color:#cadeeb;

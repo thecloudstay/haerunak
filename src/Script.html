@@ -3952,6 +3952,7 @@ function dgShow_(name){
   }
   if (x.dg) h += '<div class="dgwarn"><b>주의</b> ' + E(x.dg) + '</div>';
   else if (x.rig && x.rig.warn) h += '<div class="dgwarn"><b>주의</b> ' + E(x.rig.warn) + '</div>';
+  if (x.cf === '하') h += '<p class="dgk" style="margin-top:10px">지역마다 부르는 이름과 방법이 달라 확인을 더 하고 있는 어종입니다.</p>';
   h += '<div class="dgacts"><button class="go" type="button" id="dgGo">' + E(x.n) + ' 노릴 자리 보기</button>'
      + '<a class="more" href="species/' + encodeURIComponent(x.n) + '.html" target="_blank" rel="noopener">도감 쪽에서 크게 보기</a></div></div>';
   var body = DG.el.querySelector('#dgBody');

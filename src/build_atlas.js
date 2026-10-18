@@ -240,6 +240,7 @@ function guideHow(g, name){
   if (g.care) rows.push(['보관·손질', g.care]);
   if (rows.length) o += `<dl class="traits">${rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('')}</dl>`;
   if (g.danger) o += `<p class="warn"><b>주의</b> ${esc(g.danger)}</p>`;
+  if (g.conf === '하') o += `<p class="cap">이 어종은 지역마다 부르는 이름과 방법이 달라 확인을 더 하고 있습니다. 현장 경험과 다르면 알려 주세요.</p>`;
   return o + `</section>`;
 }
 
@@ -581,7 +582,7 @@ fs.writeFileSync(path.join(OUT,'data','guide.json'), JSON.stringify(D.species.ma
     bn: s.ban ? banText(s.ban) : '', bb: s.ban ? s.ban.b : null, bz: (s.ban && s.ban.z) ? s.ban.z + 'cm' : '',
     sp: new Set(s.spots).size, rig: s.rig || null,
     lk: g.look || '', sz: g.size || '', ec: g.eco || '', hb: g.hab || '', ds: g.dist || '',
-    hw: g.how || null, cr: g.care || '', dg: g.danger || '' };
+    hw: g.how || null, cr: g.care || '', dg: g.danger || '', cf: g.conf || '' };
 })));
 fs.writeFileSync(path.join(OUT,'spot','index.html'), spotIndex()); n++;
 
