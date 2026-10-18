@@ -12,6 +12,14 @@ const fs = require('fs');
 const path = require('path');
 
 const D = JSON.parse(fs.readFileSync('atlas_data.json', 'utf8'));
+/* 어종 도감 본문 — 생김새·생태·서식지·잡는 법 (src/species_guide.json, 2026-10-18)
+   이름으로 붙인다. 없는 어종은 기존 내용만 나온다. */
+const GUIDE = (function(){
+  try {
+    const arr = JSON.parse(fs.readFileSync('species_guide.json', 'utf8'));
+    const m = {}; arr.forEach(g => { if (g && g.n) m[g.n] = g; }); return m;
+  } catch(e){ return {}; }
+})();
 const OUT = 'ghup';
 const SITE = 'https://haerunak.com';   // 개인 도메인 사면 여기만 바꾸면 된다
 const TODAY = D.generated;
@@ -203,11 +211,44 @@ function banText(b){
   return parts.join(' · ');
 }
 
+/* ── 도감 본문 블록 ── */
+function guideTop(g){
+  if (!g) return '';
+  const rows = [];
+  if (g.look) rows.push(['생김새', g.look]);
+  if (g.size) rows.push(['크기', g.size]);
+  if (g.eco)  rows.push(['생태', g.eco]);
+  if (!rows.length) return '';
+  return `<section><h2>어떤 ${g.group === '해조류' ? '해조류' : '녀석'}인가</h2>
+${(g.alias && g.alias.length) ? `<p class="alias">다른 이름 ${g.alias.map(esc).join(' · ')}</p>` : ''}
+<dl class="traits">${rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('')}</dl></section>`;
+}
+function guideHab(g){
+  if (!g || !(g.hab || g.dist)) return '';
+  return `<section><h2>어디에 사나</h2>
+<dl class="traits">${g.hab ? `<dt>서식지</dt><dd>${esc(g.hab)}</dd>` : ''}${g.dist ? `<dt>분포</dt><dd>${esc(g.dist)}</dd>` : ''}</dl></section>`;
+}
+function guideHow(g, name){
+  const h = g && g.how; if (!h) return '';
+  let o = `<section class="howto"><h2>${esc(name)} 잡는 법</h2>`;
+  if (h.steps && h.steps.length) o += `<ol class="steps">${h.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>`;
+  const rows = [];
+  if (h.spot) rows.push(['자리 찾기', h.spot]);
+  if (h.time) rows.push(['시간·물때', h.time]);
+  if (h.gear) rows.push(['채비·도구', h.gear]);
+  if (h.miss) rows.push(['초보 실수', h.miss]);
+  if (g.care) rows.push(['보관·손질', g.care]);
+  if (rows.length) o += `<dl class="traits">${rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('')}</dl>`;
+  if (g.danger) o += `<p class="warn"><b>주의</b> ${esc(g.danger)}</p>`;
+  return o + `</section>`;
+}
+
 /* ══════════ 어종 페이지 ══════════ */
 function speciesPage(s){
+  const G = GUIDE[s.n] || null;
   const kindWord = s.kind === 'fish' ? '낚시 대상어' : s.kind === 'both' ? '해루질·낚시 대상' : '해루질 채집물';
   const best = seasonWords(s.season);
-  const desc = `${s.n} — ${kindWord}. ${best ? '제철 ' + best + '. ' : ''}`
+  const desc = `${s.n} — ${kindWord}. ${best ? '제철 ' + best + '. ' : ''}${G && G.hab ? G.hab.split('.')[0] + '. ' : ''}`
     + (s.rig && s.rig.t ? '준비물: ' + s.rig.t.slice(0,3).join('·') + '. ' : '')
     + (s.spots.length ? `전국 ${s.spots.length}곳에서 노릴 수 있습니다.` : '');
 
@@ -222,7 +263,7 @@ function speciesPage(s){
   let body = `<article class="page">
 <nav class="crumb"><a href="../species/">어종 도감</a> <span>›</span> ${esc(s.n)}</nav>
 <h1>${esc(s.n)}</h1>
-<p class="kicker">${kindWord}${best ? ' · 제철 ' + esc(best) : ''}</p>`;
+<p class="kicker">${kindWord}${G && G.group ? ' · ' + esc(G.group) : ''}${best ? ' · 제철 ' + esc(best) : ''}</p>`;
 
   if (s.ban){
     const bt = banText(s.ban);
@@ -240,7 +281,9 @@ ${s.ban.note ? `<p class="note">${esc(s.ban.note)}</p>` : ''}
 <p class="cap">색이 진할수록 제철입니다. 지역과 그 해 수온에 따라 앞뒤로 밀립니다.</p></section>`;
   }
 
+  body += guideTop(G);
   body += traitBlock(s.n, s.kind === 'fish' ? 'fish' : 'haeru');
+  body += guideHab(G);
 
   if (s.rig){
     body += `<section><h2>준비물과 채비</h2>`;
@@ -251,6 +294,8 @@ ${s.ban.note ? `<p class="note">${esc(s.ban.note)}</p>` : ''}
     if (s.rig.warn) body += `<p class="warn"><b>주의</b> ${esc(s.rig.warn)}</p>`;
     body += `</section>`;
   }
+
+  body += guideHow(G, s.n);
 
   if (spotList.length){
     body += `<section><h2>어디서 잡히나</h2>
@@ -314,12 +359,19 @@ ${s.ban.note ? `<p class="note">${esc(s.ban.note)}</p>` : ''}
 </article>`;
 
   return shell({
-    title: `${s.n} — 제철·금어기·채비 | 해루낚 어종 도감`,
+    title: G ? `${s.n} 잡는 법 — 서식지·제철·채비 | 해루낚 어종 도감` : `${s.n} — 제철·금어기·채비 | 해루낚 어종 도감`,
     desc: desc.slice(0, 155),
     url: `/species/${slug(s.n)}.html`,
     depth: 1,
     body,
-    ld: {
+    ld: (G && G.how && G.how.steps && G.how.steps.length) ? {
+      '@context':'https://schema.org', '@type':'HowTo',
+      name: `${s.n} 잡는 법`, inLanguage:'ko-KR', datePublished: TODAY,
+      description: (G.hab || desc).slice(0, 150),
+      tool: ((s.rig && s.rig.t) || []).map(t => ({ '@type':'HowToTool', name: t })),
+      step: G.how.steps.map((t, i) => ({ '@type':'HowToStep', position: i + 1, text: t })),
+      publisher:{ '@type':'Organization', name:'해루낚' }
+    } : {
       '@context':'https://schema.org', '@type':'Article',
       headline: `${s.n} 잡는 법 — 제철, 금어기, 채비`,
       inLanguage:'ko-KR', datePublished: TODAY,
@@ -522,6 +574,15 @@ D.points.forEach(p => {
 });
 
 fs.writeFileSync(path.join(OUT,'species','index.html'), speciesIndex()); n++;
+/* 앱 안 「어종 도감」 팝업이 읽는 자료 — 열 때 한 번만 받는다 */
+fs.writeFileSync(path.join(OUT,'data','guide.json'), JSON.stringify(D.species.map(s => {
+  const g = GUIDE[s.n] || {};
+  return { n: s.n, k: s.kind, g: g.group || '', a: g.alias || [], se: s.season || null,
+    bn: s.ban ? banText(s.ban) : '', bb: s.ban ? s.ban.b : null, bz: (s.ban && s.ban.z) ? s.ban.z + 'cm' : '',
+    sp: new Set(s.spots).size, rig: s.rig || null,
+    lk: g.look || '', sz: g.size || '', ec: g.eco || '', hb: g.hab || '', ds: g.dist || '',
+    hw: g.how || null, cr: g.care || '', dg: g.danger || '' };
+})));
 fs.writeFileSync(path.join(OUT,'spot','index.html'), spotIndex()); n++;
 
 /* 목록에서 뺀 지점·어종의 옛 쪽 정리

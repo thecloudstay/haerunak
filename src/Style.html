@@ -256,6 +256,58 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .mtfoot b{color:#d7e8f2}
 .sort.mtbtn{background:linear-gradient(100deg,rgba(31,196,192,.18),rgba(46,230,168,.14));
   border:1px solid rgba(31,196,192,.4);color:#a4e9d4;font-weight:800}
+/* ── 어종 도감 팝업 (2026-10-18) ── */
+.icon-btn.icon-dg{background:rgba(53,208,255,.13);color:var(--acc2)}
+.dgcard{width:min(760px,100%);height:min(88vh,820px)}
+.dghead{flex-wrap:wrap}
+.dghead input{flex:1 1 180px;min-width:0;background:#0a2436;color:#d7e8f2;border:1px solid rgba(140,200,235,.35);
+  border-radius:10px;padding:8px 11px;font-family:inherit;font-size:14px}
+.dgback{-webkit-appearance:none;appearance:none;border:0;background:rgba(255,255,255,.08);color:#cadeeb;
+  height:32px;padding:0 11px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.dgchips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+.dgchip{-webkit-appearance:none;appearance:none;border:1px solid rgba(140,200,235,.25);background:transparent;color:#9fc0d4;
+  border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.dgchip.on{background:rgba(46,230,168,.16);border-color:rgba(46,230,168,.5);color:var(--acc)}
+.dglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:12px 14px}
+.dgitem{background:rgba(255,255,255,.04);border:1px solid rgba(140,200,235,.16);border-radius:12px;padding:10px 11px;cursor:pointer;text-align:left}
+.dgitem:active{transform:scale(.98)}
+.dgitem b{display:block;font-size:14.5px;color:#e9f3fa}
+.dgitem span{display:block;font-size:11.5px;color:#8ba6b8;margin-top:2px}
+.dgitem .tg{display:inline-block;margin-top:5px;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:999px}
+.dgitem .tg.pk{background:rgba(46,230,168,.16);color:var(--acc)}
+.dgitem .tg.bn{background:rgba(255,127,90,.18);color:#ffa38a}
+.dgdet{padding:16px 18px 22px}
+.dgdet h2{margin:0;font-size:22px;letter-spacing:-.4px}
+.dgdet .dgk{margin:4px 0 0;color:#8ba6b8;font-size:13px}
+.dgdet .dgal{margin:4px 0 0;color:#6d8ba0;font-size:12.5px}
+.dgdet h4{margin:20px 0 8px;font-size:13px;font-weight:800;color:var(--acc);letter-spacing:.2px}
+.dgdet p{margin:0 0 6px;font-size:14.5px;line-height:1.75;color:#d7e8f2}
+.dgdet dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:7px 12px}
+.dgdet dt{font-size:12px;font-weight:800;color:#9fc0d4;white-space:nowrap;padding-top:2px}
+.dgdet dd{margin:0;font-size:14px;line-height:1.7;color:#d7e8f2}
+.dgdet ol{margin:0;padding:0;list-style:none;counter-reset:dg}
+.dgdet ol li{position:relative;padding:8px 10px 8px 38px;margin:0 0 6px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(140,200,235,.14);border-radius:10px;font-size:14px;line-height:1.65}
+.dgdet ol li::before{counter-increment:dg;content:counter(dg);position:absolute;left:10px;top:8px;width:20px;height:20px;
+  border-radius:50%;background:rgba(46,230,168,.16);color:var(--acc);font-size:11.5px;font-weight:800;
+  display:flex;align-items:center;justify-content:center}
+.dgdet .dgban{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:rgba(255,127,90,.12);
+  border:1px solid rgba(255,127,90,.35);color:#ffc2b0;font-size:13.5px;line-height:1.6}
+.dgdet .dgwarn{margin-top:10px;padding:9px 12px;border-radius:12px;background:rgba(252,211,77,.08);
+  border:1px solid rgba(252,211,77,.28);color:#f3dd94;font-size:13.5px;line-height:1.6}
+.dgseason{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin-top:4px}
+.dgseason i{font-style:normal;text-align:center;font-size:10.5px;color:#6d8ba0;padding:5px 0;border-radius:6px;background:rgba(255,255,255,.04)}
+.dgseason i.l1{background:rgba(46,230,168,.12);color:#9fc0d4}
+.dgseason i.l2{background:rgba(46,230,168,.26);color:#d7e8f2}
+.dgseason i.l3{background:rgba(46,230,168,.5);color:#04121c;font-weight:800}
+.dgseason i.now{outline:2px solid #ff7f5a;outline-offset:-2px}
+.dgacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.dgacts button,.dgacts a{flex:1 1 180px;text-align:center;border-radius:12px;padding:11px 12px;font-size:14px;font-weight:800;
+  cursor:pointer;font-family:inherit;text-decoration:none;border:0}
+.dgacts .go{background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c}
+.dgacts .more{background:rgba(255,255,255,.07);color:#cadeeb;border:1px solid rgba(140,200,235,.25)}
+.dgempty{padding:30px 0;text-align:center;color:#8ba6b8;font-size:13.5px}
+@media (max-width:520px){ .dgdet dl{grid-template-columns:1fr;gap:2px 0} .dgdet dd{margin-bottom:6px} }
 /* 윈디 */
 .wdcard{width:min(900px,100%);height:min(86vh,720px)}
 .wdbody{flex:1;min-height:0}

@@ -215,3 +215,12 @@ section p strong{color:var(--acc)}
   .traits{grid-template-columns:1fr;gap:3px 0}
   .traits dd{margin-bottom:9px}
 }
+
+/* 어종 도감 본문 — 잡는 법 단계 (2026-10-18) */
+.alias{margin:-4px 0 12px;font-size:13px;color:var(--mut)}
+.howto .steps{margin:0 0 16px;padding:0;list-style:none;counter-reset:st}
+.howto .steps li{position:relative;padding:10px 12px 10px 44px;margin:0 0 8px;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;font-size:15px;line-height:1.7}
+.howto .steps li::before{counter-increment:st;content:counter(st);position:absolute;left:12px;top:10px;
+  width:22px;height:22px;border-radius:50%;background:rgba(46,230,168,.16);color:var(--acc);
+  font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
