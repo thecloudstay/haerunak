@@ -269,6 +269,61 @@ body.map-sat .leaflet-container{background:#0b1a22}
 .mtfoot b{color:#d7e8f2}
 .sort.mtbtn{background:linear-gradient(100deg,rgba(31,196,192,.18),rgba(46,230,168,.14));
   border:1px solid rgba(31,196,192,.4);color:#a4e9d4;font-weight:800}
+/* ── 어종 도감 팝업 (2026-10-18) ── */
+.icon-btn.icon-dg{background:rgba(53,208,255,.13);color:var(--acc2)}
+.dgcard{width:min(760px,100%);height:min(88vh,820px)}
+.dghead{flex-wrap:nowrap}
+.dghead h3{flex:0 0 auto;white-space:nowrap}
+#dgwrap [hidden]{display:none!important}
+.dghead .mtx{margin-left:auto;flex:0 0 auto}
+.dghead input{flex:1 1 180px;min-width:0;background:#0a2436;color:#d7e8f2;border:1px solid rgba(140,200,235,.35);
+  border-radius:10px;padding:8px 11px;font-family:inherit;font-size:14px}
+.dgback{-webkit-appearance:none;appearance:none;border:0;background:rgba(255,255,255,.08);color:#cadeeb;
+  height:32px;padding:0 11px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.dgchips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+.dgchip{-webkit-appearance:none;appearance:none;border:1px solid rgba(140,200,235,.25);background:transparent;color:#9fc0d4;
+  border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.dgchip.on{background:rgba(46,230,168,.16);border-color:rgba(46,230,168,.5);color:var(--acc)}
+.dglist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:12px 14px}
+.dgitem{background:rgba(255,255,255,.04);border:1px solid rgba(140,200,235,.16);border-radius:12px;padding:10px 11px;cursor:pointer;text-align:left}
+.dgitem:active{transform:scale(.98)}
+.dgitem b{display:block;font-size:14.5px;color:#e9f3fa}
+.dgitem span{display:block;font-size:11.5px;color:#8ba6b8;margin-top:2px}
+.dgitem .tg{display:inline-block;margin-top:5px;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:999px}
+.dgitem .tg.pk{background:rgba(46,230,168,.16);color:var(--acc)}
+.dgitem .tg.bn{background:rgba(255,127,90,.18);color:#ffa38a}
+.dgdet{padding:16px 18px 22px}
+.dgdet h2{margin:0;font-size:22px;letter-spacing:-.4px}
+.dgdet .dgk{margin:4px 0 0;color:#8ba6b8;font-size:13px}
+.dgdet .dgal{margin:4px 0 0;color:#6d8ba0;font-size:12.5px}
+.dgdet h4{margin:20px 0 8px;font-size:13px;font-weight:800;color:var(--acc);letter-spacing:.2px}
+.dgdet p{margin:0 0 6px;font-size:14.5px;line-height:1.75;color:#d7e8f2}
+.dgdet dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:7px 12px}
+.dgdet dt{font-size:12px;font-weight:800;color:#9fc0d4;white-space:nowrap;padding-top:2px}
+.dgdet dd{margin:0;font-size:14px;line-height:1.7;color:#d7e8f2}
+.dgdet ol{margin:0;padding:0;list-style:none;counter-reset:dg}
+.dgdet ol li{position:relative;padding:8px 10px 8px 38px;margin:0 0 6px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(140,200,235,.14);border-radius:10px;font-size:14px;line-height:1.65}
+.dgdet ol li::before{counter-increment:dg;content:counter(dg);position:absolute;left:10px;top:8px;width:20px;height:20px;
+  border-radius:50%;background:rgba(46,230,168,.16);color:var(--acc);font-size:11.5px;font-weight:800;
+  display:flex;align-items:center;justify-content:center}
+.dgdet .dgban{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:rgba(255,127,90,.12);
+  border:1px solid rgba(255,127,90,.35);color:#ffc2b0;font-size:13.5px;line-height:1.6}
+.dgdet .dgwarn{margin-top:10px;padding:9px 12px;border-radius:12px;background:rgba(252,211,77,.08);
+  border:1px solid rgba(252,211,77,.28);color:#f3dd94;font-size:13.5px;line-height:1.6}
+.dgseason{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin-top:4px}
+.dgseason i{font-style:normal;text-align:center;font-size:10.5px;color:#6d8ba0;padding:5px 0;border-radius:6px;background:rgba(255,255,255,.04)}
+.dgseason i.l1{background:rgba(46,230,168,.12);color:#9fc0d4}
+.dgseason i.l2{background:rgba(46,230,168,.26);color:#d7e8f2}
+.dgseason i.l3{background:rgba(46,230,168,.5);color:#04121c;font-weight:800}
+.dgseason i.now{outline:2px solid #ff7f5a;outline-offset:-2px}
+.dgacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.dgacts button,.dgacts a{flex:1 1 180px;text-align:center;border-radius:12px;padding:11px 12px;font-size:14px;font-weight:800;
+  cursor:pointer;font-family:inherit;text-decoration:none;border:0}
+.dgacts .go{background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04121c}
+.dgacts .more{background:rgba(255,255,255,.07);color:#cadeeb;border:1px solid rgba(140,200,235,.25)}
+.dgempty{padding:30px 0;text-align:center;color:#8ba6b8;font-size:13.5px}
+@media (max-width:520px){ .dgdet dl{grid-template-columns:1fr;gap:2px 0} .dgdet dd{margin-bottom:6px} }
 /* 윈디 */
 .wdcard{width:min(900px,100%);height:min(86vh,720px)}
 .wdbody{flex:1;min-height:0}
@@ -1504,6 +1559,9 @@ body.map-kakao .dchip span{color:#b5cad8}
   </div>
   <button class="icon-btn icon-mt" id="btnTide" title="오늘 물때표" aria-label="오늘 물때표 바로 보기">
     <svg viewBox="0 0 24 24"><rect x="3.3" y="3.8" width="17.4" height="16.4" rx="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3.5 8.7h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6.2 16.4c1.3-1.6 2.6-1.6 3.9 0s2.6 1.6 3.9 0 2.6-1.6 3.8 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.4 12.3h2.1M13.5 12.3h2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </button>
+  <button class="icon-btn icon-dg" id="btnDogam" title="어종 도감" aria-label="어종 도감 — 특성·서식지·잡는 법">
+    <svg viewBox="0 0 24 24"><path d="M4 5.2c2.6-1 5.3-1 8 .6 2.7-1.6 5.4-1.6 8-.6v13.4c-2.6-1-5.3-1-8 .6-2.7-1.6-5.4-1.6-8-.6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M12 5.8v13.4" stroke="currentColor" stroke-width="1.7"/><path d="M6.3 10.6c1.1-.9 2.4-.9 3.5 0-1.1.9-2.4.9-3.5 0z" fill="currentColor"/></svg>
   </button>
   <button class="icon-btn" id="btnGeo" title="내 위치" aria-label="내 위치 기준 추천">
     <svg viewBox="0 0 24 24"><path d="M12 2.6v3.2M12 18.2v3.2M2.6 12h3.2M18.2 12h3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="6.1" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></svg>
@@ -9152,10 +9210,14 @@ var HAERU_WAY = {
     var tip = [];
     if (t.sig) tip.push('이 자리 후기에서 유독 많이 잡힌 종');
     var bt = biteTip_(t.n); if (bt) tip.push(bt);
-    if (tip.length) c0.title = tip.join(' · ');
+    tip.push('누르면 도감 — 특성·서식지·잡는 법');
+    c0.title = tip.join(' · ');
+    c0.style.cursor = 'pointer';
+    c0.onclick = function(){ openDogam(t.n); };
     ch.appendChild(c0);
   });
   s6.appendChild(ch);
+  s6.appendChild(el('div','bite-note','어종 이름을 누르면 도감에서 생김새·서식지·잡는 법을 볼 수 있습니다.'));
   /* 이 자리 해루질이 어떤 방식인지 — 조개 캐러 갔다가 갯바위를 만나면 안 된다 */
   if (S.mode === 'haeru'){
     var kdv = d.point.kd || '';
@@ -10708,6 +10770,189 @@ function mtLoad_(id){
     } catch(e){}
     openMultae(id, nm);
   };
+})();
+
+/* ══════════════ 어종 도감 — 157종의 생김새·생태·서식지·잡는 법 (2026-10-18) ══════════════
+   지도를 떠나지 않고 찾아보고, 「이 어종 노릴 자리」로 바로 넘어간다.
+   자료는 data/guide.json (빌드가 만든다) — 처음 열 때 한 번만 받는다. */
+var DG = { el:null, data:null, kind:'all', grp:'', now:false, q:'', cur:null };
+var DG_GROUPS = ['어류','조개류','고둥류','게·새우류','두족류','극피·피낭동물','해조류'];
+function dgEsc_(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function dgMonth_(){
+  var ds = (S && S.ds) || '';
+  var m = /^\d{4}-(\d{2})-(\d{2})/.exec(ds);
+  var d = m ? { mo: +m[1], dd: +m[2] } : (function(){ var t = new Date(); return { mo: t.getMonth()+1, dd: t.getDate() }; })();
+  return d;
+}
+/* 금어기 안인지 — bb 는 [[시작월,일],[끝월,일]] 하나 또는 그 묶음 */
+function dgInBan_(bb){
+  if (!bb || !bb.length) return false;
+  var t = dgMonth_(), cur = t.mo * 100 + t.dd;
+  var ranges = (bb.length === 2 && !Array.isArray(bb[0][0])) ? [bb] : bb;
+  return ranges.some(function(r){
+    if (!r || !r[0] || !r[1] || Array.isArray(r[0][0])) return false;
+    var a = r[0][0] * 100 + r[0][1], b = r[1][0] * 100 + r[1][1];
+    return a <= b ? (cur >= a && cur <= b) : (cur >= a || cur <= b);
+  });
+}
+function dgBuild_(){
+  if (DG.el) return;
+  var d = el('div','mtwrap');
+  d.id = 'dgwrap'; d.hidden = true;
+  d.innerHTML =
+      '<div class="mtcard dgcard glass" role="dialog" aria-label="어종 도감">'
+    +   '<div class="mthead dghead">'
+    +     '<button class="dgback" id="dgBack" type="button" hidden>목록</button>'
+    +     '<h3>어종 도감</h3>'
+    +     '<input id="dgQ" type="search" placeholder="이름·다른 이름으로 찾기" aria-label="어종 찾기">'
+    +     '<button class="mtx" id="dgClose" aria-label="닫기">×</button>'
+    +   '</div>'
+    +   '<div class="dgchips" id="dgChips"></div>'
+    +   '<div class="mtbody" id="dgBody"><p class="mtload">도감을 불러오는 중…</p></div>'
+    + '</div>';
+  document.body.appendChild(d);
+  DG.el = d;
+  d.addEventListener('click', function(e){ if (e.target === d) dgClose_(); });
+  d.querySelector('#dgClose').onclick = dgClose_;
+  d.querySelector('#dgBack').onclick = function(){ dgList_(); };
+  d.querySelector('#dgQ').addEventListener('input', function(){ DG.q = this.value.trim(); dgList_(); });
+}
+function dgClose_(){ if (DG.el) DG.el.hidden = true; }
+function openDogam(name){
+  dgBuild_();
+  DG.el.hidden = false;
+  var go = function(){ if (name) dgShow_(name); else dgList_(); };
+  if (DG.data){ go(); return; }
+  fetch('data/guide.json').then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if (!j){ DG.el.querySelector('#dgBody').innerHTML = '<p class="mtload">도감을 불러오지 못했습니다</p>'; return; }
+      DG.data = j; go();
+    })
+    .catch(function(){ DG.el.querySelector('#dgBody').innerHTML = '<p class="mtload">도감을 불러오지 못했습니다</p>'; });
+}
+function dgChips_(){
+  var c = DG.el.querySelector('#dgChips'), h = '';
+  var k = [['all','전체'],['haeru','해루질'],['fish','낚시']];
+  k.forEach(function(x){ h += '<button class="dgchip' + (DG.kind === x[0] ? ' on' : '') + '" data-k="' + x[0] + '">' + x[1] + '</button>'; });
+  h += '<button class="dgchip' + (DG.now ? ' on' : '') + '" data-now="1">지금 제철</button>';
+  DG_GROUPS.forEach(function(g){ h += '<button class="dgchip' + (DG.grp === g ? ' on' : '') + '" data-g="' + g + '">' + g + '</button>'; });
+  c.innerHTML = h;
+  c.onclick = function(e){
+    var b = e.target.closest ? e.target.closest('.dgchip') : null; if (!b) return;
+    if (b.dataset.k) DG.kind = b.dataset.k;
+    else if (b.dataset.now) DG.now = !DG.now;
+    else if (b.dataset.g) DG.grp = (DG.grp === b.dataset.g) ? '' : b.dataset.g;
+    dgList_();
+  };
+}
+function dgList_(){
+  DG.cur = null;
+  DG.el.querySelector('#dgBack').hidden = true;
+  DG.el.querySelector('#dgQ').hidden = false;
+  DG.el.querySelector('#dgChips').hidden = false;
+  dgChips_();
+  var mo = dgMonth_().mo - 1, q = DG.q;
+  var list = (DG.data || []).filter(function(x){
+    if (DG.kind === 'haeru' && x.k === 'fish') return false;
+    if (DG.kind === 'fish' && x.k === 'haeru') return false;
+    if (DG.grp && x.g !== DG.grp) return false;
+    if (DG.now && !(x.se && x.se[mo] >= 2)) return false;
+    if (q){
+      if (x.n.indexOf(q) < 0 && !(x.a || []).some(function(a){ return a.indexOf(q) >= 0; })) return false;
+    }
+    return true;
+  });
+  /* 지금 제철 → 등록 지점 많은 순 */
+  list.sort(function(a, b){
+    var sa = (a.se ? a.se[mo] : 0) >= 2 ? 1 : 0, sb = (b.se ? b.se[mo] : 0) >= 2 ? 1 : 0;
+    if (sa !== sb) return sb - sa;
+    return (b.sp || 0) - (a.sp || 0);
+  });
+  var body = DG.el.querySelector('#dgBody');
+  if (!list.length){ body.innerHTML = '<p class="dgempty">조건에 맞는 어종이 없습니다.</p>'; return; }
+  var h = '<div class="dglist">';
+  list.forEach(function(x){
+    var ban = dgInBan_(x.bb), pk = x.se && x.se[mo] >= 2;
+    var sub = (x.g || (x.k === 'fish' ? '낚시' : '해루질')) + (x.sp ? ' · ' + x.sp + '곳' : '');
+    h += '<button class="dgitem" type="button" data-n="' + dgEsc_(x.n) + '"><b>' + dgEsc_(x.n) + '</b><span>' + dgEsc_(sub) + '</span>'
+       + (ban ? '<i class="tg bn">금어기</i>' : (pk ? '<i class="tg pk">제철</i>' : '')) + '</button>';
+  });
+  h += '</div><p class="dgempty" style="padding:6px 0 16px">' + list.length + '종 · 누르면 특성·서식지·잡는 법이 나옵니다</p>';
+  body.innerHTML = h;
+  body.scrollTop = 0;
+  body.onclick = function(e){
+    var b = e.target.closest ? e.target.closest('.dgitem') : null; if (b) dgShow_(b.dataset.n);
+  };
+}
+function dgShow_(name){
+  var x = (DG.data || []).filter(function(o){ return o.n === name; })[0];
+  if (!x){ dgList_(); return; }
+  DG.cur = name;
+  DG.el.querySelector('#dgBack').hidden = false;
+  DG.el.querySelector('#dgQ').hidden = true;
+  DG.el.querySelector('#dgChips').hidden = true;
+  var mo = dgMonth_().mo - 1, E = dgEsc_;
+  var kindW = x.k === 'fish' ? '낚시 대상' : x.k === 'both' ? '해루질·낚시 대상' : '해루질 채집물';
+  var h = '<div class="dgdet"><h2>' + E(x.n) + '</h2>'
+        + '<p class="dgk">' + kindW + (x.g ? ' · ' + E(x.g) : '') + (x.sp ? ' · 전국 ' + x.sp + '곳에서 노릴 수 있음' : '') + '</p>'
+        + ((x.a && x.a.length) ? '<p class="dgal">다른 이름 ' + x.a.map(E).join(' · ') + '</p>' : '');
+  if (x.bn){
+    h += '<div class="dgban"><b>' + (dgInBan_(x.bb) ? '지금 금어기입니다' : '금어기 있음') + '</b> — ' + E(x.bn)
+       + (x.bz ? ' · 금지체장 ' + E(x.bz) + ' 미만은 놓아주세요' : '') + '</div>';
+  }
+  if (x.se){
+    h += '<h4>언제 잡히나</h4><div class="dgseason">';
+    for (var m = 0; m < 12; m++){
+      var v = x.se[m] || 0;
+      h += '<i class="l' + Math.min(3, v) + (m === mo ? ' now' : '') + '">' + (m + 1) + '</i>';
+    }
+    h += '</div>';
+  }
+  var rows = function(arr){
+    arr = arr.filter(function(r){ return r[1]; }); if (!arr.length) return '';
+    return '<dl>' + arr.map(function(r){ return '<dt>' + r[0] + '</dt><dd>' + E(r[1]) + '</dd>'; }).join('') + '</dl>';
+  };
+  var t1 = rows([['생김새', x.lk], ['크기', x.sz], ['생태', x.ec]]);
+  if (t1) h += '<h4>특성</h4>' + t1;
+  var t2 = rows([['서식지', x.hb], ['분포', x.ds]]);
+  if (t2) h += '<h4>서식지</h4>' + t2;
+  var hw = x.hw || {};
+  if ((hw.steps && hw.steps.length) || hw.spot || hw.gear){
+    h += '<h4>잡는 법' + (hw.way ? ' — ' + E(hw.way) : '') + '</h4>';
+    if (hw.steps && hw.steps.length) h += '<ol>' + hw.steps.map(function(t){ return '<li>' + E(t) + '</li>'; }).join('') + '</ol>';
+    var rg = x.rig || {};
+    h += rows([['자리 찾기', hw.spot], ['시간·물때', hw.time], ['준비물', (rg.t || []).join(' · ')],
+               ['채비·도구', hw.gear], ['미끼', rg.b], ['초보 실수', hw.miss], ['보관·손질', x.cr]]);
+  } else if (x.rig){
+    h += '<h4>준비물과 요령</h4>' + rows([['준비물', (x.rig.t || []).join(' · ')], ['미끼', x.rig.b], ['요령', x.rig.tip]]);
+  }
+  if (x.dg) h += '<div class="dgwarn"><b>주의</b> ' + E(x.dg) + '</div>';
+  else if (x.rig && x.rig.warn) h += '<div class="dgwarn"><b>주의</b> ' + E(x.rig.warn) + '</div>';
+  if (x.cf === '하') h += '<p class="dgk" style="margin-top:10px">지역마다 부르는 이름과 방법이 달라 확인을 더 하고 있는 어종입니다.</p>';
+  h += '<div class="dgacts"><button class="go" type="button" id="dgGo">' + E(x.n) + ' 노릴 자리 보기</button>'
+     + '<a class="more" href="species/' + encodeURIComponent(x.n) + '.html" target="_blank" rel="noopener">도감 쪽에서 크게 보기</a></div></div>';
+  var body = DG.el.querySelector('#dgBody');
+  body.innerHTML = h; body.scrollTop = 0; body.onclick = null;
+  body.querySelector('#dgGo').onclick = function(){
+    dgClose_();
+    if (dgInBan_(x.bb)){ toast(x.n + ' — 지금 금어기라 노릴 자리를 낼 수 없습니다', 3600); return; }
+    try { S.fmode = (x.k === 'fish') ? 'fish' : (x.k === 'haeru' ? 'haeru' : S.mode); } catch(e){}
+    pickWant(x.n);
+  };
+}
+(function(){
+  var b = $('btnDogam');
+  if (b) b.onclick = function(){ openDogam(); };
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Escape' || !DG.el || DG.el.hidden) return;
+    e.stopImmediatePropagation();
+    if (DG.cur) dgList_(); else dgClose_();
+  }, true);
+  /* ?dg=낙지 로 들어오면 그 어종 도감을 바로 연다, ?dg=1 이면 목록 */
+  try {
+    var m = /[?&]dg=([^&]+)/.exec(location.search || '');
+    if (m){ var v = decodeURIComponent(m[1]); setTimeout(function(){ openDogam(v === '1' ? null : v); }, 1200); }
+  } catch(e){}
 })();
 
 /* 주소에 ?mt=1 이 붙어 들어오면 열자마자 물때표를 띄운다 —
