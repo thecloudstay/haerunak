@@ -35,6 +35,10 @@ const verifyTags = () =>
   + (VERIFY.naver ? `<meta name="naver-site-verification" content="${VERIFY.naver}">\n` : '');
 
 /* ── 유틸 ── */
+// 받침 있으면 a, 없으면 b (한글이 아닌 끝 글자면 a(b))
+const josa = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1);
+  if (!(c >= 0xAC00 && c <= 0xD7A3)) return a + '(' + b + ')';
+  return (c - 0xAC00) % 28 ? a : b; };
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -419,7 +423,7 @@ ${p.fr[2] ? '· 차량 선적이 됩니다.' : '· 차는 두고 들어가야 �
 <section><h2>이 항로에 배를 가지고 계신가요</h2>
 <div class="joinbox jb-biz">
 <b>낚싯배·유어선·민박을 하시면 이 페이지에 올려드립니다</b>
-<p>${esc(p.n)}을 검색해서 들어온 사람에게 바로 보입니다. 등록은 무료이고, 예약이 성사된 것에만 수수료를 받습니다.</p>
+<p>${esc(p.n)}${josa(p.n, '을', '를')} 검색해서 들어온 사람에게 바로 보입니다. 등록은 무료이고, 예약이 성사된 것에만 수수료를 받습니다.</p>
 <a class="joinbox-a" href="../business/">업체 등록 안내 보기 →</a>
 </div></section>`;
   }
@@ -493,7 +497,7 @@ ${sp.w ? `<p class="warn sm">주의 — ${esc(sp.w)}</p>` : ''}
 <section><h2>이 자리 영상을 가지고 계신가요</h2>
 <div class="joinbox jb-ch">
 <b>유튜브·블로그 하시면 앱 첫 화면에 걸어드립니다</b>
-<p>${esc(p.n)}이 그날 원픽으로 뜰 때마다 그 영상이 자동으로 붙습니다. 노출료는 받지 않습니다.</p>
+<p>${esc(p.n)}${josa(p.n, '이', '가')} 그날 원픽으로 뜰 때마다 그 영상이 자동으로 붙습니다. 노출료는 받지 않습니다.</p>
 <a class="joinbox-a" href="../partner/">채널 제휴 안내 보기 →</a>
 </div>
 </section>
@@ -621,6 +625,27 @@ urls.unshift({ loc: `${SITE}/species/`, pri: '0.9' });
 urls.push({ loc: `${SITE}/method/`, pri: '0.8' });
 urls.push({ loc: `${SITE}/partner/`, pri: '0.7' });
 urls.push({ loc: `${SITE}/business/`, pri: '0.75' });
+urls.push({ loc: `${SITE}/calendar/`, pri: '0.75' });
+urls.push({ loc: `${SITE}/widget/`, pri: '0.6' });
+
+/* 손으로 만든 안내 쪽(계산 근거·채널 제휴·업체 등록·물때달력·물때 위젯)에도 공유 그림을 붙인다 — 2026-10-14, 위젯 2026-10-15 */
+['method','partner','business','calendar','widget'].forEach(dir => {
+  const f = path.join(OUT, dir, 'index.html');
+  if (!fs.existsSync(f)) return;
+  const h = fs.readFileSync(f, 'utf8');
+  if (h.includes('og:image') || !h.includes('</head>')) return;
+  const t = (h.match(/<title>([^<]*)<\/title>/) || [])[1] || '해루낚';
+  const d = (h.match(/<meta name="description" content="([^"]*)"/) || [])[1] || '';
+  const tag = [
+    h.includes('og:type') ? '' : '<meta property="og:type" content="website">',
+    h.includes('og:title') ? '' : `<meta property="og:title" content="${t}">`,
+    h.includes('og:description') || !d ? '' : `<meta property="og:description" content="${d}">`,
+    h.includes('og:url') ? '' : `<meta property="og:url" content="${SITE}/${dir}/">`,
+    '<meta property="og:image" content="https://haerunak.com/og.png">',
+    '<meta name="twitter:card" content="summary_large_image">'
+  ].filter(Boolean).join('\n');
+  fs.writeFileSync(f, h.replace('</head>', tag + '\n</head>'));
+});
 urls.unshift({ loc: `${SITE}/`, pri: '1.0' });
 
 /* 사이트맵 */
@@ -635,22 +660,28 @@ fs.writeFileSync(path.join(OUT,'robots.txt'),
 
 User-agent: *
 Allow: /
+# 앱스 스크립트 원본(gas/)은 사람이 볼 쪽이 아니다 — 2026-10-15
+Disallow: /gas/
 
 # 네이버 검색로봇 — 명시해야 잘 수집한다
 User-agent: Yeti
 Allow: /
+Disallow: /gas/
 
 # 구글
 User-agent: Googlebot
 Allow: /
+Disallow: /gas/
 
 # 다음
 User-agent: Daumoa
 Allow: /
+Disallow: /gas/
 
 # 빙
 User-agent: bingbot
 Allow: /
+Disallow: /gas/
 
 Sitemap: ${SITE}/sitemap.xml
 `);
