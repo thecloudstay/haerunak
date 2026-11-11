@@ -8152,17 +8152,24 @@ function tickFromCatch_(c){
   return { tag:'위판', cls:'t-gi', text: t + ' — 그 앞바다가 살아 있습니다', i: null };
 }
 
+/* 속보 줄은 3주 지난 항목을 스스로 뺀다 — 손이 안 가도 옛 소식이 「속보」로 남지 않게(2026-11-11) */
+function feedFresh_(r){
+  if (!r || !r.일) return true;
+  var t = Date.parse(r.일); if (isNaN(t)) return true;
+  return (Date.now() - t) <= 21 * 86400000;
+}
 function tickerPool_(){
   var pool = [];
   if (FEED && FEED.제보) FEED.제보.forEach(function(r){
-    if (r && r.글) pool.push({ tag:'제보', cls:'t-bo',
+    if (r && r.글 && feedFresh_(r)) pool.push({ tag:'제보', cls:'t-bo',
       text: (r.지점 ? r.지점 + ' · ' : '') + r.글, i: r.번호 || null });
   });
   if (FEED && FEED.위판) FEED.위판.forEach(function(c){
+    if (!feedFresh_(c)) return;
     var t = tickFromCatch_(c); if (t) pool.push(t);
   });
   if (FEED && FEED.기사) FEED.기사.forEach(function(a){
-    if (a && a.제목) pool.push({ tag:'기사', cls:'t-gi',
+    if (a && a.제목 && feedFresh_(a)) pool.push({ tag:'기사', cls:'t-gi',
       text: '「' + a.제목 + '」' + (a.출처 ? ' — ' + a.출처 : ''),
       i: a.번호 || null, url: a.url || null });
   });
