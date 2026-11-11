@@ -2,21 +2,27 @@
 
 User-agent: *
 Allow: /
+# 앱스 스크립트 원본(gas/)은 사람이 볼 쪽이 아니다 — 2026-10-15
+Disallow: /gas/
 
 # 네이버 검색로봇 — 명시해야 잘 수집한다
 User-agent: Yeti
 Allow: /
+Disallow: /gas/
 
 # 구글
 User-agent: Googlebot
 Allow: /
+Disallow: /gas/
 
 # 다음
 User-agent: Daumoa
 Allow: /
+Disallow: /gas/
 
 # 빙
 User-agent: bingbot
 Allow: /
+Disallow: /gas/
 
 Sitemap: https://haerunak.com/sitemap.xml
