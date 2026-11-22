@@ -224,3 +224,11 @@ section p strong{color:var(--acc)}
 .howto .steps li::before{counter-increment:st;content:counter(st);position:absolute;left:12px;top:10px;
   width:22px;height:22px;border-radius:50%;background:rgba(46,230,168,.16);color:var(--acc);
   font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+/* 2026-11-22 지점 쪽 앞으로 7일 물때 */
+.tide7{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;min-width:440px}
+.tide7 th{text-align:left;font-size:12.5px;font-weight:700;color:var(--mut2);padding:8px 8px;border-bottom:1px solid var(--line2)}
+.tide7 td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.6}
+.tide7 td small{color:var(--mut2);font-size:12px}
+.tide7 tr.good td{background:rgba(46,230,168,.07)}
+.tide7 tr.good td:last-child small{color:var(--acc);font-weight:700}
