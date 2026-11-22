@@ -54,15 +54,23 @@ jobs:
       - name: 이웃끼리 맞춰 보고 이상한 지점 알리기
         run: node scripts/check-tide.js
 
+      # 2026-11-22 지점 쪽에 앞으로 7일 물때를 싣는다 — 새벽 회차에서 사이트를 다시 만들어 날짜를 하루씩 민다
+      - name: 지점 쪽 7일 물때 다시 만들기(새벽 회차)
+        if: github.event.schedule == '30 19 * * *' || github.event_name == 'workflow_dispatch'
+        run: bash src/build.sh
+
       - name: 바뀌었으면 저장
         run: |
-          if [ -n "$(git status --porcelain data/tide data/tide-points.json)" ]; then
+          if [ -n "$(git status --porcelain -- . ':!src')" ]; then
             git config user.name  "haerunak-bot"
             git config user.email "bot@haerunak.com"
-            git add -A data/tide data/tide-points.json
+            git add -A -- . ':!src'
             git commit -m "물때 자료 갱신 $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git pull --rebase --autostash origin main || true
-            git push
+            for i in 1 2 3 4 5; do
+              if git pull --rebase --autostash origin main && git push; then exit 0; fi
+              git rebase --abort 2>/dev/null || true; sleep $((i * 6))
+            done
+            exit 1
           else
             echo "바뀐 것 없음"
           fi

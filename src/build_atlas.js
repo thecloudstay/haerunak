@@ -386,6 +386,74 @@ ${s.ban.note ? `<p class="note">${esc(s.ban.note)}</p>` : ''}
 }
 
 /* ══════════ 지점 페이지 ══════════ */
+/* ── 앞으로 7일 물때 (2026-11-22 대표 승인) ──
+   맨 위에 「매일 바뀌는 값은 넣지 않는다」고 적었지만, 9~10월 구글 노출을 보면 물때표를 실은 지역 물때 쪽이 가장 많이 나왔고
+   물때 없이 「앱에서 확인하세요」로 넘기던 지점 쪽은 10월 초 색인에서 대거 빠졌다. 검색한 사람이 찾는 답(간조 시각)을 쪽 안에 둔다.
+   숫자는 앱과 같은 출처 — 국립해양조사원 예보 캐시(data/tide/날짜.json), 같은 관측소 고르기(build_standalone.js 의 TIDE_FIX·30km 안 가까운 순).
+   자료가 없는 날은 칸을 비운다(자체 계산으로 채우지 않는다). 매일 아침 물때 자료가 갱신될 때 다시 만든다(tide.yml). */
+const TIDE7 = (function(){
+  try {
+    const rd = f => JSON.parse(fs.readFileSync(path.join(OUT, 'data', f), 'utf8'));
+    const st = (rd('tide-stations.json').stations || []).concat(rd('tide-points.json').points || []);
+    const seen = {}, ST = [];
+    st.forEach(x => { if (x && x.code && !seen[x.code] && isFinite(x.la) && isFinite(x.lo)) { seen[x.code] = 1; ST.push(x); } });
+    let FIX = {};
+    const src = fs.readFileSync('build_standalone.js', 'utf8').match(/var TIDE_FIX = (\{[\s\S]*?\n\});/);
+    if (src) FIX = Function('return ' + src[1])();
+    const eng = fs.readFileSync('tide_engine.js', 'utf8');
+    const MT = Function(eng + '\nreturn { moonAge_: moonAge_, multtae_: multtae_, REC_SET: REC_SET };')();
+    const now = new Date(Date.now() + 9 * 36e5), days = [];
+    for (let k = 0; k < 7; k++) {
+      const d = new Date(now.getTime() + k * 864e5), ds = d.toISOString().slice(0, 10);
+      let j = null; try { j = rd(path.join('tide', ds + '.json')); } catch (e) {}
+      days.push({ ds: ds, y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate(), w: '일월화수목금토'[d.getUTCDay()], j: j });
+    }
+    return { ST: ST, FIX: FIX, MT: MT, days: days };
+  } catch (e) { console.log('7일 물때 자료 없음:', e.message); return null; }
+})();
+function tideKm(a, b, c, d){ const r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r;
+  const h = Math.sin(x / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(y / 2) ** 2; return 2 * 6371 * Math.asin(Math.sqrt(h)); }
+const hm = t => { let m = Math.round(t * 60); m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+function tide7(p){
+  if (!TIDE7 || !p.la) return '';
+  const T = TIDE7, fix = T.FIX[p.i], fc = fix && (fix.c || fix), dt = (fix && fix.dt) || 0;
+  const cands = T.ST.map(s => ({ s: s, d: tideKm(p.la, p.lo, s.la, s.lo) })).filter(x => x.d <= 30).sort((a, b) => a.d - b.d).slice(0, 6).map(x => x.s);
+  if (fc) { const f = T.ST.filter(s => s.code === fc)[0]; if (f) cands.unshift(f); }
+  if (!cands.length) return '';
+  let used = null;
+  const rows = T.days.map(D => {
+    const mt = T.MT.multtae_(T.MT.moonAge_(D.y, D.m, D.d), p.seaCode);
+    let ev = null, sname = '';
+    if (D.j) for (const s of cands) { if (D.j[s.code] && D.j[s.code].length) { ev = D.j[s.code]; sname = s.name; break; } }
+    if (!ev) return { D: D, mt: mt, ev: null };
+    if (!used) used = sname;
+    ev = ev.map(x => ({ k: x.k, t: x.t + dt / 60, lv: x.lv }));
+    const L = ev.filter(x => x.k === 'L'), H = ev.filter(x => x.k === 'H');
+    const rg = H.length && L.length ? (Math.max.apply(null, H.map(x => x.lv)) - Math.min.apply(null, L.map(x => x.lv))) / 100 : null;
+    return { D: D, mt: mt, L: L, H: H, rg: rg, ev: ev };
+  });
+  const ok = rows.filter(r => r.ev);
+  if (ok.length < 3) return '';
+  // 해루질은 해 있는 동안(6~18시) 간조가 있고 물이 많이 빠지는 날 — 7일 가운데 조차가 큰 쪽 셋, 단 낮 간조가 있는 날만
+  const day = r => r.L.some(x => x.t >= 6 && x.t <= 18);
+  const best = ok.filter(day).sort((a, b) => (b.rg || 0) - (a.rg || 0)).slice(0, 2).map(r => r.D.ds);
+  const tr = rows.map(r => {
+    const lab = `${r.D.m}/${r.D.d} (${r.D.w})`;
+    if (!r.ev) return `<tr><td>${lab}</td><td>${esc(r.mt.name)}</td><td colspan="3" class="cap">예보 자료 없음</td></tr>`;
+    const good = best.indexOf(r.D.ds) > -1;
+    return `<tr${good ? ' class="good"' : ''}><td>${lab}</td><td>${esc(r.mt.name)}</td>`
+      + `<td>${r.L.map(x => `<b>${hm(x.t)}</b> <small>${x.lv}cm</small>`).join('<br>') || '-'}</td>`
+      + `<td>${r.H.map(x => `${hm(x.t)} <small>${x.lv}cm</small>`).join('<br>') || '-'}</td>`
+      + `<td>${r.rg != null ? r.rg.toFixed(1) + 'm' : '-'}${good ? '<br><small>해루질 좋음</small>' : ''}</td></tr>`;
+  }).join('');
+  const bw = best.map(ds => { const r = ok.filter(x => x.D.ds === ds)[0], l = r.L.filter(x => x.t >= 6 && x.t <= 18)[0];
+    return `${r.D.m}월 ${r.D.d}일(${r.D.w}) 간조 ${hm(l.t)}`; });
+  return `<section><h2>${esc(p.n)} 앞으로 7일 물때</h2>
+${bw.length ? `<p>이번 주 해루질은 <strong>${bw.join(', ')}</strong> 앞뒤 두 시간이 좋습니다. 낮에 물이 가장 많이 빠지는 날입니다.</p>` : ''}
+<div style="overflow-x:auto"><table class="tide7"><thead><tr><th>날짜</th><th>물때</th><th>간조 (물 빠짐)</th><th>만조</th><th>조차</th></tr></thead><tbody>${tr}</tbody></table></div>
+<p class="cap">국립해양조사원 조석 예보 · ${esc(used || '')} 기준${dt ? ` (${dt > 0 ? dt + '분 늦게' : -dt + '분 일찍'} 맞춤)` : ''} · ${T.days[0].ds} 갱신. 수위는 기본수준면 기준이며 바람·기압에 따라 달라집니다.</p></section>`;
+}
+
 function spotPage(p){
   const all = p.haeru.concat(p.fish.filter(x => p.haeru.indexOf(x) < 0));
   const desc = `${p.n}(${p.r}) — ${p.sea} ${p.floor} 지형. `
@@ -468,6 +536,8 @@ ${sp.w ? `<p class="warn sm">주의 — ${esc(sp.w)}</p>` : ''}
 </div>`).join('')}</div></section>`;
   }
 
+  body += tide7(p);
+
   // 조차가 말해주는 것
   if (p.mr){
     const mrWord = p.mr >= 7 ? '전국에서도 손꼽히게 큰 편입니다. 물이 멀리까지 빠지는 대신 들어올 때도 빠릅니다.'
@@ -477,7 +547,7 @@ ${sp.w ? `<p class="warn sm">주의 — ${esc(sp.w)}</p>` : ''}
       : '거의 없습니다. 해루질보다 낚시 쪽입니다.';
     body += `<section><h2>물이 얼마나 빠지나</h2>
 <p>평균 조차 <strong>${p.mr}m</strong>. ${mrWord}</p>
-<p class="cap">사리 때는 이보다 더 빠지고 조금 때는 덜 빠집니다. 그날 실제 조차와 간조 시각은 앱에서 확인하세요.</p></section>`;
+<p class="cap">사리 때는 이보다 더 빠지고 조금 때는 덜 빠집니다.</p></section>`;
   }
 
   // 인근 지점 — 헛걸음했을 때 대안
